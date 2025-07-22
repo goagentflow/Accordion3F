@@ -125,56 +125,69 @@ const TimelineBuilder = () => {
         const newCalculatedStartDates = {};
         const newDateErrors = [];
         const allStartDates = [];
+        const allTasks = [];
 
         // Calculate for each selected asset
         selectedAssets.forEach(assetName => {
-    // Determine the correct live date without the incorrect fallback
-    const liveDate = useGlobalDate ? globalLiveDate : assetLiveDates[assetName];
-    
-    // If no date is available for this asset, skip it
-    if (!liveDate) return;
-
-            // Get tasks for this asset
             const assetTasks = csvData.filter(row => row['Asset Type'] === assetName);
-            
             if (assetTasks.length === 0) return;
 
-            // Work backwards through tasks sequentially
+            // Get the correct live date for this asset
+            const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
+            if (!liveDate) return;
+
+            // We'll build the tasks in reverse (from go-live backwards)
             let currentEndDate = new Date(liveDate);
-            
-            // Process tasks in reverse order (last task ends on live date)
+            const ganttTasks = [];
+            let taskIndex = 0;
+
+            // Go-live task (single day)
+            ganttTasks.unshift({
+                id: `task-${taskIndex}`,
+                name: `${assetName}: Go-Live`,
+                start: liveDate.toISOString().split('T')[0],
+                end: liveDate.toISOString().split('T')[0],
+                progress: 0,
+            });
+            taskIndex++;
+
+            // Process all other tasks in reverse order
             for (let i = assetTasks.length - 1; i >= 0; i--) {
-                const task = assetTasks[i];
-                const duration = parseInt(task['Duration (Days)'], 10) || 1;
-                
-                // Calculate when this task must start
+                const taskInfo = assetTasks[i];
+                const duration = parseInt(taskInfo['Duration (Days)'], 10) || 1;
+                // Subtract working days to get the start date
                 const taskStartDate = subtractWorkingDays(currentEndDate, duration);
-                
-                // Next task ends the working day before this task starts
-                currentEndDate = new Date(taskStartDate);
-                currentEndDate.setDate(currentEndDate.getDate() - 1);
-                
+                // Task ends the working day before currentEndDate
+                const taskEndDate = new Date(currentEndDate);
+                taskEndDate.setDate(taskEndDate.getDate() - 1);
                 // Ensure end date is a working day
-                if (isWeekend(currentEndDate)) {
-                    currentEndDate = getPreviousWorkingDay(currentEndDate);
+                let finalTaskEndDate = new Date(taskEndDate);
+                if (isWeekend(finalTaskEndDate)) {
+                    finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
                 }
+                ganttTasks.unshift({
+                    id: `task-${taskIndex}`,
+                    name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
+                    start: taskStartDate.toISOString().split('T')[0],
+                    end: finalTaskEndDate.toISOString().split('T')[0],
+                    progress: 0,
+                });
+                taskIndex++;
+                // Update currentEndDate for the next task
+                currentEndDate = new Date(taskStartDate);
             }
-            
-            // The project start date is the day after the last calculated end date
-            let calculatedStart = new Date(currentEndDate);
-            calculatedStart.setDate(calculatedStart.getDate() + 1);
-            
-            // Ensure start date is a working day
-            if (isWeekend(calculatedStart)) {
-                calculatedStart = getNextWorkingDay(calculatedStart);
+
+            // Add all tasks for this asset to the main list
+            allTasks.push(...ganttTasks);
+
+            // Set the calculated start date for this asset to the start date of the first (earliest) task
+            if (ganttTasks.length > 0 && ganttTasks[0].start) {
+                newCalculatedStartDates[assetName] = ganttTasks[0].start;
+                allStartDates.push(new Date(ganttTasks[0].start));
             }
-            
-            const calculatedStartDate = calculatedStart.toISOString().split('T')[0];
-            newCalculatedStartDates[assetName] = calculatedStartDate;
-            allStartDates.push(new Date(calculatedStartDate));
-            
+
             // Check if start date is before today
-            if (calculatedStart < today) {
+            if (ganttTasks.length > 0 && new Date(ganttTasks[0].start) < today) {
                 newDateErrors.push(assetName);
             }
         });
@@ -185,12 +198,9 @@ const TimelineBuilder = () => {
             setProjectStartDate(earliestDate.toISOString().split('T')[0]);
         }
 
+        setTimelineTasks(allTasks);
         setCalculatedStartDates(newCalculatedStartDates);
         setDateErrors(newDateErrors);
-
-        // Generate timeline tasks for display
-        generateTimelineTasks(newCalculatedStartDates);
-
     }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData]);
 // This new useEffect pre-populates individual dates when switching from global mode
     useEffect(() => {
