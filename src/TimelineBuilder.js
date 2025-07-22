@@ -233,14 +233,15 @@ const TimelineBuilder = () => {
 
             assetTasks.forEach((taskInfo, idx) => {
                 const duration = parseInt(taskInfo['Duration (Days)'], 10) || 1;
-                const taskStart = new Date(currentStartDate);
+                let taskStart, taskEnd;
 
-                // If this is the last task, force the end date to the live date
-                let taskEnd;
                 if (idx === assetTasks.length - 1) {
-                    // Use the correct live date (global or asset-specific)
-                    taskEnd = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
+                    // Last task: set both start and end to the live date
+                    const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
+                    taskStart = new Date(liveDate);
+                    taskEnd = new Date(liveDate);
                 } else {
+                    taskStart = new Date(currentStartDate);
                     taskEnd = addWorkingDays(taskStart, duration);
                 }
 
