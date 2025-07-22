@@ -104,7 +104,7 @@ const GanttChart = ({ tasks }) => {
                return (
                  <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
                    <div 
-  className="sticky left-0 z-30 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-gray-50 flex items-center" 
+  className="sticky left-0 z-50 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-white flex items-center"
   style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}
 >
                      <div className="font-medium text-gray-800 text-sm leading-tight whitespace-normal">{task.name}</div>
