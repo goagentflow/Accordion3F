@@ -270,15 +270,7 @@ const TimelineBuilder = () => {
 
             // Add all tasks for this asset to the main list
             allTasks.push(...ganttTasks);
-
-            // Set calculatedStartDates for AssetSelector (start of the first real task)
-            if (ganttTasks.length > 1) {
-                newCalculatedStartDates[assetName] = ganttTasks[1].start;
-            } else {
-                newCalculatedStartDates[assetName] = ganttTasks[0].start;
-            }
         });
-        setCalculatedStartDates(newCalculatedStartDates);
 
         setTimelineTasks(allTasks);
     };
