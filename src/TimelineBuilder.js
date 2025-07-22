@@ -67,19 +67,27 @@ const TimelineBuilder = () => {
 
     // Helper function to add working days (forward calculation for display)
     const addWorkingDays = (startDate, workingDaysToAdd) => {
-        let currentDate = new Date(startDate);
-        let remainingDays = workingDaysToAdd - 1; // -1 because start date counts as day 1
-        
-        // Add working days
-        while (remainingDays > 0) {
-            currentDate.setDate(currentDate.getDate() + 1);
-            if (!isWeekend(currentDate)) {
-                remainingDays--;
-            }
+    if (workingDaysToAdd <= 0) {
+        return new Date(startDate);
+    }
+
+    let currentDate = new Date(startDate);
+    let remainingDays = workingDaysToAdd -1;
+
+    while (remainingDays > 0) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        if (!isWeekend(currentDate)) {
+            remainingDays--;
         }
-        
-        return currentDate;
-    };
+    }
+
+    // Ensure the final day is a working day
+    while (isWeekend(currentDate)) {
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return currentDate;
+};
 
     // Load CSV data
     useEffect(() => {
