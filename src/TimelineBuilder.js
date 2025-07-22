@@ -270,9 +270,13 @@ const TimelineBuilder = () => {
 
             // Add all tasks for this asset to the main list
             allTasks.push(...ganttTasks);
-        });
 
-        setTimelineTasks(allTasks);
+            // Set the calculated start date for this asset to the start date of the first (earliest) task
+            if (ganttTasks.length > 0) {
+                newCalculatedStartDates[assetName] = ganttTasks[0].start;
+            }
+        });
+        setCalculatedStartDates(newCalculatedStartDates);
     };
 
     const handleAssetToggle = (asset) => {
