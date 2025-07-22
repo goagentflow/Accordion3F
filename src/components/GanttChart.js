@@ -77,55 +77,56 @@ const GanttChart = ({ tasks }) => {
         </p>
       </div>
 
-      {/* Main Container */}
-      <div className="border border-gray-300 rounded-lg" style={{ maxHeight: '75vh' }}>
-        {/* Sticky Header OUTSIDE the scrollable area */}
-        <div className="flex sticky top-0 z-30 bg-white" style={{ height: `${HEADER_HEIGHT}px` }}>
-          <div className="sticky left-0 z-10 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-gray-50 flex items-center" style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}>
-            Task Name
-          </div>
-          {dateColumns.map((date, index) => (
-            <div key={index} className="p-1 text-xs text-center border-b border-r border-gray-200 flex flex-col justify-center" style={{ width: `${DAY_COLUMN_WIDTH}px`, minWidth: `${DAY_COLUMN_WIDTH}px` }}>
-              <div className="font-medium">{date.getDate()}</div>
-              <div className="text-gray-500">{date.toLocaleDateString('en', { month: 'short' })}</div>
-            </div>
-          ))}
-        </div>
-        {/* Scrollable Task Rows */}
-        <div className="overflow-auto" style={{ maxHeight: `calc(75vh - ${HEADER_HEIGHT}px)` }}>
-          <div className="relative">
-            {tasks.map((task) => {
-              const taskStart = new Date(task.start);
-              const taskEnd = new Date(task.end);
-              const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
-              const durationDays = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
-              const durationText = durationDays;
-              return (
-                <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
-                  <div 
-                    className="sticky left-0 z-40 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-white flex items-center"
-                    style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}
-                  >
-                    <div className="font-medium text-gray-800 text-sm leading-tight whitespace-normal">{task.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{durationText} day{durationText !== 1 ? 's' : ''}</div>
-                  </div>
-                  <div className="relative border-b border-gray-200" style={{ width: `${dateColumns.length * DAY_COLUMN_WIDTH}px` }}>
-                    <div className="flex h-full">
-                      {dateColumns.map((_, colIndex) => (
-                        <div key={colIndex} className="border-r border-gray-200" style={{ width: `${DAY_COLUMN_WIDTH}px`, minWidth: `${DAY_COLUMN_WIDTH}px` }} />
-                      ))}
-                    </div>
-                    <div className="absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2"
-                      style={{ left: `${startOffsetDays * DAY_COLUMN_WIDTH}px`, width: `${durationDays * DAY_COLUMN_WIDTH}px` }}>
-                      <span className="text-white text-xs font-medium truncate">{task.name}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Main Scrollable Container */}
+      {/* ... (The Gantt chart display JSX remains the same) ... */}
+      <div className="overflow-auto border border-gray-300 rounded-lg" style={{ maxHeight: '75vh' }}>
+         <div className="relative">
+           {/* STICKY HEADER */}
+           <div className="flex sticky top-0 z-30 bg-white" style={{ height: `${HEADER_HEIGHT}px` }}>
+             <div className="sticky left-0 z-10 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-gray-50 flex items-center" style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}>
+               Task Name
+             </div>
+             {dateColumns.map((date, index) => (
+               <div key={index} className="p-1 text-xs text-center border-b border-r border-gray-200 flex flex-col justify-center" style={{ width: `${DAY_COLUMN_WIDTH}px`, minWidth: `${DAY_COLUMN_WIDTH}px` }}>
+                 <div className="font-medium">{date.getDate()}</div>
+                 <div className="text-gray-500">{date.toLocaleDateString('en', { month: 'short' })}</div>
+               </div>
+             ))}
+           </div>
+           {/* TASK ROWS */}
+           <div>
+             {tasks.map((task) => {
+               const taskStart = new Date(task.start);
+               const taskEnd = new Date(task.end);
+               const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
+               const durationDays = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
+               const durationText = durationDays;
+               return (
+                 <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
+                   <div 
+  className="sticky left-0 z-40 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-white flex items-center"
+  style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}
+>
+                     <div className="font-medium text-gray-800 text-sm leading-tight whitespace-normal">{task.name}</div>
+                     <div className="text-xs text-gray-500 mt-1">{durationText} day{durationText !== 1 ? 's' : ''}</div>
+                   </div>
+                   <div className="relative border-b border-gray-200" style={{ width: `${dateColumns.length * DAY_COLUMN_WIDTH}px` }}>
+                     <div className="flex h-full">
+                       {dateColumns.map((_, colIndex) => (
+                         <div key={colIndex} className="border-r border-gray-200" style={{ width: `${DAY_COLUMN_WIDTH}px`, minWidth: `${DAY_COLUMN_WIDTH}px` }} />
+                       ))}
+                     </div>
+                     <div className="absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2"
+                       style={{ left: `${startOffsetDays * DAY_COLUMN_WIDTH}px`, width: `${durationDays * DAY_COLUMN_WIDTH}px` }}>
+                       <span className="text-white text-xs font-medium truncate">{task.name}</span>
+                     </div>
+                   </div>
+                 </div>
+               );
+             })}
+           </div>
+         </div>
+       </div>
 
       {/* Export Options */}
       <div className="mt-6 p-4 border-t border-gray-200">
