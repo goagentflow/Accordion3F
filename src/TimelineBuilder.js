@@ -220,71 +220,56 @@ const TimelineBuilder = () => {
         let taskIndex = 0;
 
         selectedAssets.forEach(assetName => {
-            const startDate = startDates[assetName];
-            if (!startDate) return;
-
             const assetTasks = csvData.filter(row => row['Asset Type'] === assetName);
-            let currentStartDate = new Date(startDate);
+            if (assetTasks.length === 0) return;
 
-            // Ensure project starts on working day
-            if (isWeekend(currentStartDate)) {
-                currentStartDate = getNextWorkingDay(currentStartDate);
-            }
+            // Get the correct live date for this asset
+            const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
+            if (!liveDate) return;
 
-            // We'll collect all but the last task first
-            for (let idx = 0; idx < assetTasks.length; idx++) {
-                const taskInfo = assetTasks[idx];
+            // We'll build the tasks in reverse (from go-live backwards)
+            let currentEndDate = new Date(liveDate);
+            const ganttTasks = [];
+            let taskIndex = 0;
+
+            // Go-live task (single day)
+            ganttTasks.unshift({
+                id: `task-${taskIndex}`,
+                name: `${assetName}: Go-Live`,
+                start: liveDate.toISOString().split('T')[0],
+                end: liveDate.toISOString().split('T')[0],
+                progress: 0,
+            });
+            taskIndex++;
+
+            // Process all other tasks in reverse order
+            for (let i = assetTasks.length - 1; i >= 0; i--) {
+                const taskInfo = assetTasks[i];
                 const duration = parseInt(taskInfo['Duration (Days)'], 10) || 1;
-                let taskStart, taskEnd;
-
-                // If this is the last real task (not the go-live task)
-                if (idx === assetTasks.length - 1) {
-                    // The last real task should end on the last working day before the live date
-                    const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
-                    const lastWorkingDay = getPreviousWorkingDay(liveDate);
-                    taskStart = new Date(currentStartDate);
-                    taskEnd = new Date(lastWorkingDay);
-
-                    // Add the last real task
-                    allTasks.push({
-                        id: `task-${taskIndex}`,
-                        name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
-                        start: taskStart.toISOString().split('T')[0],
-                        end: taskEnd.toISOString().split('T')[0],
-                        progress: 0,
-                    });
-                    taskIndex++;
-
-                    // Now add the go-live task as a single day
-                    allTasks.push({
-                        id: `task-${taskIndex}`,
-                        name: `${taskInfo['Asset Type']}: Go-Live`,
-                        start: liveDate.toISOString().split('T')[0],
-                        end: liveDate.toISOString().split('T')[0],
-                        progress: 0,
-                    });
-                    taskIndex++;
-                } else {
-                    // Normal task logic
-                    taskStart = new Date(currentStartDate);
-                    taskEnd = addWorkingDays(taskStart, duration);
-                    allTasks.push({
-                        id: `task-${taskIndex}`,
-                        name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
-                        start: taskStart.toISOString().split('T')[0],
-                        end: taskEnd.toISOString().split('T')[0],
-                        progress: 0,
-                    });
-                    taskIndex++;
-                    // Move to next start date (day after current task ends)
-                    currentStartDate = new Date(taskEnd);
-                    currentStartDate.setDate(taskEnd.getDate() + 1);
-                    // Ensure next start date is working day
-                    if (isWeekend(currentStartDate)) {
-                        currentStartDate = getNextWorkingDay(currentStartDate);
-                    }
+                // Subtract working days to get the start date
+                const taskStartDate = subtractWorkingDays(currentEndDate, duration);
+                // Task ends the working day before currentEndDate
+                const taskEndDate = new Date(currentEndDate);
+                taskEndDate.setDate(taskEndDate.getDate() - 1);
+                // Ensure end date is a working day
+                let finalTaskEndDate = new Date(taskEndDate);
+                if (isWeekend(finalTaskEndDate)) {
+                    finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
                 }
+                ganttTasks.unshift({
+                    id: `task-${taskIndex}`,
+                    name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
+                    start: taskStartDate.toISOString().split('T')[0],
+                    end: finalTaskEndDate.toISOString().split('T')[0],
+                    progress: 0,
+                });
+                taskIndex++;
+                // Update currentEndDate for the next task
+                currentEndDate = new Date(taskStartDate);
             }
+
+            // Add all tasks for this asset to the main list
+            allTasks.push(...ganttTasks);
         });
 
         setTimelineTasks(allTasks);

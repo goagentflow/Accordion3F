@@ -82,7 +82,7 @@ const GanttChart = ({ tasks }) => {
       <div className="overflow-auto border border-gray-300 rounded-lg" style={{ maxHeight: '75vh' }}>
          <div className="relative">
            {/* STICKY HEADER */}
-           <div className="flex sticky top-0 z-20 bg-gray-100" style={{ height: `${HEADER_HEIGHT}px` }}>
+           <div className="flex sticky top-0 z-30 bg-white" style={{ height: `${HEADER_HEIGHT}px` }}>
              <div className="sticky left-0 z-10 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-gray-50 flex items-center" style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}>
                Task Name
              </div>
@@ -94,7 +94,7 @@ const GanttChart = ({ tasks }) => {
              ))}
            </div>
            {/* TASK ROWS */}
-           <div style={{ marginTop: `${HEADER_HEIGHT}px` }}>
+           <div>
              {tasks.map((task) => {
                const taskStart = new Date(task.start);
                const taskEnd = new Date(task.end);
@@ -104,7 +104,7 @@ const GanttChart = ({ tasks }) => {
                return (
                  <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
                    <div 
-  className="sticky left-0 z-50 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-white flex items-center"
+  className="sticky left-0 z-40 p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-white flex items-center"
   style={{ width: `${TASK_NAME_WIDTH}px`, minWidth: `${TASK_NAME_WIDTH}px` }}
 >
                      <div className="font-medium text-gray-800 text-sm leading-tight whitespace-normal">{task.name}</div>
