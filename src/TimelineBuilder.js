@@ -134,7 +134,7 @@ const TimelineBuilder = () => {
 
             // Get the correct live date for this asset
             const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
-            if (!liveDate) return;
+            if (isNaN(liveDate.getTime())) return;
 
             // We'll build the tasks in reverse (from go-live backwards)
             let currentEndDate = new Date(liveDate);
@@ -235,7 +235,7 @@ const TimelineBuilder = () => {
 
             // Get the correct live date for this asset
             const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
-            if (!liveDate) return;
+            if (isNaN(liveDate.getTime())) return;
 
             // We'll build the tasks in reverse (from go-live backwards)
             let currentEndDate = new Date(liveDate);
