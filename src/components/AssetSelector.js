@@ -20,8 +20,9 @@ const AssetSelector = ({
 
     // Format date for display
     const formatDate = (dateString) => {
-        if (!dateString) return '';
+        if (!dateString) return 'N/A';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'N/A';
         return date.toLocaleDateString('en-GB', {
             weekday: 'short',
             month: 'short',

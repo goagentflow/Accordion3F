@@ -272,7 +272,7 @@ const TimelineBuilder = () => {
             allTasks.push(...ganttTasks);
 
             // Set the calculated start date for this asset to the start date of the first (earliest) task
-            if (ganttTasks.length > 0) {
+            if (ganttTasks.length > 0 && ganttTasks[0].start) {
                 newCalculatedStartDates[assetName] = ganttTasks[0].start;
             }
         });
