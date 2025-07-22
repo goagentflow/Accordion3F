@@ -94,7 +94,7 @@ const GanttChart = ({ tasks }) => {
              ))}
            </div>
            {/* TASK ROWS */}
-           <div>
+           <div style={{ marginTop: `${HEADER_HEIGHT}px` }}>
              {tasks.map((task) => {
                const taskStart = new Date(task.start);
                const taskEnd = new Date(task.end);
