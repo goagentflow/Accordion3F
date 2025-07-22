@@ -231,12 +231,19 @@ const TimelineBuilder = () => {
                 currentStartDate = getNextWorkingDay(currentStartDate);
             }
 
-            assetTasks.forEach(taskInfo => {
+            assetTasks.forEach((taskInfo, idx) => {
                 const duration = parseInt(taskInfo['Duration (Days)'], 10) || 1;
-                
                 const taskStart = new Date(currentStartDate);
-                const taskEnd = addWorkingDays(taskStart, duration);
-                
+
+                // If this is the last task, force the end date to the live date
+                let taskEnd;
+                if (idx === assetTasks.length - 1) {
+                    // Use the correct live date (global or asset-specific)
+                    taskEnd = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
+                } else {
+                    taskEnd = addWorkingDays(taskStart, duration);
+                }
+
                 const ganttTask = {
                     id: `task-${taskIndex}`,
                     name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
@@ -244,14 +251,14 @@ const TimelineBuilder = () => {
                     end: taskEnd.toISOString().split('T')[0],
                     progress: 0,
                 };
-                
+
                 allTasks.push(ganttTask);
                 taskIndex++;
-                
+
                 // Move to next start date (day after current task ends)
                 currentStartDate = new Date(taskEnd);
                 currentStartDate.setDate(taskEnd.getDate() + 1);
-                
+
                 // Ensure next start date is working day
                 if (isWeekend(currentStartDate)) {
                     currentStartDate = getNextWorkingDay(currentStartDate);
