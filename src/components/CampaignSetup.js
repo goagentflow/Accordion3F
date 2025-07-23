@@ -43,11 +43,15 @@ const CampaignSetup = ({
                 Campaign Setup
             </h3>
 
-            {/* Global Live Date */}
+            {/* Campaign Live Date */}
             <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Global Live Date *
+                    Campaign Live Date *
                 </label>
+                {/* Helper text for instructions, smaller than the label */}
+                <p className="text-xs text-gray-500 mb-2">
+                    If campaign elements start on different days, uncheck the box and set each asset’s start date when selected.
+                </p>
                 <input
                     type="date"
                     value={globalLiveDate}
