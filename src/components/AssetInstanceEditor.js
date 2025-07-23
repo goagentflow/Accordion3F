@@ -1,0 +1,143 @@
+import React, { useState } from 'react';
+
+const AssetInstanceEditor = ({
+  asset,
+  csvData,
+  useGlobalDate,
+  dateErrors = [],
+  onRenameAsset = () => {},
+  onAssetStartDateChange = () => {},
+  onRemoveAsset = () => {},
+  onSaveTaskDurations = () => {},
+  getWorkingDaysToSave = () => 0,
+}) => {
+  // Check if this asset has a date conflict
+  const hasConflict = dateErrors.includes(asset.id);
+
+  // Local state for duration editor
+  const [showDurationEditor, setShowDurationEditor] = useState(false);
+  const [editedDurations, setEditedDurations] = useState({});
+
+  // Get the list of tasks for this asset type from csvData
+  const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
+
+  // Initialize durations if opening the editor
+  const openDurationEditor = () => {
+    const initialDurations = {};
+    assetTasks.forEach(task => {
+      initialDurations[task['Task']] = parseInt(task['Duration (Days)'], 10) || 1;
+    });
+    setEditedDurations(initialDurations);
+    setShowDurationEditor(true);
+  };
+
+  // Handle duration change
+  const handleDurationChange = (taskName, value) => {
+    setEditedDurations(prev => ({ ...prev, [taskName]: Math.max(1, parseInt(value) || 1) }));
+  };
+
+  // Handle Save
+  const handleSaveDurations = () => {
+    onSaveTaskDurations(asset.id, editedDurations);
+    setShowDurationEditor(false);
+  };
+
+  // Calculate working days to save for this asset
+  const workingDaysToSave = getWorkingDaysToSave(asset.id);
+
+  return (
+    <div className="border rounded p-3 mb-4 bg-gray-50" style={{ minWidth: 320 }}>
+      <div className="flex items-center mb-2">
+        <input
+          type="text"
+          value={asset.name}
+          onChange={e => onRenameAsset(asset.id, e.target.value)}
+          className="text-sm border rounded px-2 py-1 mr-2 w-40"
+        />
+        <input
+          type="date"
+          value={asset.startDate}
+          onChange={e => onAssetStartDateChange(asset.id, e.target.value)}
+          className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ml-2"
+          disabled={useGlobalDate}
+        />
+      </div>
+      {/* If there is a conflict, show the warning and options */}
+      {hasConflict && !showDurationEditor && (
+        <div className="bg-red-50 border border-red-300 text-red-800 rounded p-3 mb-2 text-xs">
+          <div className="mb-2 font-semibold">
+            ⚠️ This asset's timeline can't be completed by the selected start date.
+            {workingDaysToSave > 0 && (
+              <span className="block mt-1 font-normal text-red-700">
+                You need to save <span className="font-bold">{workingDaysToSave}</span> working day{workingDaysToSave !== 1 ? 's' : ''}.
+              </span>
+            )}
+          </div>
+          <button
+            className="px-2 py-1 bg-blue-500 text-white rounded text-xs mr-2"
+            onClick={() => onAssetStartDateChange(asset.id, '')}
+          >
+            Change Go-Live Date
+          </button>
+          <span className="mx-2 text-gray-500">or</span>
+          <button
+            className="px-2 py-1 bg-gray-200 text-gray-800 rounded text-xs"
+            onClick={openDurationEditor}
+          >
+            I can't change the go-live date
+          </button>
+        </div>
+      )}
+      {/* If user can't change go-live date, show manual duration editor */}
+      {hasConflict && showDurationEditor && (
+        <div className="bg-yellow-50 border border-yellow-300 text-yellow-900 rounded p-3 mb-2 text-xs">
+          <div className="mb-2 font-semibold">Adjust the task durations below to fit the schedule:</div>
+          <table className="w-full mb-2">
+            <thead>
+              <tr>
+                <th className="text-left">Task</th>
+                <th className="text-left">Duration (days)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assetTasks.map(task => (
+                <tr key={task['Task']}>
+                  <td>{task['Task']}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editedDurations[task['Task']] || 1}
+                      onChange={e => handleDurationChange(task['Task'], e.target.value)}
+                      className="w-16 px-1 py-0.5 border rounded text-xs"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button
+            className="px-2 py-1 bg-green-500 text-white rounded text-xs mr-2"
+            onClick={handleSaveDurations}
+          >
+            Save
+          </button>
+          <button
+            className="px-2 py-1 bg-gray-300 text-gray-800 rounded text-xs"
+            onClick={() => setShowDurationEditor(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      <button
+        className="px-2 py-1 bg-red-500 text-white rounded text-xs mt-2 w-full"
+        onClick={() => onRemoveAsset(asset.id)}
+      >
+        Remove
+      </button>
+    </div>
+  );
+};
+
+export default AssetInstanceEditor;

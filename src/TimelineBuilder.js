@@ -25,6 +25,9 @@ const TimelineBuilder = () => {
     const [timelineTasks, setTimelineTasks] = useState([]);
     const [showInfoBox, setShowInfoBox] = useState(true); // Add state for info box
 
+    // Add state to store custom task durations for each asset instance
+    const [assetTaskDurations, setAssetTaskDurations] = useState({}); // { assetId: { taskName: duration, ... } }
+
     // Helper function to check if date is weekend
     const isWeekend = (date) => {
         const day = date.getDay();
@@ -160,7 +163,11 @@ const TimelineBuilder = () => {
             // Process all other tasks in reverse order
             for (let i = assetTasks.length - 1; i >= 0; i--) {
                 const taskInfo = assetTasks[i];
-                const duration = parseInt(taskInfo['Duration (Days)'], 10) || 1;
+                // Use custom duration if present, else default from CSV
+                const customDurations = assetTaskDurations[asset.id] || {};
+                const duration = customDurations[taskInfo['Task']] !== undefined
+                    ? customDurations[taskInfo['Task']]
+                    : parseInt(taskInfo['Duration (Days)'], 10) || 1;
                 // Subtract working days to get the start date
                 const taskStartDate = subtractWorkingDays(currentEndDate, duration);
                 // Task ends the working day before currentEndDate
@@ -194,7 +201,7 @@ const TimelineBuilder = () => {
 
             // Check if start date is before today
             if (ganttTasks.length > 0 && new Date(ganttTasks[0].start) < today) {
-                newDateErrors.push(asset.name);
+                newDateErrors.push(asset.id);
             }
         });
 
@@ -207,7 +214,7 @@ const TimelineBuilder = () => {
         setTimelineTasks(allTasks);
         setCalculatedStartDates(newCalculatedStartDates);
         setDateErrors(newDateErrors);
-    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData]);
+    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations]);
 // This new useEffect pre-populates individual dates when switching from global mode
     useEffect(() => {
         if (!useGlobalDate && globalLiveDate && selectedAssets.length > 0) {
@@ -353,6 +360,11 @@ useEffect(() => {
         );
     };
 
+    // Handler to save custom task durations for an asset
+    const handleSaveTaskDurations = (assetId, durations) => {
+        setAssetTaskDurations(prev => ({ ...prev, [assetId]: durations }));
+    };
+
     return (
         <div className="bg-gray-100 min-h-screen font-sans">
             <header className="bg-white shadow-md">
@@ -424,6 +436,8 @@ useEffect(() => {
     dateErrors={dateErrors || []}
     onRenameAsset={handleRenameAsset}
     onAssetStartDateChange={handleAssetStartDateChange}
+    csvData={csvData}
+    onSaveTaskDurations={handleSaveTaskDurations}
 />
                     </div>
                     

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AssetInstanceEditor from './AssetInstanceEditor';
 
 const AssetSelector = ({
     assets = [],
@@ -12,7 +13,9 @@ const AssetSelector = ({
     calculatedStartDates = {},
     dateErrors = [],
     onRenameAsset = () => {},
-    onAssetStartDateChange = () => {}
+    onAssetStartDateChange = () => {},
+    csvData = [], // <-- add this prop
+    onSaveTaskDurations = () => {} // <-- add this prop
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -75,17 +78,17 @@ const AssetSelector = ({
         return workingDays;
     };
 
-    // Get working days that need to be saved for an asset
-    const getWorkingDaysToSave = (assetName) => {
-        const calculatedStart = calculatedStartDates[assetName];
-        if (!calculatedStart || !hasDateError(assetName)) return 0;
-       
+    // Update getWorkingDaysToSave to use assetId as the key
+    const getWorkingDaysToSave = (assetId) => {
+        const calculatedStart = calculatedStartDates[assetId];
+        if (!calculatedStart || !dateErrors.includes(assetId)) return 0;
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-       
+
         // Ensure we're working with proper date format
         const startDate = new Date(calculatedStart);
-       
+
         return calculateWorkingDaysBetween(startDate, today);
     };
 
@@ -132,33 +135,18 @@ const AssetSelector = ({
                     <div className="text-xs text-gray-500">No assets selected.</div>
                 )}
                 {selectedAssets.map(asset => (
-                    <div
+                    <AssetInstanceEditor
                         key={asset.id}
-                        className="border rounded p-3 mb-4 bg-gray-50"
-                        style={{ minWidth: 320 }}
-                    >
-                        <div className="flex items-center mb-2">
-                            <input
-                                type="text"
-                                value={asset.name}
-                                onChange={e => onRenameAsset(asset.id, e.target.value)}
-                                className="text-sm border rounded px-2 py-1 mr-2 w-40"
-                            />
-                            <input
-                                type="date"
-                                value={asset.startDate}
-                                onChange={e => onAssetStartDateChange(asset.id, e.target.value)}
-                                className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ml-2"
-                                disabled={useGlobalDate}
-                            />
-                        </div>
-                        <button
-                            className="px-2 py-1 bg-red-500 text-white rounded text-xs mt-2 w-full"
-                            onClick={() => onRemoveAsset(asset.id)}
-                        >
-                            Remove
-                        </button>
-                    </div>
+                        asset={asset}
+                        csvData={csvData}
+                        useGlobalDate={useGlobalDate}
+                        dateErrors={dateErrors}
+                        onRenameAsset={onRenameAsset}
+                        onAssetStartDateChange={onAssetStartDateChange}
+                        onRemoveAsset={onRemoveAsset}
+                        onSaveTaskDurations={onSaveTaskDurations}
+                        getWorkingDaysToSave={getWorkingDaysToSave}
+                    />
                 ))}
             </div>
 
