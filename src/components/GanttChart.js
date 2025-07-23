@@ -99,23 +99,35 @@ const GanttChart = ({ tasks }) => {
               Task Name
             </div>
             {/* Date headers: sticky top only */}
-            {dateColumns.map((date, index) => (
-              <div
-                key={index}
-                className="p-1 text-xs text-center border-b border-r border-gray-200 flex flex-col justify-center bg-white"
-                style={{
-                  width: `${DAY_COLUMN_WIDTH}px`,
-                  minWidth: `${DAY_COLUMN_WIDTH}px`,
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 30,
-                  background: 'white',
-                }}
-              >
-                <div className="font-medium">{date.getDate()}</div>
-                <div className="text-gray-500">{date.toLocaleDateString('en', { month: 'short' })}</div>
-              </div>
-            ))}
+            {dateColumns.map((date, index) => {
+              // Array of day abbreviations, starting with Sunday
+              const dayAbbr = ["Su", "M", "Tu", "W", "Th", "F", "Sa"];
+              // Get the day abbreviation for this date
+              const day = dayAbbr[date.getDay()];
+              // Get the day of the month (number)
+              const dayOfMonth = date.getDate();
+              // Get the month abbreviation (e.g., Aug)
+              const month = date.toLocaleString('en', { month: 'short' });
+              // Format: M 4 Aug, Tu 5 Aug, etc.
+              const formatted = `${day} ${dayOfMonth} ${month}`;
+              return (
+                <div
+                  key={index}
+                  className="p-1 text-xs text-center border-b border-r border-gray-200 flex flex-col justify-center bg-white"
+                  style={{
+                    width: `${DAY_COLUMN_WIDTH}px`,
+                    minWidth: `${DAY_COLUMN_WIDTH}px`,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 30,
+                    background: 'white',
+                  }}
+                >
+                  {/* Show the formatted date with day abbreviation */}
+                  <div className="font-medium">{formatted}</div>
+                </div>
+              );
+            })}
           </div>
           {/* TASK ROWS */}
           {tasks.map((task) => {

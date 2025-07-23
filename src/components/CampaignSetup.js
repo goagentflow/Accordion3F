@@ -8,7 +8,7 @@ const CampaignSetup = ({
     projectStartDate, 
     dateErrors 
 }) => {
-    const [clientDeadline, setClientDeadline] = useState('');
+    // Remove the clientDeadline state and handleDeadlineChange
 
     // Handle global live date change
     const handleLiveDateChange = (e) => {
@@ -19,11 +19,6 @@ const CampaignSetup = ({
     // Handle use global date toggle
     const handleUseGlobalToggle = (e) => {
         onUseGlobalDateChange(e.target.checked);
-    };
-
-    // Handle client deadline change (optional field)
-    const handleDeadlineChange = (e) => {
-        setClientDeadline(e.target.value);
     };
 
     // Format date for display
@@ -110,23 +105,7 @@ const CampaignSetup = ({
                 </div>
             )}
 
-            {/* Optional Client Deadline */}
-            <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Client Deadline (Optional)
-                </label>
-                <input
-                    type="date"
-                    value={clientDeadline}
-                    onChange={handleDeadlineChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                {clientDeadline && (
-                    <p className="text-xs text-gray-500 mt-1">
-                        {formatDate(clientDeadline)}
-                    </p>
-                )}
-            </div>
+            {/* Removed Client Deadline (Optional) section */}
 
             {/* Summary */}
             {globalLiveDate && projectStartDate && (
