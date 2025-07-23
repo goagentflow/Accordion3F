@@ -8,6 +8,7 @@ const TimelineBuilder = () => {
     // CSV and asset data
     const [csvData, setCsvData] = useState([]);
     const [uniqueAssets, setUniqueAssets] = useState([]);
+    // Each selected asset is now an object with a unique id, type, name, and startDate
     const [selectedAssets, setSelectedAssets] = useState([]);
     
     // Live date management
@@ -22,6 +23,7 @@ const TimelineBuilder = () => {
     
     // Final timeline for display
     const [timelineTasks, setTimelineTasks] = useState([]);
+    const [showInfoBox, setShowInfoBox] = useState(true); // Add state for info box
 
     // Helper function to check if date is weekend
     const isWeekend = (date) => {
@@ -127,13 +129,17 @@ const TimelineBuilder = () => {
         const allStartDates = [];
         const allTasks = [];
 
-        // Calculate for each selected asset
-        selectedAssets.forEach(assetName => {
-            const assetTasks = csvData.filter(row => row['Asset Type'] === assetName);
+        // Loop over each selected asset instance (not just type)
+        selectedAssets.forEach(asset => {
+            // asset: { id, type, name, startDate }
+            if (!asset.startDate) return; // Skip if no start date set
+
+            // Find all tasks for this asset type from the CSV
+            const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
             if (assetTasks.length === 0) return;
 
-            // Get the correct live date for this asset
-            const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
+            // Use the asset instance's startDate as the go-live date
+            const liveDate = new Date(asset.startDate);
             if (isNaN(liveDate.getTime())) return;
 
             // We'll build the tasks in reverse (from go-live backwards)
@@ -143,8 +149,8 @@ const TimelineBuilder = () => {
 
             // Go-live task (single day)
             ganttTasks.unshift({
-                id: `task-${taskIndex}`,
-                name: `${assetName}: Go-Live`,
+                id: `${asset.id}-go-live`,
+                name: `${asset.name}: Go-Live`, // Use custom name
                 start: liveDate.toISOString().split('T')[0],
                 end: liveDate.toISOString().split('T')[0],
                 progress: 0,
@@ -166,8 +172,8 @@ const TimelineBuilder = () => {
                     finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
                 }
                 ganttTasks.unshift({
-                    id: `task-${taskIndex}`,
-                    name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
+                    id: `${asset.id}-task-${taskIndex}`,
+                    name: `${asset.name}: ${taskInfo['Task']}`,
                     start: taskStartDate.toISOString().split('T')[0],
                     end: finalTaskEndDate.toISOString().split('T')[0],
                     progress: 0,
@@ -177,18 +183,18 @@ const TimelineBuilder = () => {
                 currentEndDate = new Date(taskStartDate);
             }
 
-            // Add all tasks for this asset to the main list
+            // Add all tasks for this asset instance to the main list
             allTasks.push(...ganttTasks);
 
             // Set the calculated start date for this asset to the start date of the first (earliest) task
             if (ganttTasks.length > 0 && ganttTasks[0].start) {
-                newCalculatedStartDates[assetName] = ganttTasks[0].start;
+                newCalculatedStartDates[asset.id] = ganttTasks[0].start;
                 allStartDates.push(new Date(ganttTasks[0].start));
             }
 
             // Check if start date is before today
             if (ganttTasks.length > 0 && new Date(ganttTasks[0].start) < today) {
-                newDateErrors.push(assetName);
+                newDateErrors.push(asset.name);
             }
         });
 
@@ -209,8 +215,8 @@ const TimelineBuilder = () => {
             let updated = false;
             selectedAssets.forEach(asset => {
                 // Pre-fill only if the asset doesn't have an individual date set
-                if (!newLiveDates[asset]) {
-                    newLiveDates[asset] = globalLiveDate;
+                if (!newLiveDates[asset.name]) { // Changed to asset.name
+                    newLiveDates[asset.name] = globalLiveDate; // Changed to asset.name
                     updated = true;
                 }
             });
@@ -219,6 +225,20 @@ const TimelineBuilder = () => {
             }
         }
     }, [useGlobalDate, globalLiveDate, selectedAssets, assetLiveDates]);
+
+// Sync all asset instance startDates to globalLiveDate if useGlobalDate is true
+useEffect(() => {
+    if (useGlobalDate && globalLiveDate) {
+        setSelectedAssets(prev =>
+            prev.map(asset =>
+                asset.startDate !== globalLiveDate
+                    ? { ...asset, startDate: globalLiveDate }
+                    : asset
+            )
+        );
+    }
+    // Optionally, if unchecked, you could clear the dates or leave as-is
+}, [useGlobalDate, globalLiveDate]);
     // Generate timeline tasks for Gantt chart
     const generateTimelineTasks = (startDates) => {
         if (selectedAssets.length === 0 || Object.keys(startDates).length === 0) {
@@ -229,7 +249,8 @@ const TimelineBuilder = () => {
         const allTasks = [];
         let taskIndex = 0;
 
-        selectedAssets.forEach(assetName => {
+        selectedAssets.forEach(asset => {
+            const assetName = asset.name; // Assuming asset object has a 'name' property
             const assetTasks = csvData.filter(row => row['Asset Type'] === assetName);
             if (assetTasks.length === 0) return;
 
@@ -289,11 +310,31 @@ const TimelineBuilder = () => {
         setCalculatedStartDates(newCalculatedStartDates);
     };
 
-    const handleAssetToggle = (asset) => {
-        setSelectedAssets(prev => 
-            prev.includes(asset) 
-                ? prev.filter(a => a !== asset)
-                : [...prev, asset]
+    // Helper to generate a unique id (could use a counter or Date.now())
+    const generateAssetId = () => Date.now() + Math.random();
+
+    // Add a new asset instance
+    const handleAddAsset = (assetType) => {
+        const newAsset = {
+            id: generateAssetId(),
+            type: assetType,
+            name: assetType, // default name, can be edited later
+            startDate: useGlobalDate && globalLiveDate ? globalLiveDate : ''
+        };
+        setSelectedAssets(prev => [...prev, newAsset]);
+    };
+
+    // Remove an asset instance by id
+    const handleRemoveAsset = (assetId) => {
+        setSelectedAssets(prev => prev.filter(asset => asset.id !== assetId));
+    };
+
+    // Handler to rename an asset instance by id
+    const handleRenameAsset = (assetId, newName) => {
+        setSelectedAssets(prev =>
+            prev.map(asset =>
+                asset.id === assetId ? { ...asset, name: newName } : asset
+            )
         );
     };
 
@@ -304,17 +345,63 @@ const TimelineBuilder = () => {
         }));
     };
 
+    const handleAssetStartDateChange = (assetId, newDate) => {
+        setSelectedAssets(prev =>
+            prev.map(asset =>
+                asset.id === assetId ? { ...asset, startDate: newDate } : asset
+            )
+        );
+    };
+
     return (
         <div className="bg-gray-100 min-h-screen font-sans">
             <header className="bg-white shadow-md">
                 <div className="container mx-auto px-6 py-4">
                     <h1 className="text-3xl font-bold text-gray-800">Accordion Timeline Builder</h1>
+                    {/* Info Box: How to Use This Timeline Builder (moved here, dismissible) */}
+                    {showInfoBox && (
+                        <div className="relative mb-6 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-900">
+                            <button
+                                className="absolute top-2 right-2 text-blue-700 hover:text-blue-900 text-lg font-bold focus:outline-none"
+                                onClick={() => setShowInfoBox(false)}
+                                aria-label="Close instructions"
+                            >
+                                ×
+                            </button>
+                            <strong>How to Build Your Campaign Timeline:</strong>
+                            <ol className="list-decimal pl-5 mt-2 space-y-1">
+                                <li>
+                                    <strong>Choose Your Campaign Start Date:</strong><br />
+                                    If all assets launch on the same day, set a global start date and check “Use same live date for all assets.”<br />
+                                    If assets launch on different days, uncheck the box and set dates individually for each asset.
+                                </li>
+                                <li>
+                                    <strong>Add Assets:</strong><br />
+                                    Click “Add” next to each asset type you need.<br />
+                                    Need the same asset type more than once? Click “Add” again and give each a unique name.
+                                </li>
+                                <li>
+                                    <strong>Customize Assets:</strong><br />
+                                    Rename each asset for clarity (e.g., “Metro Advertorial – August”).<br />
+                                    Set or confirm the start date for each asset.
+                                </li>
+                                <li>
+                                    <strong>Review Your Timeline:</strong><br />
+                                    Remove any asset you don’t need.<br />
+                                    Check the timeline to ensure all assets are scheduled as planned.
+                                </li>
+                            </ol>
+                        </div>
+                    )}
                 </div>
             </header>
             <main className="container mx-auto p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* LEFT COLUMN: CONTROLS */}
-                    <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                    <div
+  className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg overflow-x-auto"
+  style={{ minWidth: 380 }} // You can adjust 380 to your needs
+>
                         <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Timeline Setup</h2>
                         <CampaignSetup 
                             globalLiveDate={globalLiveDate}
@@ -327,18 +414,24 @@ const TimelineBuilder = () => {
 <AssetSelector
     assets={uniqueAssets || []}
     selectedAssets={selectedAssets || []}
-    onAssetToggle={handleAssetToggle}
-    useGlobalDate={useGlobalDate} // <-- CORRECTED LINE
+    onAddAsset={handleAddAsset}
+    onRemoveAsset={handleRemoveAsset}
+    useGlobalDate={useGlobalDate}
     globalLiveDate={globalLiveDate || ''}
     assetLiveDates={assetLiveDates || {}}
     onAssetLiveDateChange={handleAssetLiveDateChange}
     calculatedStartDates={calculatedStartDates || {}}
     dateErrors={dateErrors || []}
+    onRenameAsset={handleRenameAsset}
+    onAssetStartDateChange={handleAssetStartDateChange}
 />
                     </div>
                     
                     {/* RIGHT COLUMN: TIMELINE */}
-                    <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                    <div
+  className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg"
+  style={{ minWidth: 0, maxWidth: "100%" }}
+>
                         <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Generated Timeline</h2>
                         
                      {/* Error Messages - Temporarily Disabled */}

@@ -3,13 +3,16 @@ import React, { useState } from 'react';
 const AssetSelector = ({
     assets = [],
     selectedAssets = [],
-    onAssetToggle = () => {},
+    onAddAsset = () => {},
+    onRemoveAsset = () => {},
     useGlobalDate = true,
     globalLiveDate = '',
     assetLiveDates = {},
     onAssetLiveDateChange = () => {},
     calculatedStartDates = {},
-    dateErrors = []
+    dateErrors = [],
+    onRenameAsset = () => {},
+    onAssetStartDateChange = () => {}
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -88,6 +91,7 @@ const AssetSelector = ({
 
     return (
         <div className="bg-white rounded-lg shadow-sm">
+            {/* Info Box removed, now shown globally at the top of the app */}
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Select Assets</h3>
                 <div className="text-sm text-gray-600">
@@ -108,84 +112,54 @@ const AssetSelector = ({
 
             {/* Assets List */}
             <div className="space-y-3 max-h-96 overflow-y-auto">
-                {filteredAssets.map((asset) => {
-                    const isSelected = (selectedAssets || []).includes(asset);
-                    const hasError = hasDateError(asset);
-                    const assetLiveDate = getAssetLiveDate(asset);
-                    const calculatedStart = calculatedStartDates[asset];
-                    const workingDaysToSave = getWorkingDaysToSave(asset);
-                   
-                    return (
-                        <div
-                            key={asset}
-                            className={`border rounded-lg p-3 ${
-                                hasError
-                                    ? 'border-red-300 bg-red-50'
-                                    : 'border-gray-200 bg-white'
-                            }`}
+                {filteredAssets.map((assetType) => (
+                    <div key={assetType} className="flex items-center justify-between mb-2">
+                        <span className="text-sm">{assetType}</span>
+                        <button
+                            className="px-2 py-1 bg-blue-500 text-white rounded text-xs"
+                            onClick={() => onAddAsset(assetType)}
                         >
-                            {/* Asset Selection */}
-                            <div className="flex items-start space-x-3">
-                                <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => onAssetToggle(asset)}
-                                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <div className={`text-sm font-medium ${
-                                        hasError ? 'text-red-900' : 'text-gray-900'
-                                    }`}>
-                                        {asset}
-                                        {hasError && (
-                                            <span className="ml-2 text-red-600">
-                                                ⚠️ Need to save {workingDaysToSave} working day{workingDaysToSave !== 1 ? 's' : ''}
-                                            </span>
-                                        )}
-                                    </div>
+                            Add
+                        </button>
+                    </div>
+                ))}
+            </div>
 
-                                    {/* Date Information */}
-                                    {isSelected && (
-                                        <div className="mt-2 space-y-2">
-                                            {/* Live Date */}
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-xs text-gray-600 w-16">Live Date:</span>
-                                                {useGlobalDate ? (
-                                                    <span className="text-xs text-gray-700">
-                                                        {assetLiveDate ? formatDate(assetLiveDate) : 'Not set'}
-                                                        <span className="ml-1 text-gray-500">(Global)</span>
-                                                    </span>
-                                                ) : (
-                                                   <input
-    type="date"
-    value={assetLiveDates[asset] || ''}
-    onChange={(e) => handleAssetDateChange(asset, e.target.value)}
-    className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-/>
-                                                )}
-                                            </div>
-
-                                            {/* Calculated Start Date */}
-                                            {calculatedStart && (
-                                                <div className="flex items-center space-x-2">
-                                                    <span className="text-xs text-gray-600 w-16">Must Start:</span>
-                                                    <span className={`text-xs font-medium ${
-                                                        hasError ? 'text-red-700' : 'text-green-700'
-                                                    }`}>
-                                                        {formatDate(calculatedStart)}
-                                                        {hasError && (
-                                                            <span className="ml-1 text-red-600">(Past)</span>
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+            {/* Display Selected Asset Instances */}
+            <div className="mt-4">
+                <h4 className="text-xs font-semibold text-gray-700 mb-2">Selected Assets</h4>
+                {selectedAssets.length === 0 && (
+                    <div className="text-xs text-gray-500">No assets selected.</div>
+                )}
+                {selectedAssets.map(asset => (
+                    <div
+                        key={asset.id}
+                        className="border rounded p-3 mb-4 bg-gray-50"
+                        style={{ minWidth: 320 }}
+                    >
+                        <div className="flex items-center mb-2">
+                            <input
+                                type="text"
+                                value={asset.name}
+                                onChange={e => onRenameAsset(asset.id, e.target.value)}
+                                className="text-sm border rounded px-2 py-1 mr-2 w-40"
+                            />
+                            <input
+                                type="date"
+                                value={asset.startDate}
+                                onChange={e => onAssetStartDateChange(asset.id, e.target.value)}
+                                className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ml-2"
+                                disabled={useGlobalDate}
+                            />
                         </div>
-                    );
-                })}
+                        <button
+                            className="px-2 py-1 bg-red-500 text-white rounded text-xs mt-2 w-full"
+                            onClick={() => onRemoveAsset(asset.id)}
+                        >
+                            Remove
+                        </button>
+                    </div>
+                ))}
             </div>
 
             {/* Summary */}
@@ -193,7 +167,7 @@ const AssetSelector = ({
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <div className="text-sm">
                         <div className="font-medium text-blue-900 mb-1">
-                            Selected Assets: {(selectedAssets || []).join(', ')}
+                            Selected Assets: {(selectedAssets || []).map(a => a.name).join(', ')}
                         </div>
                         {dateErrors.length > 0 && (
                             <div className="text-red-700 text-xs">
