@@ -402,6 +402,12 @@ useEffect(() => {
                                     Remove any asset you don’t need.<br />
                                     Check the timeline to ensure all assets are scheduled as planned.
                                 </li>
+                                <li>
+                                    <strong>Adjust Your Timeline if Needed:</strong><br />
+                                    If an asset’s timeline can’t be completed by the selected start date, you’ll see a warning.<br />
+                                    – You can either change the go-live date, or<br />
+                                    – Manually shorten the durations of individual tasks (“accordion” your timeline) until the schedule fits.
+                                </li>
                             </ol>
                         </div>
                     )}
