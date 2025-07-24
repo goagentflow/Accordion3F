@@ -15,7 +15,8 @@ const AssetSelector = ({
     onRenameAsset = () => {},
     onAssetStartDateChange = () => {},
     csvData = [], // <-- add this prop
-    onSaveTaskDurations = () => {} // <-- add this prop
+    onSaveTaskDurations = () => {}, // <-- add this prop
+    isNonWorkingDay = () => false // <-- add this prop
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -146,6 +147,7 @@ const AssetSelector = ({
                         onRemoveAsset={onRemoveAsset}
                         onSaveTaskDurations={onSaveTaskDurations}
                         getWorkingDaysToSave={getWorkingDaysToSave}
+                        isNonWorkingDay={isNonWorkingDay}
                     />
                 ))}
             </div>

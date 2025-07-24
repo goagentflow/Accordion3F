@@ -28,10 +28,14 @@ const TimelineBuilder = () => {
     // Add state to store custom task durations for each asset instance
     const [assetTaskDurations, setAssetTaskDurations] = useState({}); // { assetId: { taskName: duration, ... } }
 
-    // Helper function to check if date is weekend
-    const isWeekend = (date) => {
+    // Add state to store bank holidays
+    const [bankHolidays, setBankHolidays] = useState([]); // Array of YYYY-MM-DD strings
+
+    // Helper function to check if date is a non-working day (weekend or bank holiday)
+    const isNonWorkingDay = (date) => {
         const day = date.getDay();
-        return day === 0 || day === 6; // Sunday = 0, Saturday = 6
+        const yyyy_mm_dd = date.toISOString().split('T')[0];
+        return day === 0 || day === 6 || bankHolidays.includes(yyyy_mm_dd);
     };
 
     // Helper function to get previous working day
@@ -39,7 +43,7 @@ const TimelineBuilder = () => {
         let workingDate = new Date(date);
         do {
             workingDate.setDate(workingDate.getDate() - 1);
-        } while (isWeekend(workingDate));
+        } while (isNonWorkingDay(workingDate));
         return workingDate;
     };
 
@@ -48,7 +52,7 @@ const TimelineBuilder = () => {
         let workingDate = new Date(date);
         do {
             workingDate.setDate(workingDate.getDate() + 1);
-        } while (isWeekend(workingDate));
+        } while (isNonWorkingDay(workingDate));
         return workingDate;
     };
 
@@ -56,43 +60,36 @@ const TimelineBuilder = () => {
     const subtractWorkingDays = (endDate, workingDaysToSubtract) => {
         let currentDate = new Date(endDate);
         let remainingDays = workingDaysToSubtract;
-        
         // Subtract working days
         while (remainingDays > 0) {
             currentDate.setDate(currentDate.getDate() - 1);
-            
-            // Only count non-weekend days
-            if (!isWeekend(currentDate)) {
+            // Only count non-non-working days
+            if (!isNonWorkingDay(currentDate)) {
                 remainingDays--;
             }
         }
-        
         return currentDate;
     };
 
     // Helper function to add working days (forward calculation for display)
     const addWorkingDays = (startDate, workingDaysToAdd) => {
-    if (workingDaysToAdd <= 0) {
-        return new Date(startDate);
-    }
-
-    let currentDate = new Date(startDate);
-    let remainingDays = workingDaysToAdd -1;
-
-    while (remainingDays > 0) {
-        currentDate.setDate(currentDate.getDate() + 1);
-        if (!isWeekend(currentDate)) {
-            remainingDays--;
+        if (workingDaysToAdd <= 0) {
+            return new Date(startDate);
         }
-    }
-
-    // Ensure the final day is a working day
-    while (isWeekend(currentDate)) {
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    return currentDate;
-};
+        let currentDate = new Date(startDate);
+        let remainingDays = workingDaysToAdd - 1;
+        while (remainingDays > 0) {
+            currentDate.setDate(currentDate.getDate() + 1);
+            if (!isNonWorkingDay(currentDate)) {
+                remainingDays--;
+            }
+        }
+        // Ensure the final day is a working day
+        while (isNonWorkingDay(currentDate)) {
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        return currentDate;
+    };
 
     // Load CSV data
     useEffect(() => {
@@ -112,6 +109,30 @@ const TimelineBuilder = () => {
                 console.error("Error parsing CSV file:", error);
             }
         });
+    }, []);
+
+    // Fetch UK bank holidays for England and Wales on app load
+    useEffect(() => {
+        fetch('https://www.gov.uk/bank-holidays.json')
+            .then(response => response.json())
+            .then(data => {
+                // Get all dates for England and Wales
+                const events = data['england-and-wales'].events;
+                // Get all dates for the next 10 years
+                const now = new Date();
+                const tenYearsFromNow = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate());
+                const holidayDates = events
+                    .map(event => event.date)
+                    .filter(dateStr => {
+                        const date = new Date(dateStr);
+                        return date >= now && date <= tenYearsFromNow;
+                    });
+                setBankHolidays(holidayDates);
+            })
+            .catch(err => {
+                // If fetch fails, fallback to an empty array (or you could use a static list)
+                setBankHolidays([]);
+            });
     }, []);
 
     // Calculate backwards timeline when live dates or assets change
@@ -175,7 +196,7 @@ const TimelineBuilder = () => {
                 taskEndDate.setDate(taskEndDate.getDate() - 1);
                 // Ensure end date is a working day
                 let finalTaskEndDate = new Date(taskEndDate);
-                if (isWeekend(finalTaskEndDate)) {
+                if (isNonWorkingDay(finalTaskEndDate)) {
                     finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
                 }
                 ganttTasks.unshift({
@@ -291,7 +312,7 @@ useEffect(() => {
                 taskEndDate.setDate(taskEndDate.getDate() - 1);
                 // Ensure end date is a working day
                 let finalTaskEndDate = new Date(taskEndDate);
-                if (isWeekend(finalTaskEndDate)) {
+                if (isNonWorkingDay(finalTaskEndDate)) {
                     finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
                 }
                 ganttTasks.unshift({
@@ -444,6 +465,7 @@ useEffect(() => {
     onAssetStartDateChange={handleAssetStartDateChange}
     csvData={csvData}
     onSaveTaskDurations={handleSaveTaskDurations}
+    isNonWorkingDay={isNonWorkingDay}
 />
                     </div>
                     

@@ -10,6 +10,7 @@ const AssetInstanceEditor = ({
   onRemoveAsset = () => {},
   onSaveTaskDurations = () => {},
   getWorkingDaysToSave = () => 0,
+  isNonWorkingDay = () => false,
 }) => {
   // Check if this asset has a date conflict
   const hasConflict = dateErrors.includes(asset.id);
@@ -17,6 +18,9 @@ const AssetInstanceEditor = ({
   // Local state for duration editor
   const [showDurationEditor, setShowDurationEditor] = useState(false);
   const [editedDurations, setEditedDurations] = useState({});
+
+  // Add a warning if go-live date is a non-working day
+  const goLiveDateIsNonWorking = asset.startDate && isNonWorkingDay && isNonWorkingDay(new Date(asset.startDate));
 
   // Get the list of tasks for this asset type from csvData
   const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
@@ -62,6 +66,11 @@ const AssetInstanceEditor = ({
           disabled={useGlobalDate}
         />
       </div>
+      {goLiveDateIsNonWorking && (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-2 mb-2 text-xs">
+          ⚠️ The selected go-live date is a weekend or bank holiday. Consider choosing a working day.
+        </div>
+      )}
       {/* If there is a conflict, show the warning and options */}
       {hasConflict && !showDurationEditor && (
         <div className="bg-red-50 border border-red-300 text-red-800 rounded p-3 mb-2 text-xs">
