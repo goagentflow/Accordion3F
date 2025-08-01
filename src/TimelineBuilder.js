@@ -28,6 +28,9 @@ const TimelineBuilder = () => {
     // Add state to store custom task durations for each asset instance
     const [assetTaskDurations, setAssetTaskDurations] = useState({}); // { assetId: { taskName: duration, ... } }
 
+    // Add state to store custom tasks separately
+    const [customTasks, setCustomTasks] = useState([]); // Array of custom task objects
+
     // Add state to store bank holidays
     const [bankHolidays, setBankHolidays] = useState([]); // Array of YYYY-MM-DD strings
 
@@ -232,9 +235,301 @@ const TimelineBuilder = () => {
             setProjectStartDate(earliestDate.toISOString().split('T')[0]);
         }
 
-        setTimelineTasks(allTasks);
-        setCalculatedStartDates(newCalculatedStartDates);
-        setDateErrors(newDateErrors);
+        // Integrate custom tasks into the main timeline calculation
+        const currentCustomTasks = timelineTasks.filter(task => task.isCustom);
+        if (currentCustomTasks.length > 0) {
+            setCustomTasks(currentCustomTasks);
+            
+            // Create a unified timeline that includes both asset tasks and custom tasks
+            const unifiedTimeline = [...allTasks];
+            
+            // Sort custom tasks by their original insertion order
+            const sortedCustomTasks = [...currentCustomTasks].sort((a, b) => {
+                const aIndex = timelineTasks.findIndex(task => task.id === a.id);
+                const bIndex = timelineTasks.findIndex(task => task.id === b.id);
+                return aIndex - bIndex;
+            });
+            
+            // Insert custom tasks at their correct positions in the unified timeline
+            sortedCustomTasks.forEach(customTask => {
+                let insertIndex = 0;
+                if (customTask.insertAfterTaskId) {
+                    const afterTaskIndex = unifiedTimeline.findIndex(task => task.id === customTask.insertAfterTaskId);
+                    if (afterTaskIndex !== -1) {
+                        insertIndex = afterTaskIndex + 1;
+                    }
+                }
+                
+                // Calculate the custom task dates based on the current unified timeline
+                let newTaskStartDate;
+                if (insertIndex === 0) {
+                    // Insert at the beginning
+                    newTaskStartDate = new Date(projectStartDate);
+                } else {
+                    // Insert after another task
+                    const previousTask = unifiedTimeline[insertIndex - 1];
+                    const previousTaskEnd = new Date(previousTask.end);
+                    newTaskStartDate = new Date(previousTaskEnd);
+                    newTaskStartDate.setDate(newTaskStartDate.getDate() + 1);
+                    
+                    // Ensure the start date is a working day
+                    while (isNonWorkingDay(newTaskStartDate)) {
+                        newTaskStartDate.setDate(newTaskStartDate.getDate() + 1);
+                    }
+                }
+                
+                // Calculate the end date based on duration (inclusive)
+                let newTaskEndDate = new Date(newTaskStartDate);
+                let newTaskRemainingDays = customTask.duration - 1;
+                
+                while (newTaskRemainingDays > 0) {
+                    newTaskEndDate.setDate(newTaskEndDate.getDate() + 1);
+                    if (!isNonWorkingDay(newTaskEndDate)) {
+                        newTaskRemainingDays--;
+                    }
+                }
+                
+                // Create the custom task with recalculated dates
+                const newCustomTask = {
+                    ...customTask,
+                    id: customTask.id,
+                    name: customTask.name,
+                    duration: customTask.duration,
+                    start: newTaskStartDate.toISOString().split('T')[0],
+                    end: newTaskEndDate.toISOString().split('T')[0],
+                    isCustom: true
+                };
+                
+                // Insert the custom task into the unified timeline
+                unifiedTimeline.splice(insertIndex, 0, newCustomTask);
+            });
+            
+            // After inserting custom tasks, rebuild the timeline backwards from go-live
+            // This preserves the fixed go-live date and respects manual duration overrides
+            const finalTimeline = [];
+            
+            // Group tasks by asset to maintain the backwards calculation
+            const tasksByAsset = {};
+            unifiedTimeline.forEach(task => {
+                if (task.isCustom) {
+                    // Custom tasks will be inserted at their specified positions
+                    if (!tasksByAsset.custom) tasksByAsset.custom = [];
+                    tasksByAsset.custom.push(task);
+                } else {
+                    // Asset tasks are grouped by their asset ID
+                    const assetId = task.id.split('-')[0];
+                    if (!tasksByAsset[assetId]) tasksByAsset[assetId] = [];
+                    tasksByAsset[assetId].push(task);
+                }
+            });
+            
+            // Rebuild each asset's timeline backwards from go-live
+            selectedAssets.forEach(asset => {
+                const assetTasks = tasksByAsset[asset.id] || [];
+                if (assetTasks.length === 0) return;
+                
+                // Separate go-live task from other tasks
+                const goLiveTask = assetTasks.find(task => task.name.includes('Go-Live'));
+                const regularTasks = assetTasks.filter(task => !task.name.includes('Go-Live'));
+                
+                // Build backwards from go-live to calculate dates
+                let currentEndDate = new Date(asset.startDate);
+                const calculatedTasks = [];
+                
+                // Calculate dates for regular tasks in reverse order (backwards from go-live)
+                for (let i = regularTasks.length - 1; i >= 0; i--) {
+                    const task = regularTasks[i];
+                    const taskInfo = csvData.find(row => 
+                        row['Asset Type'] === asset.type && 
+                        row['Task'] === task.name.split(': ')[1]
+                    );
+                    
+                    // Use manual duration override if available
+                    const customDurations = assetTaskDurations[asset.id] || {};
+                    const duration = customDurations[taskInfo?.['Task']] !== undefined
+                        ? customDurations[taskInfo['Task']]
+                        : parseInt(taskInfo?.['Duration (Days)'], 10) || 1;
+                    
+                    const taskStartDate = subtractWorkingDays(currentEndDate, duration);
+                    const taskEndDate = new Date(currentEndDate);
+                    taskEndDate.setDate(taskEndDate.getDate() - 1);
+                    
+                    // Ensure end date is a working day
+                    let finalTaskEndDate = new Date(taskEndDate);
+                    if (isNonWorkingDay(finalTaskEndDate)) {
+                        finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
+                    }
+                    
+                    calculatedTasks.unshift({
+                        ...task,
+                        start: taskStartDate.toISOString().split('T')[0],
+                        end: finalTaskEndDate.toISOString().split('T')[0]
+                    });
+                    
+                    currentEndDate = new Date(taskStartDate);
+                }
+                
+                // Add go-live task at the end
+                if (goLiveTask) {
+                    calculatedTasks.push({
+                        ...goLiveTask,
+                        start: asset.startDate,
+                        end: asset.startDate
+                    });
+                }
+                
+                // Add all tasks to final timeline in correct order
+                finalTimeline.push(...calculatedTasks);
+            });
+            
+            // Now rebuild the entire timeline sequentially including custom tasks
+            const allTasksSequential = [];
+            
+            // First, collect all tasks (asset tasks + custom tasks) in the correct order
+            selectedAssets.forEach(asset => {
+                const assetTasks = tasksByAsset[asset.id] || [];
+                const customTasksForAsset = customTasks.filter(ct => {
+                    // Find which asset this custom task belongs to based on insertAfterTaskId
+                    if (ct.insertAfterTaskId) {
+                        const afterTask = assetTasks.find(task => task.id === ct.insertAfterTaskId);
+                        return afterTask !== undefined;
+                    }
+                    return false;
+                });
+                
+                // Separate go-live task from regular tasks
+                const goLiveTask = assetTasks.find(task => task.name.includes('Go-Live'));
+                const regularTasks = assetTasks.filter(task => !task.name.includes('Go-Live'));
+                
+                // Create ordered task list for this asset
+                const orderedTasks = [];
+                
+                // Add regular tasks in their original order
+                regularTasks.forEach((task, index) => {
+                    orderedTasks.push(task);
+                    
+                    // Insert custom tasks that should go after this task
+                    const customTasksAfterThis = customTasksForAsset.filter(ct => 
+                        ct.insertAfterTaskId === task.id
+                    );
+                    orderedTasks.push(...customTasksAfterThis);
+                });
+                
+                // Add go-live task at the end
+                if (goLiveTask) {
+                    orderedTasks.push(goLiveTask);
+                }
+                
+                // Now build the timeline backwards from go-live for this asset
+                let currentEndDate = new Date(asset.startDate);
+                const assetTimeline = [];
+                
+                // Process tasks in reverse order (backwards from go-live)
+                for (let i = orderedTasks.length - 1; i >= 0; i--) {
+                    const task = orderedTasks[i];
+                    
+                    if (task.isCustom) {
+                        // Custom task - calculate backwards
+                        const taskStartDate = subtractWorkingDays(currentEndDate, task.duration);
+                        const taskEndDate = new Date(currentEndDate);
+                        taskEndDate.setDate(taskEndDate.getDate() - 1);
+                        
+                        // Ensure end date is a working day
+                        let finalTaskEndDate = new Date(taskEndDate);
+                        if (isNonWorkingDay(finalTaskEndDate)) {
+                            finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
+                        }
+                        
+                        assetTimeline.unshift({
+                            ...task,
+                            start: taskStartDate.toISOString().split('T')[0],
+                            end: finalTaskEndDate.toISOString().split('T')[0]
+                        });
+                        
+                        currentEndDate = new Date(taskStartDate);
+                    } else if (task.name.includes('Go-Live')) {
+                        // Go-live task
+                        assetTimeline.unshift({
+                            ...task,
+                            start: currentEndDate.toISOString().split('T')[0],
+                            end: currentEndDate.toISOString().split('T')[0]
+                        });
+                    } else {
+                        // Regular asset task - calculate backwards
+                        const taskInfo = csvData.find(row => 
+                            row['Asset Type'] === asset.type && 
+                            row['Task'] === task.name.split(': ')[1]
+                        );
+                        
+                        // Use manual duration override if available
+                        const customDurations = assetTaskDurations[asset.id] || {};
+                        const duration = customDurations[taskInfo?.['Task']] !== undefined
+                            ? customDurations[taskInfo['Task']]
+                            : parseInt(taskInfo?.['Duration (Days)'], 10) || 1;
+                        
+                        const taskStartDate = subtractWorkingDays(currentEndDate, duration);
+                        const taskEndDate = new Date(currentEndDate);
+                        taskEndDate.setDate(taskEndDate.getDate() - 1);
+                        
+                        // Ensure end date is a working day
+                        let finalTaskEndDate = new Date(taskEndDate);
+                        if (isNonWorkingDay(finalTaskEndDate)) {
+                            finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
+                        }
+                        
+                        assetTimeline.unshift({
+                            ...task,
+                            start: taskStartDate.toISOString().split('T')[0],
+                            end: finalTaskEndDate.toISOString().split('T')[0]
+                        });
+                        
+                        currentEndDate = new Date(taskStartDate);
+                    }
+                }
+                
+                // Add this asset's timeline to the main timeline
+                allTasksSequential.push(...assetTimeline);
+            });
+            
+            // Update the final timeline
+            finalTimeline.length = 0;
+            finalTimeline.push(...allTasksSequential);
+            
+            setTimelineTasks(finalTimeline);
+            
+            // Recalculate dateErrors based on the final timeline
+            const finalDateErrors = [];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            selectedAssets.forEach(asset => {
+                const assetTasks = finalTimeline.filter(task => 
+                    task.id.startsWith(`${asset.id}-`) && !task.name.includes('Go-Live')
+                );
+                
+                if (assetTasks.length > 0) {
+                    // Find the earliest task for this asset
+                    const earliestTask = assetTasks.reduce((earliest, task) => {
+                        return new Date(task.start) < new Date(earliest.start) ? task : earliest;
+                    });
+                    
+                    // Update calculated start date
+                    newCalculatedStartDates[asset.id] = earliestTask.start;
+                    
+                    // Check if start date is before today
+                    if (new Date(earliestTask.start) < today) {
+                        finalDateErrors.push(asset.id);
+                    }
+                }
+            });
+            
+            setCalculatedStartDates(newCalculatedStartDates);
+            setDateErrors(finalDateErrors);
+        } else {
+            setTimelineTasks(allTasks);
+            setCalculatedStartDates(newCalculatedStartDates);
+            setDateErrors(newDateErrors);
+        }
     }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations]);
 // This new useEffect pre-populates individual dates when switching from global mode
     useEffect(() => {
@@ -267,6 +562,20 @@ useEffect(() => {
     }
     // Optionally, if unchecked, you could clear the dates or leave as-is
 }, [useGlobalDate, globalLiveDate]);
+
+    // Preserve custom tasks whenever timelineTasks changes
+    useEffect(() => {
+        const currentCustomTasks = timelineTasks.filter(task => task.isCustom);
+        if (currentCustomTasks.length > 0) {
+            setCustomTasks(currentCustomTasks);
+        }
+    }, [timelineTasks]);
+
+    // REMOVED: Separate custom task merging useEffect
+    // Custom tasks are now integrated directly into the main timeline calculation
+
+    // REMOVED: Custom task merging useEffect that was causing timeline disruption
+    // Custom tasks are now handled properly in the main timeline calculation
     // Generate timeline tasks for Gantt chart
     const generateTimelineTasks = (startDates) => {
         if (selectedAssets.length === 0 || Object.keys(startDates).length === 0) {
@@ -335,7 +644,39 @@ useEffect(() => {
                 newCalculatedStartDates[assetName] = ganttTasks[0].start;
             }
         });
+        
+        // Merge custom tasks back into the timeline
+        if (customTasks.length > 0) {
+            // Insert custom tasks at their specified positions
+            customTasks.forEach(customTask => {
+                let insertIndex = 0;
+                if (customTask.insertAfterTaskId) {
+                    const afterTaskIndex = allTasks.findIndex(task => task.id === customTask.insertAfterTaskId);
+                    if (afterTaskIndex !== -1) {
+                        insertIndex = afterTaskIndex + 1;
+                    }
+                }
+                
+                // Create a new custom task with updated dates
+                const newCustomTask = {
+                    ...customTask,
+                    id: customTask.id, // Keep the same ID
+                    name: customTask.name,
+                    duration: customTask.duration,
+                    isCustom: true
+                };
+                
+                // Insert the custom task
+                allTasks.splice(insertIndex, 0, newCustomTask);
+            });
+            
+            // Recalculate all task dates to accommodate custom tasks
+            // This is a simplified version - in practice, you'd want to recalculate dates
+            // based on the new timeline structure
+        }
+        
         setCalculatedStartDates(newCalculatedStartDates);
+        setTimelineTasks(allTasks);
     };
 
     // Helper to generate a unique id (could use a counter or Date.now())
@@ -384,6 +725,10 @@ useEffect(() => {
     // Handler to save custom task durations for an asset
     const handleSaveTaskDurations = (assetId, durations) => {
         setAssetTaskDurations(prev => ({ ...prev, [assetId]: durations }));
+        
+        // Preserve custom tasks before timeline recalculation
+        const currentCustomTasks = timelineTasks.filter(task => task.isCustom);
+        setCustomTasks(currentCustomTasks);
     };
 
     // Handler for drag-to-resize task duration
@@ -410,6 +755,220 @@ useEffect(() => {
         });
     };
 
+    // Handler for adding custom tasks
+    const handleAddCustomTask = (customTaskData) => {
+        const { name, duration, insertAfterTaskId } = customTaskData;
+        
+        // Find the index where to insert the new task
+        let insertIndex = 0;
+        if (insertAfterTaskId) {
+            const afterTaskIndex = timelineTasks.findIndex(task => task.id === insertAfterTaskId);
+            if (afterTaskIndex !== -1) {
+                insertIndex = afterTaskIndex + 1;
+            }
+        }
+        
+        // Calculate how much the project duration will increase
+        const goLiveDate = new Date(globalLiveDate);
+        const currentProjectEnd = new Date(Math.max(...timelineTasks.map(task => new Date(task.end))));
+        
+        // Calculate the new project end date by adding the custom task duration
+        let newProjectEnd = new Date(currentProjectEnd);
+        let remainingDays = duration;
+        
+        while (remainingDays > 0) {
+            newProjectEnd.setDate(newProjectEnd.getDate() + 1);
+            if (!isNonWorkingDay(newProjectEnd)) {
+                remainingDays--;
+            }
+        }
+        
+        // Calculate how many working days the project duration increased
+        const durationIncrease = countWorkingDays(currentProjectEnd, newProjectEnd);
+        
+        // Move the project start date earlier by the duration increase
+        const newProjectStartDate = subtractWorkingDays(new Date(projectStartDate), durationIncrease);
+        
+        // Create the new task
+        const newTaskId = `custom-task-${Date.now()}`;
+        let newTaskStartDate;
+        
+        if (insertIndex === 0) {
+            // Insert at the beginning - start on the new project start date
+            newTaskStartDate = new Date(newProjectStartDate);
+        } else {
+            // Insert after another task - calculate position relative to new timeline
+            const previousTask = timelineTasks[insertIndex - 1];
+            const previousTaskEnd = new Date(previousTask.end);
+            newTaskStartDate = new Date(previousTaskEnd);
+            newTaskStartDate.setDate(newTaskStartDate.getDate() + 1);
+            
+            // Ensure the start date is a working day
+            while (isNonWorkingDay(newTaskStartDate)) {
+                newTaskStartDate.setDate(newTaskStartDate.getDate() + 1);
+            }
+        }
+        
+        // Calculate the end date based on duration (inclusive)
+        let newTaskEndDate = new Date(newTaskStartDate);
+        let newTaskRemainingDays = duration - 1; // -1 because we count the start date
+        
+        while (newTaskRemainingDays > 0) {
+            newTaskEndDate.setDate(newTaskEndDate.getDate() + 1);
+            if (!isNonWorkingDay(newTaskEndDate)) {
+                newTaskRemainingDays--;
+            }
+        }
+        
+        const newTask = {
+            id: newTaskId,
+            name: `Custom: ${name}`,
+            start: newTaskStartDate.toISOString().split('T')[0],
+            end: newTaskEndDate.toISOString().split('T')[0],
+            progress: 0,
+            isCustom: true,
+            insertAfterTaskId: insertAfterTaskId,
+            duration: duration
+        };
+        
+        // Store the custom task separately
+        setCustomTasks(prev => [...prev, newTask]);
+        
+        // Insert the new task into current timeline
+        const updatedTasks = [...timelineTasks];
+        updatedTasks.splice(insertIndex, 0, newTask);
+        
+        // Recalculate all task dates to fit within the new timeline
+        // Start from the beginning and work forward
+        for (let i = 0; i < updatedTasks.length; i++) {
+            const currentTask = updatedTasks[i];
+            
+            if (i === 0) {
+                // First task starts on the new project start date
+                const taskStart = new Date(newProjectStartDate);
+                let taskEnd = new Date(taskStart);
+                
+                // Calculate task duration inclusively
+                const originalStart = new Date(currentTask.start);
+                const originalEnd = new Date(currentTask.end);
+                let taskDuration = 0;
+                const current = new Date(originalStart);
+                const end = new Date(originalEnd);
+                
+                while (current <= end) {
+                    if (!isNonWorkingDay(current)) {
+                        taskDuration++;
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+                
+                // Calculate end date
+                let taskRemainingDays = taskDuration - 1;
+                while (taskRemainingDays > 0) {
+                    taskEnd.setDate(taskEnd.getDate() + 1);
+                    if (!isNonWorkingDay(taskEnd)) {
+                        taskRemainingDays--;
+                    }
+                }
+                
+                updatedTasks[i] = {
+                    ...currentTask,
+                    start: taskStart.toISOString().split('T')[0],
+                    end: taskEnd.toISOString().split('T')[0]
+                };
+            } else {
+                // Subsequent tasks start after the previous task ends
+                const previousTask = updatedTasks[i - 1];
+                const previousTaskEnd = new Date(previousTask.end);
+                let taskStart = new Date(previousTaskEnd);
+                taskStart.setDate(taskStart.getDate() + 1);
+                
+                // Ensure the start date is a working day
+                while (isNonWorkingDay(taskStart)) {
+                    taskStart.setDate(taskStart.getDate() + 1);
+                }
+                
+                // Calculate task duration inclusively
+                const originalStart = new Date(currentTask.start);
+                const originalEnd = new Date(currentTask.end);
+                let taskDuration = 0;
+                const current = new Date(originalStart);
+                const end = new Date(originalEnd);
+                
+                while (current <= end) {
+                    if (!isNonWorkingDay(current)) {
+                        taskDuration++;
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+                
+                // Calculate end date
+                let taskEnd = new Date(taskStart);
+                let taskRemainingDays = taskDuration - 1;
+                while (taskRemainingDays > 0) {
+                    taskEnd.setDate(taskEnd.getDate() + 1);
+                    if (!isNonWorkingDay(taskEnd)) {
+                        taskRemainingDays--;
+                    }
+                }
+                
+                updatedTasks[i] = {
+                    ...currentTask,
+                    start: taskStart.toISOString().split('T')[0],
+                    end: taskEnd.toISOString().split('T')[0]
+                };
+            }
+        }
+        
+        setTimelineTasks(updatedTasks);
+        
+        // Update project start date
+        setProjectStartDate(newProjectStartDate.toISOString().split('T')[0]);
+        
+        // Recalculate calculated start dates for each asset
+        const newCalculatedStartDates = {};
+        const assetGroups = {};
+        
+        // Group tasks by asset ID
+        updatedTasks.forEach(task => {
+            if (!task.isCustom) { // Only group non-custom tasks
+                const assetId = task.id.split('-task-')[0];
+                if (!assetGroups[assetId]) {
+                    assetGroups[assetId] = [];
+                }
+                assetGroups[assetId].push(task);
+            }
+        });
+        
+        // Find the earliest start date for each asset
+        Object.keys(assetGroups).forEach(assetId => {
+            const assetTasks = assetGroups[assetId];
+            const startDates = assetTasks.map(task => new Date(task.start));
+            const earliestDate = new Date(Math.min(...startDates));
+            newCalculatedStartDates[assetId] = earliestDate.toISOString().split('T')[0];
+        });
+        
+        setCalculatedStartDates(newCalculatedStartDates);
+        
+        // Recalculate date errors
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const newDateErrors = [];
+        
+        // Check each selected asset's calculated start date
+        selectedAssets.forEach(asset => {
+            const calculatedStartDate = newCalculatedStartDates[asset.id];
+            if (calculatedStartDate) {
+                const startDate = new Date(calculatedStartDate);
+                if (startDate < today) {
+                    newDateErrors.push(asset.id);
+                }
+            }
+        });
+        
+        setDateErrors(newDateErrors);
+    };
+
         // Helper function to count working days between two dates (exclusive)
     const countWorkingDays = (startDate, endDate) => {
         let count = 0;
@@ -428,34 +987,71 @@ useEffect(() => {
         return count;
     };
 
-    // Calculate working days needed to save to start on time
+    // Single source of truth for working days calculation (same as AssetSelector)
+    const calculateWorkingDaysBetween = (startDate, endDate) => {
+        if (!startDate || !endDate) return 0;
+       
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+       
+        if (start >= end) return 0;
+       
+        let workingDays = 0;
+        let currentDate = new Date(start);
+       
+        while (currentDate < end) {
+            const dayOfWeek = currentDate.getDay();
+            // Count if not weekend (0 = Sunday, 6 = Saturday)
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                workingDays++;
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+       
+        return workingDays;
+    };
+
+    // Helper function to calculate task end date based on start date and duration
+    const calculateTaskEndDate = (startDate, duration) => {
+        let endDate = new Date(startDate);
+        let remainingDays = duration - 1; // -1 because we count the start date
+        
+        while (remainingDays > 0) {
+            endDate.setDate(endDate.getDate() + 1);
+            if (!isNonWorkingDay(endDate)) {
+                remainingDays--;
+            }
+        }
+        
+        return endDate.toISOString().split('T')[0];
+    };
+
+    // Single source of truth for working days needed (same as AssetSelector's getWorkingDaysToSave)
     const calculateWorkingDaysNeeded = () => {
         if (!globalLiveDate || timelineTasks.length === 0) return null;
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Calculate total working days from all calculated start dates to today
-        // Use the same logic as AssetSelector (weekends only, no bank holidays)
+        // Use the exact same logic as AssetSelector's getWorkingDaysToSave
         let totalDaysInPast = 0;
         
-        Object.values(calculatedStartDates).forEach(startDateStr => {
-            const startDate = new Date(startDateStr);
-            if (startDate < today) {
-                // Use the same logic as AssetSelector's calculateWorkingDaysBetween
-                let workingDays = 0;
-                let currentDate = new Date(startDate);
-                
-                while (currentDate < today) {
-                    const dayOfWeek = currentDate.getDay();
-                    // Count if not weekend (0 = Sunday, 6 = Saturday)
-                    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                        workingDays++;
-                    }
-                    currentDate.setDate(currentDate.getDate() + 1);
+        // Only count assets that are in dateErrors (same as asset-specific calculation)
+        selectedAssets.forEach(asset => {
+            const calculatedStart = calculatedStartDates[asset.id];
+            if (calculatedStart && dateErrors.includes(asset.id)) {
+                const startDate = new Date(calculatedStart);
+                totalDaysInPast += calculateWorkingDaysBetween(startDate, today);
+            }
+        });
+        
+        // Also check custom tasks that start in the past
+        timelineTasks.forEach(task => {
+            if (task.isCustom) {
+                const taskStart = new Date(task.start);
+                if (taskStart < today) {
+                    totalDaysInPast += calculateWorkingDaysBetween(taskStart, today);
                 }
-                
-                totalDaysInPast += workingDays;
             }
         });
         
@@ -547,6 +1143,7 @@ useEffect(() => {
     csvData={csvData}
     onSaveTaskDurations={handleSaveTaskDurations}
     isNonWorkingDay={isNonWorkingDay}
+    calculateWorkingDaysBetween={calculateWorkingDaysBetween}
 />
                     </div>
                     
@@ -583,6 +1180,7 @@ useEffect(() => {
                                 bankHolidays={bankHolidays}
                                 onTaskDurationChange={handleTaskDurationChange}
                                 workingDaysNeeded={calculateWorkingDaysNeeded()}
+                                onAddCustomTask={handleAddCustomTask}
                             />
                         ) : (
                             <div className="text-center text-gray-500 py-10">

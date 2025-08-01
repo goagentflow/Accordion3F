@@ -16,7 +16,8 @@ const AssetSelector = ({
     onAssetStartDateChange = () => {},
     csvData = [], // <-- add this prop
     onSaveTaskDurations = () => {}, // <-- add this prop
-    isNonWorkingDay = () => false // <-- add this prop
+    isNonWorkingDay = () => false, // <-- add this prop
+    calculateWorkingDaysBetween = null // <-- add this prop
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -55,8 +56,13 @@ const AssetSelector = ({
         return dateErrors.includes(assetName);
     };
 
-    // Calculate working days between two dates (matching TimelineBuilder logic)
-    const calculateWorkingDaysBetween = (startDate, endDate) => {
+    // Use the passed function or fall back to local implementation
+    const calculateWorkingDaysBetweenLocal = (startDate, endDate) => {
+        if (calculateWorkingDaysBetween) {
+            return calculateWorkingDaysBetween(startDate, endDate);
+        }
+        
+        // Fallback implementation (same as TimelineBuilder)
         if (!startDate || !endDate) return 0;
        
         const start = new Date(startDate);
@@ -90,7 +96,7 @@ const AssetSelector = ({
         // Ensure we're working with proper date format
         const startDate = new Date(calculatedStart);
 
-        return calculateWorkingDaysBetween(startDate, today);
+        return calculateWorkingDaysBetweenLocal(startDate, today);
     };
 
     return (

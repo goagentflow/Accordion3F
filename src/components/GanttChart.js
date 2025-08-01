@@ -1,13 +1,19 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; // Import the new library
 
-const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, workingDaysNeeded = null }) => {
+const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, workingDaysNeeded = null, onAddCustomTask = () => {} }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [originalDuration, setOriginalDuration] = useState(0);
   const containerRef = useRef(null);
+
+  // Custom task modal state
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskDuration, setNewTaskDuration] = useState(1);
+  const [insertAfterTask, setInsertAfterTask] = useState('');
 
   // --- CONFIGURATION ---
   const DAY_COLUMN_WIDTH = 48;
@@ -133,6 +139,35 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     }
   };
 
+  // Custom task modal handlers
+  const handleOpenAddTaskModal = () => {
+    setShowAddTaskModal(true);
+    setNewTaskName('');
+    setNewTaskDuration(1);
+    setInsertAfterTask('');
+  };
+
+  const handleCloseAddTaskModal = () => {
+    setShowAddTaskModal(false);
+    setNewTaskName('');
+    setNewTaskDuration(1);
+    setInsertAfterTask('');
+  };
+
+  const handleSubmitCustomTask = () => {
+    if (!newTaskName.trim() || newTaskDuration < 1) {
+      return;
+    }
+
+    onAddCustomTask({
+      name: newTaskName.trim(),
+      duration: newTaskDuration,
+      insertAfterTaskId: insertAfterTask
+    });
+
+    handleCloseAddTaskModal();
+  };
+
   // Add global mouse event listeners
   React.useEffect(() => {
     if (isDragging) {
@@ -209,10 +244,21 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     <div className="w-full">
       {/* Summary Header */}
       <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-        <h3 className="text-lg font-semibold text-blue-800">Project Gantt Chart</h3>
-        <p className="text-sm text-blue-600">
-          {tasks.length} tasks • {totalDays} days total • {minDate.toLocaleDateString()} to {maxDate.toLocaleDateString()}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-blue-800">Project Gantt Chart</h3>
+            <p className="text-sm text-blue-600">
+              {tasks.length} tasks • {totalDays} days total • {minDate.toLocaleDateString()} to {maxDate.toLocaleDateString()}
+            </p>
+          </div>
+          <button
+            onClick={handleOpenAddTaskModal}
+            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center"
+          >
+            <span className="mr-2">➕</span>
+            Add Task
+          </button>
+        </div>
       </div>
 
       {/* Main Scrollable Container */}
@@ -392,6 +438,85 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
           </button>
         </div>
       </div>
+
+      {/* Add Custom Task Modal */}
+      {showAddTaskModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Add Custom Task</h3>
+              <button
+                onClick={handleCloseAddTaskModal}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Task Name *
+                </label>
+                <input
+                  type="text"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  placeholder="e.g., Source talent, Organise translation"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Duration (working days) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newTaskDuration}
+                  onChange={(e) => setNewTaskDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Insert After
+                </label>
+                <select
+                  value={insertAfterTask}
+                  onChange={(e) => setInsertAfterTask(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">At the beginning</option>
+                  {tasks.map((task, index) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCloseAddTaskModal}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitCustomTask}
+                disabled={!newTaskName.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
