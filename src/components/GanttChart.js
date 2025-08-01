@@ -324,7 +324,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             const taskEnd = new Date(task.end);
             const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
             const durationDays = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
-            const durationText = durationDays;
+            const durationText = countWorkingDays(taskStart, taskEnd);
             return (
               <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
                 {/* Task name column: sticky left only */}
