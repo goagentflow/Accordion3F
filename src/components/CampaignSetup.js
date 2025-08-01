@@ -6,7 +6,8 @@ const CampaignSetup = ({
     useGlobalDate, 
     onUseGlobalDateChange, 
     projectStartDate, 
-    dateErrors 
+    dateErrors,
+    workingDaysNeeded
 }) => {
     // Remove the clientDeadline state and handleDeadlineChange
 
@@ -106,6 +107,41 @@ const CampaignSetup = ({
                             Project can start on schedule
                         </p>
                     )}
+                </div>
+            )}
+
+            {/* Real-time Working Days Indicator */}
+            {workingDaysNeeded && (
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Timeline Status
+                    </label>
+                    <div className={`px-3 py-2 border rounded-md ${
+                        workingDaysNeeded.needed > 0
+                            ? 'border-red-300 bg-red-50'
+                            : workingDaysNeeded.needed < 0
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-blue-300 bg-blue-50'
+                    }`}>
+                        <div className="text-sm font-medium">
+                            {workingDaysNeeded.needed > 0 ? (
+                                <span className="text-red-700">
+                                    ⚠️ {workingDaysNeeded.needed} day{workingDaysNeeded.needed !== 1 ? 's' : ''} need to be saved to start on time
+                                </span>
+                            ) : workingDaysNeeded.needed < 0 ? (
+                                <span className="text-green-700">
+                                    ✅ {Math.abs(workingDaysNeeded.needed)} day{Math.abs(workingDaysNeeded.needed) !== 1 ? 's' : ''} to spare
+                                </span>
+                            ) : (
+                                <span className="text-blue-700">
+                                    🎯 You're on target
+                                </span>
+                            )}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                            Available: {workingDaysNeeded.available} days | Allocated: {workingDaysNeeded.allocated} days
+                        </div>
+                    </div>
                 </div>
             )}
 

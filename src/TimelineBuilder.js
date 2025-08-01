@@ -410,15 +410,15 @@ useEffect(() => {
         });
     };
 
-    // Helper function to count working days between two dates (exclusive)
+        // Helper function to count working days between two dates (exclusive)
     const countWorkingDays = (startDate, endDate) => {
         let count = 0;
         const current = new Date(startDate);
         const end = new Date(endDate);
-        
+
         // Move to next day to make it exclusive
         current.setDate(current.getDate() + 1);
-        
+
         while (current <= end) {
             if (!isNonWorkingDay(current)) {
                 count++;
@@ -426,6 +426,44 @@ useEffect(() => {
             current.setDate(current.getDate() + 1);
         }
         return count;
+    };
+
+    // Calculate working days needed to save to start on time
+    const calculateWorkingDaysNeeded = () => {
+        if (!globalLiveDate || timelineTasks.length === 0) return null;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Calculate total working days from all calculated start dates to today
+        // Use the same logic as AssetSelector (weekends only, no bank holidays)
+        let totalDaysInPast = 0;
+        
+        Object.values(calculatedStartDates).forEach(startDateStr => {
+            const startDate = new Date(startDateStr);
+            if (startDate < today) {
+                // Use the same logic as AssetSelector's calculateWorkingDaysBetween
+                let workingDays = 0;
+                let currentDate = new Date(startDate);
+                
+                while (currentDate < today) {
+                    const dayOfWeek = currentDate.getDay();
+                    // Count if not weekend (0 = Sunday, 6 = Saturday)
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                        workingDays++;
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                totalDaysInPast += workingDays;
+            }
+        });
+        
+        return {
+            available: 0, // Not used in this calculation
+            allocated: 0, // Not used in this calculation
+            needed: totalDaysInPast
+        };
     };
 
     return (
@@ -491,6 +529,7 @@ useEffect(() => {
                             onUseGlobalDateChange={setUseGlobalDate}
                             projectStartDate={projectStartDate}
                             dateErrors={dateErrors}
+                            workingDaysNeeded={calculateWorkingDaysNeeded()}
                         />
 <AssetSelector
     assets={uniqueAssets || []}
@@ -543,6 +582,7 @@ useEffect(() => {
                                 tasks={timelineTasks} 
                                 bankHolidays={bankHolidays}
                                 onTaskDurationChange={handleTaskDurationChange}
+                                workingDaysNeeded={calculateWorkingDaysNeeded()}
                             />
                         ) : (
                             <div className="text-center text-gray-500 py-10">

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; // Import the new library
 
-const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} }) => {
+const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, workingDaysNeeded = null }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -331,6 +331,48 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} 
           })}
         </div>
       </div>
+
+      {/* Floating Working Days Indicator (always visible when there are issues) */}
+      {workingDaysNeeded && workingDaysNeeded.needed > 0 && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-red-300 rounded-lg shadow-lg p-4 max-w-sm">
+          <div className="text-base font-semibold text-gray-800 mb-2">
+            ⚠️ Timeline Alert
+          </div>
+          <div className="text-lg font-bold text-red-600 mb-2">
+            {workingDaysNeeded.needed} day{workingDaysNeeded.needed !== 1 ? 's' : ''} need to be saved
+          </div>
+          <div className="text-sm text-gray-600">
+            Adjust task durations to start on time
+          </div>
+        </div>
+      )}
+
+      {/* Floating Working Days Indicator (shown while dragging) */}
+      {isDragging && workingDaysNeeded && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-3 max-w-xs">
+          <div className="text-sm font-medium text-gray-700 mb-1">
+            Timeline Status
+          </div>
+          <div className={`text-sm ${
+            workingDaysNeeded.needed > 0
+              ? 'text-red-600'
+              : workingDaysNeeded.needed < 0
+              ? 'text-green-600'
+              : 'text-blue-600'
+          }`}>
+            {workingDaysNeeded.needed > 0 ? (
+              <span>⚠️ {workingDaysNeeded.needed} day{workingDaysNeeded.needed !== 1 ? 's' : ''} need to be saved</span>
+            ) : workingDaysNeeded.needed < 0 ? (
+              <span>✅ {Math.abs(workingDaysNeeded.needed)} day{Math.abs(workingDaysNeeded.needed) !== 1 ? 's' : ''} to spare</span>
+            ) : (
+              <span>🎯 You're on target</span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Available: {workingDaysNeeded.available} | Allocated: {workingDaysNeeded.allocated}
+          </div>
+        </div>
+      )}
 
       {/* Export Options */}
       <div className="mt-6 p-4 border-t border-gray-200">
