@@ -1,7 +1,24 @@
 import React from 'react';
 import * as XLSX from 'xlsx'; // Import the new library
 
-const GanttChart = ({ tasks }) => {
+const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} }) => {
+  // Helper functions to check non-working days
+  const isBankHoliday = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return bankHolidays.includes(dateStr);
+  };
+
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
+  };
+
+  const getColumnBackground = (date) => {
+    if (isBankHoliday(date)) return 'bg-red-50';
+    if (isWeekend(date)) return 'bg-gray-50';
+    return 'bg-white';
+  };
+
   if (!tasks || tasks.length === 0) {
     return (
       <div className="text-center text-gray-500 py-10">
@@ -113,7 +130,7 @@ const GanttChart = ({ tasks }) => {
               return (
                 <div
                   key={index}
-                  className="p-1 text-xs text-center border-b border-r border-gray-200 flex flex-col justify-center bg-white"
+                  className={`p-1 text-xs text-center border-b border-r border-gray-200 flex flex-col justify-center ${getColumnBackground(date)}`}
                   style={{
                     width: `${DAY_COLUMN_WIDTH}px`,
                     minWidth: `${DAY_COLUMN_WIDTH}px`,
@@ -124,7 +141,12 @@ const GanttChart = ({ tasks }) => {
                   }}
                 >
                   {/* Show the formatted date with day abbreviation */}
-                  <div className="font-medium">{formatted}</div>
+                  <div className="font-medium">
+                    {formatted}
+                    {isBankHoliday(date) && (
+                      <span className="ml-1 text-red-500" title="Bank Holiday">🏦</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -156,8 +178,12 @@ const GanttChart = ({ tasks }) => {
                 {/* Gantt bars and grid */}
                 <div className="relative border-b border-gray-200" style={{ width: `${dateColumns.length * DAY_COLUMN_WIDTH}px` }}>
                   <div className="flex h-full">
-                    {dateColumns.map((_, colIndex) => (
-                      <div key={colIndex} className="border-r border-gray-200" style={{ width: `${DAY_COLUMN_WIDTH}px`, minWidth: `${DAY_COLUMN_WIDTH}px` }} />
+                    {dateColumns.map((date, colIndex) => (
+                      <div 
+                        key={colIndex} 
+                        className={`border-r border-gray-200 ${getColumnBackground(date)}`}
+                        style={{ width: `${DAY_COLUMN_WIDTH}px`, minWidth: `${DAY_COLUMN_WIDTH}px` }} 
+                      />
                     ))}
                   </div>
                   <div

@@ -497,7 +497,7 @@ useEffect(() => {
 )} */}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
-                            <GanttChart tasks={timelineTasks} />
+                            <GanttChart tasks={timelineTasks} bankHolidays={bankHolidays} />
                         ) : (
                             <div className="text-center text-gray-500 py-10">
                                 <p className="text-lg">Your timeline will appear here.</p>
