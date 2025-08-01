@@ -382,10 +382,10 @@ const TimelineBuilder = () => {
                 finalTimeline.push(...calculatedTasks);
             });
             
-            // Now rebuild the entire timeline sequentially including custom tasks
+            // Now rebuild the entire timeline with custom tasks, ALWAYS anchored to the fixed go-live date
             const allTasksSequential = [];
             
-            // First, collect all tasks (asset tasks + custom tasks) in the correct order
+            // Process each asset with its custom tasks
             selectedAssets.forEach(asset => {
                 const assetTasks = tasksByAsset[asset.id] || [];
                 const customTasksForAsset = customTasks.filter(ct => {
@@ -401,7 +401,7 @@ const TimelineBuilder = () => {
                 const goLiveTask = assetTasks.find(task => task.name.includes('Go-Live'));
                 const regularTasks = assetTasks.filter(task => !task.name.includes('Go-Live'));
                 
-                // Create ordered task list for this asset
+                // Create ordered task list for this asset (including custom tasks)
                 const orderedTasks = [];
                 
                 // Add regular tasks in their original order
@@ -420,8 +420,9 @@ const TimelineBuilder = () => {
                     orderedTasks.push(goLiveTask);
                 }
                 
-                // Now build the timeline backwards from go-live for this asset
-                let currentEndDate = new Date(asset.startDate);
+                // CRITICAL: Always start from the FIXED go-live date
+                const fixedGoLiveDate = new Date(asset.startDate);
+                let currentEndDate = new Date(fixedGoLiveDate);
                 const assetTimeline = [];
                 
                 // Process tasks in reverse order (backwards from go-live)
@@ -429,7 +430,7 @@ const TimelineBuilder = () => {
                     const task = orderedTasks[i];
                     
                     if (task.isCustom) {
-                        // Custom task - calculate backwards
+                        // Custom task - calculate backwards from current position
                         const taskStartDate = subtractWorkingDays(currentEndDate, task.duration);
                         const taskEndDate = new Date(currentEndDate);
                         taskEndDate.setDate(taskEndDate.getDate() - 1);
@@ -448,12 +449,13 @@ const TimelineBuilder = () => {
                         
                         currentEndDate = new Date(taskStartDate);
                     } else if (task.name.includes('Go-Live')) {
-                        // Go-live task
+                        // Go-live task - ALWAYS on the fixed go-live date
                         assetTimeline.unshift({
                             ...task,
-                            start: currentEndDate.toISOString().split('T')[0],
-                            end: currentEndDate.toISOString().split('T')[0]
+                            start: fixedGoLiveDate.toISOString().split('T')[0],
+                            end: fixedGoLiveDate.toISOString().split('T')[0]
                         });
+                        // Don't update currentEndDate for go-live task
                     } else {
                         // Regular asset task - calculate backwards
                         const taskInfo = csvData.find(row => 
