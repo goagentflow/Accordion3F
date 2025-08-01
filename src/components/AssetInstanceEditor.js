@@ -18,6 +18,7 @@ const AssetInstanceEditor = ({
   // Local state for duration editor
   const [showDurationEditor, setShowDurationEditor] = useState(false);
   const [editedDurations, setEditedDurations] = useState({});
+  const [saveConfirmation, setSaveConfirmation] = useState(false);
 
   // Add a warning if go-live date is a non-working day
   const goLiveDateIsNonWorking = asset.startDate && isNonWorkingDay && isNonWorkingDay(new Date(asset.startDate));
@@ -44,6 +45,12 @@ const AssetInstanceEditor = ({
   const handleSaveDurations = () => {
     onSaveTaskDurations(asset.id, editedDurations);
     setShowDurationEditor(false);
+    setSaveConfirmation(true);
+    
+    // Clear confirmation after 3 seconds
+    setTimeout(() => {
+      setSaveConfirmation(false);
+    }, 3000);
   };
 
   // Calculate working days to save for this asset
@@ -131,6 +138,9 @@ const AssetInstanceEditor = ({
           >
             Save
           </button>
+          {saveConfirmation && (
+            <span className="text-green-600 text-xs ml-2">✅ Saved successfully!</span>
+          )}
           <button
             className="px-2 py-1 bg-gray-300 text-gray-800 rounded text-xs"
             onClick={() => setShowDurationEditor(false)}

@@ -386,6 +386,48 @@ useEffect(() => {
         setAssetTaskDurations(prev => ({ ...prev, [assetId]: durations }));
     };
 
+    // Handler for drag-to-resize task duration
+    const handleTaskDurationChange = (taskId, newDuration, newEndDate) => {
+        // Find the task being modified
+        const taskIndex = timelineTasks.findIndex(task => task.id === taskId);
+        if (taskIndex === -1) return;
+
+        // Extract asset ID and task name from the task ID
+        const assetId = taskId.split('-task-')[0];
+        const taskName = timelineTasks[taskIndex].name.split(': ')[1]; // Get task name after the colon
+        
+        // Update the assetTaskDurations state to trigger the same recalculation logic
+        // that the manual duration editing uses
+        setAssetTaskDurations(prev => {
+            const currentDurations = prev[assetId] || {};
+            return {
+                ...prev,
+                [assetId]: {
+                    ...currentDurations,
+                    [taskName]: newDuration
+                }
+            };
+        });
+    };
+
+    // Helper function to count working days between two dates (exclusive)
+    const countWorkingDays = (startDate, endDate) => {
+        let count = 0;
+        const current = new Date(startDate);
+        const end = new Date(endDate);
+        
+        // Move to next day to make it exclusive
+        current.setDate(current.getDate() + 1);
+        
+        while (current <= end) {
+            if (!isNonWorkingDay(current)) {
+                count++;
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    };
+
     return (
         <div className="bg-gray-100 min-h-screen font-sans">
             <header className="bg-white shadow-md">
@@ -497,7 +539,11 @@ useEffect(() => {
 )} */}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
-                            <GanttChart tasks={timelineTasks} bankHolidays={bankHolidays} />
+                            <GanttChart 
+                                tasks={timelineTasks} 
+                                bankHolidays={bankHolidays}
+                                onTaskDurationChange={handleTaskDurationChange}
+                            />
                         ) : (
                             <div className="text-center text-gray-500 py-10">
                                 <p className="text-lg">Your timeline will appear here.</p>

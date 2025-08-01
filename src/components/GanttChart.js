@@ -1,7 +1,20 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; // Import the new library
 
 const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} }) => {
+  // Drag state
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [originalDuration, setOriginalDuration] = useState(0);
+  const containerRef = useRef(null);
+
+  // --- CONFIGURATION ---
+  const DAY_COLUMN_WIDTH = 48;
+  const ROW_HEIGHT = 80;
+  const HEADER_HEIGHT = 50;
+  const TASK_NAME_WIDTH = 320;
+
   // Helper functions to check non-working days
   const isBankHoliday = (date) => {
     const dateStr = date.toISOString().split('T')[0];
@@ -19,6 +32,120 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} 
     return 'bg-white';
   };
 
+  // Helper function to count working days between two dates
+  const countWorkingDays = (startDate, endDate) => {
+    let count = 0;
+    const current = new Date(startDate);
+    const end = new Date(endDate);
+    
+    while (current <= end) {
+      if (!isBankHoliday(current) && !isWeekend(current)) {
+        count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return count;
+  };
+
+  // Helper function to add working days to a date
+  const addWorkingDays = (startDate, workingDaysToAdd) => {
+    if (workingDaysToAdd <= 0) {
+      return new Date(startDate);
+    }
+    let currentDate = new Date(startDate);
+    let remainingDays = workingDaysToAdd - 1;
+    
+    while (remainingDays > 0) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      if (!isBankHoliday(currentDate) && !isWeekend(currentDate)) {
+        remainingDays--;
+      }
+    }
+    
+    // Ensure the final day is a working day
+    while (isBankHoliday(currentDate) || isWeekend(currentDate)) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return currentDate;
+  };
+
+  // Mouse event handlers for drag functionality
+  const handleMouseDown = (e, taskId, taskStart, taskEnd) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const isRightEdge = e.clientX > rect.right - 15; // 15px from right edge
+    
+    if (isRightEdge) {
+      setIsDragging(true);
+      setDraggedTaskId(taskId);
+      setDragStartX(e.clientX);
+      
+      const startDate = new Date(taskStart);
+      const endDate = new Date(taskEnd);
+      const duration = countWorkingDays(startDate, endDate);
+      setOriginalDuration(duration);
+      
+      e.preventDefault();
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || !draggedTaskId) return;
+    
+    const deltaX = e.clientX - dragStartX;
+    const deltaDays = Math.round(deltaX / DAY_COLUMN_WIDTH);
+    
+    // Find the task being dragged
+    const task = tasks.find(t => t.id === draggedTaskId);
+    if (!task) return;
+    
+    const newDuration = Math.max(1, originalDuration + deltaDays); // Minimum 1 day
+    
+    // Calculate new end date based on working days
+    const startDate = new Date(task.start);
+    const newEndDate = addWorkingDays(startDate, newDuration);
+    
+    // Call the callback to update the task
+    onTaskDurationChange(draggedTaskId, newDuration, newEndDate.toISOString().split('T')[0]);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDraggedTaskId(null);
+    setDragStartX(0);
+    setOriginalDuration(0);
+  };
+
+  const handleMouseMoveOverTask = (e) => {
+    if (!isDragging) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const isRightEdge = e.clientX > rect.right - 15;
+      if (isRightEdge) {
+        e.currentTarget.style.cursor = 'ew-resize';
+      } else {
+        e.currentTarget.style.cursor = 'pointer';
+      }
+    }
+  };
+
+  const handleMouseLeave = (e) => {
+    if (!isDragging) {
+      e.currentTarget.style.cursor = 'pointer';
+    }
+  };
+
+  // Add global mouse event listeners
+  React.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, draggedTaskId, dragStartX, originalDuration]);
+
   if (!tasks || tasks.length === 0) {
     return (
       <div className="text-center text-gray-500 py-10">
@@ -27,12 +154,6 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} 
       </div>
     );
   }
-
-  // --- CONFIGURATION ---
-  const DAY_COLUMN_WIDTH = 48;
-  const ROW_HEIGHT = 80;
-  const HEADER_HEIGHT = 50;
-  const TASK_NAME_WIDTH = 320;
 
   // --- DATE CALCULATIONS ---
   const startDates = tasks.map(task => new Date(task.start));
@@ -187,13 +308,22 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {} 
                     ))}
                   </div>
                   <div
-                    className="absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2"
+                    className={`absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
+                      isDragging && draggedTaskId === task.id ? 'ring-2 ring-blue-300 ring-opacity-50 shadow-lg' : ''
+                    }`}
                     style={{
                       left: `${startOffsetDays * DAY_COLUMN_WIDTH}px`,
                       width: `${durationDays * DAY_COLUMN_WIDTH}px`,
                     }}
+                    onMouseDown={(e) => handleMouseDown(e, task.id, task.start, task.end)}
+                    onMouseMove={handleMouseMoveOverTask}
+                    onMouseLeave={handleMouseLeave}
                   >
                     <span className="text-white text-xs font-medium truncate">{task.name}</span>
+                    {/* Drag handle indicator */}
+                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-blue-600 rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize">
+                      <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
+                    </div>
                   </div>
                 </div>
               </div>
