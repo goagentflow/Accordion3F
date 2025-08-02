@@ -1,13 +1,17 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; // Import the new library
 
-const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, workingDaysNeeded = null, onAddCustomTask = () => {} }) => {
+const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, onAddCustomTask = () => {} }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [originalDuration, setOriginalDuration] = useState(0);
   const containerRef = useRef(null);
+
+  // Task name editing state
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingTaskName, setEditingTaskName] = useState('');
 
   // Custom task modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -139,6 +143,33 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     }
   };
 
+  // Task name editing handlers
+  const handleTaskNameClick = (taskId, currentName) => {
+    setEditingTaskId(taskId);
+    setEditingTaskName(currentName);
+  };
+
+  const handleTaskNameSave = () => {
+    if (editingTaskName.trim()) {
+      onTaskNameChange(editingTaskId, editingTaskName.trim());
+    }
+    setEditingTaskId(null);
+    setEditingTaskName('');
+  };
+
+  const handleTaskNameCancel = () => {
+    setEditingTaskId(null);
+    setEditingTaskName('');
+  };
+
+  const handleTaskNameKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleTaskNameSave();
+    } else if (e.key === 'Escape') {
+      handleTaskNameCancel();
+    }
+  };
+
   // Custom task modal handlers
   const handleOpenAddTaskModal = () => {
     setShowAddTaskModal(true);
@@ -250,6 +281,9 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             <p className="text-sm text-blue-600">
               {tasks.length} tasks • {totalDays} days total • {minDate.toLocaleDateString()} to {maxDate.toLocaleDateString()}
             </p>
+            <p className="text-xs text-blue-500 mt-1">
+              💡 Click on any task name to edit it
+            </p>
           </div>
           <button
             onClick={handleOpenAddTaskModal}
@@ -339,8 +373,49 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                     background: 'white',
                   }}
                 >
-                  <div className="font-medium text-gray-800 text-sm leading-tight whitespace-normal">{task.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">{durationText} day{durationText !== 1 ? 's' : ''}</div>
+                  <div className="flex flex-col w-full">
+                    {editingTaskId === task.id ? (
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="text"
+                          value={editingTaskName}
+                          onChange={(e) => setEditingTaskName(e.target.value)}
+                          onKeyDown={handleTaskNameKeyDown}
+                          onBlur={handleTaskNameSave}
+                          className="text-sm border rounded px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleTaskNameSave}
+                          className="text-xs bg-green-500 text-white px-1 py-1 rounded hover:bg-green-600"
+                          title="Save"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={handleTaskNameCancel}
+                          className="text-xs bg-gray-500 text-white px-1 py-1 rounded hover:bg-gray-600"
+                          title="Cancel"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div 
+                        className="font-medium text-gray-800 text-sm leading-tight whitespace-normal cursor-pointer hover:bg-blue-50 px-1 py-1 rounded"
+                        onClick={() => handleTaskNameClick(task.id, task.name)}
+                        title="Click to edit task name"
+                      >
+                        <div className="flex items-center">
+                          <span>{task.name}</span>
+                          <span className="ml-2 text-xs text-gray-400" title="Click to edit">
+                            ✏️
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500 mt-1">{durationText} day{durationText !== 1 ? 's' : ''}</div>
+                  </div>
                 </div>
                 {/* Gantt bars and grid */}
                 <div className="relative border-b border-gray-200" style={{ width: `${dateColumns.length * DAY_COLUMN_WIDTH}px` }}>

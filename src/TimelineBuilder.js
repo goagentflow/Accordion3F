@@ -31,8 +31,21 @@ const TimelineBuilder = () => {
     // Add state to store custom tasks separately
     const [customTasks, setCustomTasks] = useState([]); // Array of custom task objects
 
+    // Add state to store custom task names
+    const [customTaskNames, setCustomTaskNames] = useState({}); // { taskId: customName }
+
     // Add state to store bank holidays
     const [bankHolidays, setBankHolidays] = useState([]); // Array of YYYY-MM-DD strings
+
+    // Helper function to get task name (custom or default)
+    const getTaskName = (taskId, assetName, taskInfo) => {
+        // Check if there's a custom name for this task
+        if (customTaskNames[taskId]) {
+            return customTaskNames[taskId];
+        }
+        // Return default format
+        return `${assetName}: ${taskInfo['Task']}`;
+    };
 
     // Helper function to check if date is a non-working day (weekend or bank holiday)
     const isNonWorkingDay = (date) => {
@@ -175,9 +188,10 @@ const TimelineBuilder = () => {
             let taskIndex = 0;
 
             // Go-live task (single day)
+            const goLiveTaskId = `${asset.id}-go-live`;
             ganttTasks.unshift({
-                id: `${asset.id}-go-live`,
-                name: `${asset.name}: Go-Live`, // Use custom name
+                id: goLiveTaskId,
+                name: getTaskName(goLiveTaskId, asset.name, { 'Task': 'Go-Live' }),
                 start: liveDate.toISOString().split('T')[0],
                 end: liveDate.toISOString().split('T')[0],
                 progress: 0,
@@ -202,9 +216,10 @@ const TimelineBuilder = () => {
                 if (isNonWorkingDay(finalTaskEndDate)) {
                     finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
                 }
+                const taskId = `${asset.id}-task-${taskIndex}`;
                 ganttTasks.unshift({
-                    id: `${asset.id}-task-${taskIndex}`,
-                    name: `${asset.name}: ${taskInfo['Task']}`,
+                    id: taskId,
+                    name: getTaskName(taskId, asset.name, taskInfo),
                     start: taskStartDate.toISOString().split('T')[0],
                     end: finalTaskEndDate.toISOString().split('T')[0],
                     progress: 0,
@@ -530,7 +545,7 @@ const TimelineBuilder = () => {
             setCalculatedStartDates(newCalculatedStartDates);
             setDateErrors(newDateErrors);
         }
-    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations]);
+    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations, customTaskNames]);
 // This new useEffect pre-populates individual dates when switching from global mode
     useEffect(() => {
         if (!useGlobalDate && globalLiveDate && selectedAssets.length > 0) {
@@ -705,6 +720,14 @@ useEffect(() => {
                 asset.id === assetId ? { ...asset, name: newName } : asset
             )
         );
+    };
+
+    // Handler to rename a task
+    const handleRenameTask = (taskId, newName) => {
+        setCustomTaskNames(prev => ({
+            ...prev,
+            [taskId]: newName
+        }));
     };
 
     const handleAssetLiveDateChange = (assetName, date) => {
@@ -1179,6 +1202,7 @@ useEffect(() => {
                                 tasks={timelineTasks} 
                                 bankHolidays={bankHolidays}
                                 onTaskDurationChange={handleTaskDurationChange}
+                                onTaskNameChange={handleRenameTask}
                                 workingDaysNeeded={calculateWorkingDaysNeeded()}
                                 onAddCustomTask={handleAddCustomTask}
                             />
