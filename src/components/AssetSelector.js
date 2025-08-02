@@ -165,16 +165,6 @@ const AssetSelector = ({
                         <div className="font-medium text-blue-900 mb-1">
                             Selected Assets: {(selectedAssets || []).map(a => a.name).join(', ')}
                         </div>
-                        {dateErrors.length > 0 && (
-                            <div className="text-red-700 text-xs">
-                                ⚠️ {dateErrors.length} asset{dateErrors.length !== 1 ? 's' : ''} with date conflicts - manual adjustment needed
-                            </div>
-                        )}
-                        {dateErrors.length === 0 && (selectedAssets || []).length > 0 && (
-                            <div className="text-green-700 text-xs">
-                                ✅ All assets can be completed on schedule
-                            </div>
-                        )}
                     </div>
                 </div>
             )}

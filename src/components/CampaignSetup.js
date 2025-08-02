@@ -159,6 +159,16 @@ const CampaignSetup = ({
                                 ⚠️ Manual task adjustment required
                             </p>
                         )}
+                        {dateErrors.length > 0 && (
+                            <p className="text-red-600 font-medium mt-1">
+                                ⚠️ {dateErrors.length} asset{dateErrors.length !== 1 ? 's' : ''} with date conflicts - manual adjustment needed
+                            </p>
+                        )}
+                        {dateErrors.length === 0 && !isStartDateInPast && (
+                            <p className="text-green-600 font-medium mt-1">
+                                ✅ All assets can be completed on schedule
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
