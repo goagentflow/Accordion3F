@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; // Import the new library
 
-const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, onAddCustomTask = () => {} }) => {
+const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, assetAlerts = [], onAddCustomTask = () => {} }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -18,6 +18,9 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskDuration, setNewTaskDuration] = useState(1);
   const [insertAfterTask, setInsertAfterTask] = useState('');
+
+  // Asset alerts state
+  const [isAssetAlertsExpanded, setIsAssetAlertsExpanded] = useState(false);
 
   // --- CONFIGURATION ---
   const DAY_COLUMN_WIDTH = 48;
@@ -357,7 +360,8 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             const taskStart = new Date(task.start);
             const taskEnd = new Date(task.end);
             const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
-            const durationDays = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
+            // Calculate working days instead of calendar days for duration display
+            const durationDays = countWorkingDays(taskStart, taskEnd);
             const durationText = durationDays;
             return (
               <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
@@ -428,24 +432,46 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                       />
                     ))}
                   </div>
-                  <div
-                    className={`absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
-                      isDragging && draggedTaskId === task.id ? 'ring-2 ring-blue-300 ring-opacity-50 shadow-lg' : ''
-                    }`}
-                    style={{
-                      left: `${startOffsetDays * DAY_COLUMN_WIDTH}px`,
-                      width: `${durationDays * DAY_COLUMN_WIDTH}px`,
-                    }}
-                    onMouseDown={(e) => handleMouseDown(e, task.id, task.start, task.end)}
-                    onMouseMove={handleMouseMoveOverTask}
-                    onMouseLeave={handleMouseLeave}
-                  >
-                    <span className="text-white text-xs font-medium truncate">{task.name}</span>
-                    {/* Drag handle indicator */}
-                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-blue-600 rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize">
-                      <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
-                    </div>
-                  </div>
+                  {/* Render task bars for each working day */}
+                  {(() => {
+                    const bars = [];
+                    let currentDate = new Date(taskStart);
+                    let workingDaysCounted = 0;
+                    
+                    while (currentDate <= taskEnd && workingDaysCounted < durationDays) {
+                      if (!isBankHoliday(currentDate) && !isWeekend(currentDate)) {
+                        const dayOffset = Math.floor((currentDate - minDate) / (1000 * 60 * 60 * 24));
+                        bars.push(
+                          <div
+                            key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
+                            className={`absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
+                              isDragging && draggedTaskId === task.id ? 'ring-2 ring-blue-300 ring-opacity-50 shadow-lg' : ''
+                            }`}
+                            style={{
+                              left: `${dayOffset * DAY_COLUMN_WIDTH}px`,
+                              width: `${DAY_COLUMN_WIDTH}px`,
+                            }}
+                            onMouseDown={(e) => handleMouseDown(e, task.id, task.start, task.end)}
+                            onMouseMove={handleMouseMoveOverTask}
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            {workingDaysCounted === 0 && (
+                              <span className="text-white text-xs font-medium truncate">{task.name}</span>
+                            )}
+                            {/* Drag handle indicator on the last working day */}
+                            {workingDaysCounted === durationDays - 1 && (
+                              <div className="absolute right-0 top-0 bottom-0 w-2 bg-blue-600 rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize">
+                                <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                        workingDaysCounted++;
+                      }
+                      currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                    return bars;
+                  })()}
                 </div>
               </div>
             );
@@ -453,8 +479,69 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
         </div>
       </div>
 
-      {/* Floating Working Days Indicator (always visible when there are issues) */}
-      {workingDaysNeeded && workingDaysNeeded.needed > 0 && (
+      {/* Asset-Level Timeline Alerts */}
+      {assetAlerts && assetAlerts.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-red-300 rounded-lg shadow-lg p-4 max-w-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-base font-semibold text-gray-800">
+              ⚠️ Timeline Alerts ({assetAlerts.length} assets)
+            </div>
+            <button
+              onClick={() => setIsAssetAlertsExpanded(!isAssetAlertsExpanded)}
+              className="text-gray-500 hover:text-gray-700 text-sm"
+            >
+              {isAssetAlertsExpanded ? '▼' : '▶'}
+            </button>
+          </div>
+          
+          {isAssetAlertsExpanded ? (
+            <div className="space-y-2">
+              {assetAlerts.map((alert, index) => (
+                <div key={alert.assetId} className={`p-2 rounded border-l-4 ${
+                  alert.isCritical ? 'border-red-500 bg-red-50' : 'border-orange-500 bg-orange-50'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium text-gray-800">
+                      {alert.assetName}
+                    </div>
+                    <div className={`text-sm font-bold ${
+                      alert.isCritical ? 'text-red-600' : 'text-orange-600'
+                    }`}>
+                      {alert.daysNeeded} day{alert.daysNeeded !== 1 ? 's' : ''} needed
+                    </div>
+                  </div>
+                  <div className="mt-1">
+                    <div className="flex items-center space-x-1">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${
+                            alert.isCritical ? 'bg-red-500' : 'bg-orange-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (alert.daysNeeded / 10) * 100)}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {alert.daysNeeded}/10
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-lg font-bold text-red-600 mb-2">
+              {workingDaysNeeded.needed} day{workingDaysNeeded.needed !== 1 ? 's' : ''} need to be saved
+            </div>
+          )}
+          
+          <div className="text-sm text-gray-600 mt-2">
+            {isAssetAlertsExpanded ? 'Click on any asset to focus on its tasks' : 'Click to see details by asset'}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback: Original Timeline Alert for backward compatibility */}
+      {(!assetAlerts || assetAlerts.length === 0) && workingDaysNeeded && workingDaysNeeded.needed > 0 && (
         <div className="fixed top-4 right-4 z-50 bg-white border border-red-300 rounded-lg shadow-lg p-4 max-w-sm">
           <div className="text-base font-semibold text-gray-800 mb-2">
             ⚠️ Timeline Alert

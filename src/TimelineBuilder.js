@@ -82,41 +82,62 @@ const TimelineBuilder = () => {
 
     // Restore app state from a snapshot
     const restoreFromSnapshot = (snapshot) => {
-        // Restore all state from snapshot
-        setSelectedAssets(snapshot.selectedAssets);
-        setAssetLiveDates(snapshot.assetLiveDates);
-        setUseGlobalDate(snapshot.useGlobalDate);
-        setGlobalLiveDate(snapshot.globalLiveDate);
-        setCustomTaskNames(snapshot.customTaskNames);
-        setAssetTaskDurations(snapshot.assetTaskDurations);
-        setCustomTasks(snapshot.customTasks);
-        setShowInfoBox(snapshot.showInfoBox);
+        // Validate snapshot before restoring
+        if (!snapshot || typeof snapshot !== 'object') {
+            console.error('Invalid snapshot provided to restoreFromSnapshot');
+            return;
+        }
         
-        // Restore calculated state
-        setTimelineTasks(snapshot.timelineTasks);
-        setCalculatedStartDates(snapshot.calculatedStartDates);
-        setDateErrors(snapshot.dateErrors);
-        setProjectStartDate(snapshot.projectStartDate);
+        // Restore only the input state (what the user controls)
+        if (snapshot.selectedAssets) setSelectedAssets(snapshot.selectedAssets);
+        if (snapshot.assetLiveDates) setAssetLiveDates(snapshot.assetLiveDates);
+        if (snapshot.useGlobalDate !== undefined) setUseGlobalDate(snapshot.useGlobalDate);
+        if (snapshot.globalLiveDate) setGlobalLiveDate(snapshot.globalLiveDate);
+        if (snapshot.customTaskNames) setCustomTaskNames(snapshot.customTaskNames);
+        if (snapshot.assetTaskDurations) setAssetTaskDurations(snapshot.assetTaskDurations);
+        if (snapshot.customTasks) setCustomTasks(snapshot.customTasks);
+        if (snapshot.showInfoBox !== undefined) setShowInfoBox(snapshot.showInfoBox);
+        
+        // Don't restore calculated state - let the useEffect recalculate it fresh
+        // This prevents conflicts between old calculated state and new input state
+        // setTimelineTasks(snapshot.timelineTasks);
+        // setCalculatedStartDates(snapshot.calculatedStartDates);
+        // setDateErrors(snapshot.dateErrors);
+        // setProjectStartDate(snapshot.projectStartDate);
     };
 
     // Undo function
     const undo = () => {
-        if (historyIndex > 0) {
+        if (historyIndex > 0 && history[historyIndex - 1]) {
             setIsUndoRedoAction(true);
             const previousSnapshot = history[historyIndex - 1];
-            restoreFromSnapshot(previousSnapshot);
-            setHistoryIndex(prev => prev - 1);
+            if (previousSnapshot && previousSnapshot.selectedAssets) {
+                restoreFromSnapshot(previousSnapshot);
+                setHistoryIndex(prev => prev - 1);
+            } else {
+                console.error('Invalid snapshot found in history during undo');
+                // Remove the invalid snapshot and try again
+                setHistory(prev => prev.filter(snapshot => snapshot && snapshot.selectedAssets));
+                setHistoryIndex(prev => Math.max(0, prev - 1));
+            }
             setIsUndoRedoAction(false);
         }
     };
 
     // Redo function
     const redo = () => {
-        if (historyIndex < history.length - 1) {
+        if (historyIndex < history.length - 1 && history[historyIndex + 1]) {
             setIsUndoRedoAction(true);
             const nextSnapshot = history[historyIndex + 1];
-            restoreFromSnapshot(nextSnapshot);
-            setHistoryIndex(prev => prev + 1);
+            if (nextSnapshot && nextSnapshot.selectedAssets) {
+                restoreFromSnapshot(nextSnapshot);
+                setHistoryIndex(prev => prev + 1);
+            } else {
+                console.error('Invalid snapshot found in history during redo');
+                // Remove the invalid snapshot and try again
+                setHistory(prev => prev.filter(snapshot => snapshot && snapshot.selectedAssets));
+                setHistoryIndex(prev => Math.min(prev, history.length - 1));
+            }
             setIsUndoRedoAction(false);
         }
     };
@@ -295,7 +316,8 @@ const TimelineBuilder = () => {
             for (let i = assetTasks.length - 1; i >= 0; i--) {
                 const taskInfo = assetTasks[i];
                 // Use custom duration if present, else default from CSV
-                const customDurations = assetTaskDurations[asset.id] || {};
+                // Use asset.type as the key to match CSV task names consistently
+                const customDurations = assetTaskDurations[asset.type] || {};
                 const duration = customDurations[taskInfo['Task']] !== undefined
                     ? customDurations[taskInfo['Task']]
                     : parseInt(taskInfo['Duration (Days)'], 10) || 1;
@@ -890,18 +912,23 @@ useEffect(() => {
         const taskIndex = timelineTasks.findIndex(task => task.id === taskId);
         if (taskIndex === -1) return;
 
-        // Extract asset ID and task name from the task ID
-        const assetId = taskId.split('-task-')[0];
-        const taskName = timelineTasks[taskIndex].name.split(': ')[1]; // Get task name after the colon
+        const task = timelineTasks[taskIndex];
+        const taskName = task.name.split(': ')[1]; // Get task name after the colon
+        const assetName = task.name.split(': ')[0]; // Get asset name before the colon
+        
+        // Find the asset by name
+        const asset = selectedAssets.find(a => a.name === assetName);
+        if (!asset) return;
         
         executeAction(() => {
             // Update the assetTaskDurations state to trigger the same recalculation logic
             // that the manual duration editing uses
+            // Use asset.type as the key to match CSV task names consistently
             setAssetTaskDurations(prev => {
-                const currentDurations = prev[assetId] || {};
+                const currentDurations = prev[asset.type] || {};
                 return {
                     ...prev,
-                    [assetId]: {
+                    [asset.type]: {
                         ...currentDurations,
                         [taskName]: newDuration
                     }
@@ -1041,6 +1068,40 @@ useEffect(() => {
         }
         
         return endDate.toISOString().split('T')[0];
+    };
+
+    // Calculate working days needed per asset for detailed timeline alerts
+    const calculateWorkingDaysNeededPerAsset = () => {
+        if (!globalLiveDate || timelineTasks.length === 0) return [];
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const assetAlerts = [];
+        
+        // Calculate for each asset that has date errors
+        selectedAssets.forEach(asset => {
+            const calculatedStart = calculatedStartDates[asset.id];
+            if (calculatedStart && dateErrors.includes(asset.id)) {
+                const startDate = new Date(calculatedStart);
+                const daysInPast = calculateWorkingDaysBetween(startDate, today);
+                
+                if (daysInPast > 0) {
+                    assetAlerts.push({
+                        assetId: asset.id,
+                        assetName: asset.name,
+                        assetType: asset.type,
+                        daysNeeded: daysInPast,
+                        daysSaved: 0, // This would need to be calculated based on original vs current durations
+                        startDate: calculatedStart,
+                        isCritical: daysInPast > 5 // Mark as critical if more than 5 days needed
+                    });
+                }
+            }
+        });
+        
+        // Sort by urgency (most days needed first)
+        return assetAlerts.sort((a, b) => b.daysNeeded - a.daysNeeded);
     };
 
     // Single source of truth for working days needed (same as AssetSelector's getWorkingDaysToSave)
@@ -1223,14 +1284,15 @@ useEffect(() => {
 )} */}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
-                            <GanttChart 
-                                tasks={timelineTasks} 
-                                bankHolidays={bankHolidays}
-                                onTaskDurationChange={handleTaskDurationChange}
-                                onTaskNameChange={handleRenameTask}
-                                workingDaysNeeded={calculateWorkingDaysNeeded()}
-                                onAddCustomTask={handleAddCustomTask}
-                            />
+                                                    <GanttChart 
+                            tasks={timelineTasks}
+                            bankHolidays={bankHolidays}
+                            onTaskDurationChange={handleTaskDurationChange}
+                            onTaskNameChange={handleRenameTask}
+                            workingDaysNeeded={calculateWorkingDaysNeeded()}
+                            assetAlerts={calculateWorkingDaysNeededPerAsset()}
+                            onAddCustomTask={handleAddCustomTask}
+                        />
                         ) : (
                             <div className="text-center text-gray-500 py-10">
                                 <p className="text-lg">Your timeline will appear here.</p>
