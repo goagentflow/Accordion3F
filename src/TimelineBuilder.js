@@ -879,8 +879,14 @@ useEffect(() => {
     // Handler to save custom task durations for an asset
     const handleSaveTaskDurations = (assetId, durations) => {
         const assetToUpdate = selectedAssets.find(asset => asset.id === assetId);
+        if (!assetToUpdate) return;
+        
         executeAction(() => {
-            setAssetTaskDurations(prev => ({ ...prev, [assetId]: durations }));
+            // Use asset.type as the key to match how duration changes are stored
+            setAssetTaskDurations(prev => ({ 
+                ...prev, 
+                [assetToUpdate.type]: durations 
+            }));
             
             // Preserve custom tasks before timeline recalculation
             const currentCustomTasks = timelineTasks.filter(task => task.isCustom);
