@@ -41,6 +41,10 @@ const TimelineBuilder = () => {
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [isUndoRedoAction, setIsUndoRedoAction] = useState(false);
+    
+    // State for progressive disclosure
+    const [showGettingStarted, setShowGettingStarted] = useState(false);
+    const [showAllInstructions, setShowAllInstructions] = useState(false);
 
     // Helper function to get task name (custom or default)
     const getTaskName = (taskId, assetName, taskInfo) => {
@@ -1113,54 +1117,15 @@ useEffect(() => {
                             </button>
                         </div>
                     </div>
-                    {/* Info Box: How to Use This Timeline Builder (moved here, dismissible) */}
-                    {showInfoBox && (
-                        <div className="relative mb-6 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-900">
-                            <button
-                                className="absolute top-2 right-2 text-blue-700 hover:text-blue-900 text-lg font-bold focus:outline-none"
-                                onClick={() => {
-                                    executeAction(() => setShowInfoBox(false), "Hide instructions");
-                                }}
-                                aria-label="Close instructions"
-                            >
-                                ×
-                            </button>
-                            <strong>How to Build Your Campaign Timeline:</strong>
-                            <ol className="list-decimal pl-5 mt-2 space-y-1">
-                                <li>
-                                    <strong>Choose Your Campaign Start Date:</strong><br />
-                                    If all assets launch on the same day, set a global start date and check “Use same live date for all assets.”<br />
-                                    If assets launch on different days, uncheck the box and set dates individually for each asset.
-                                </li>
-                                <li>
-                                    <strong>Add Assets:</strong><br />
-                                    Click “Add” next to each asset type you need.<br />
-                                    Need the same asset type more than once? Click “Add” again and give each a unique name.
-                                </li>
-                                <li>
-                                    <strong>Customize Assets:</strong><br />
-                                    Rename each asset for clarity (e.g., “Metro Advertorial – August”).<br />
-                                    Set or confirm the start date for each asset.
-                                </li>
-                                <li>
-                                    <strong>Review Your Timeline:</strong><br />
-                                    Remove any asset you don’t need.<br />
-                                    Check the timeline to ensure all assets are scheduled as planned.
-                                </li>
-                                <li>
-                                    <strong>Adjust Your Timeline if Needed:</strong><br />
-                                    If an asset’s timeline can’t be completed by the selected start date, you’ll see a warning.<br />
-                                    – You can either change the go-live date, or<br />
-                                    – Manually shorten the durations of individual tasks (“accordion” your timeline) until the schedule fits.
-                                </li>
-                                <li>
-                                    <strong>Undo/Redo:</strong><br />
-                                    Use Ctrl+Z to undo and Ctrl+Y to redo any changes you make.<br />
-                                    You can also use the Undo/Redo buttons in the top-right corner.
-                                </li>
-                            </ol>
-                        </div>
-                    )}
+                    {/* Getting Started Button */}
+                    <div className="mt-4 text-center">
+                        <button
+                            onClick={() => setShowGettingStarted(true)}
+                            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                        >
+                            🚀 Getting Started
+                        </button>
+                    </div>
                 </div>
             </header>
             <main className="container mx-auto p-6">
@@ -1250,6 +1215,161 @@ useEffect(() => {
                     </div>
                 </div>
             </main>
+            
+            {/* Progressive Disclosure Modal */}
+            {showGettingStarted && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-gray-800">Getting Started</h2>
+                                <button
+                                    onClick={() => {
+                                        setShowGettingStarted(false);
+                                        setShowAllInstructions(false);
+                                    }}
+                                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            
+                            {!showAllInstructions ? (
+                                // Quick Start Guide
+                                <div className="space-y-6">
+                                    <div className="text-center mb-6">
+                                        <p className="text-gray-600 text-lg">
+                                            Build your campaign timeline in 4 simple steps
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        <div className="flex items-start space-x-4">
+                                            <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                                1
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-gray-800">Select Your Assets</h3>
+                                                <p className="text-gray-600 text-sm">
+                                                    Choose the campaign assets you need from the left panel. 
+                                                    You can add multiple instances of the same asset type.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-start space-x-4">
+                                            <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                                2
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-gray-800">Set Your Go-Live Date</h3>
+                                                <p className="text-gray-600 text-sm">
+                                                    Choose whether all assets launch on the same day or set individual dates. 
+                                                    The system will calculate when work needs to start.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-start space-x-4">
+                                            <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                                3
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-gray-800">Review Your Timeline</h3>
+                                                <p className="text-gray-600 text-sm">
+                                                    Check the Gantt chart to see your timeline. 
+                                                    If you see warnings, you'll need to adjust task durations.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-start space-x-4">
+                                            <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                                4
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-gray-800">Export to Excel</h3>
+                                                <p className="text-gray-600 text-sm">
+                                                    Once your timeline is perfect, export it to Excel for your team.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="border-t pt-6 mt-6">
+                                        <button
+                                            onClick={() => setShowAllInstructions(true)}
+                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                        >
+                                            Show all instructions →
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                // Full Instructions
+                                <div className="space-y-4">
+                                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Complete Instructions</h3>
+                                    
+                                    <ol className="list-decimal pl-5 space-y-4 text-sm">
+                                        <li>
+                                            <strong className="text-gray-800">Choose Your Campaign Start Date:</strong><br />
+                                            <span className="text-gray-600">
+                                                If all assets launch on the same day, set a global start date and check "Use same live date for all assets."<br />
+                                                If assets launch on different days, uncheck the box and set dates individually for each asset.
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-800">Add Assets:</strong><br />
+                                            <span className="text-gray-600">
+                                                Click "Add" next to each asset type you need.<br />
+                                                Need the same asset type more than once? Click "Add" again and give each a unique name.
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-800">Customize Assets:</strong><br />
+                                            <span className="text-gray-600">
+                                                Rename each asset for clarity (e.g., "Metro Advertorial – August").<br />
+                                                Set or confirm the start date for each asset.
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-800">Review Your Timeline:</strong><br />
+                                            <span className="text-gray-600">
+                                                Remove any asset you don't need.<br />
+                                                Check the timeline to ensure all assets are scheduled as planned.
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-800">Adjust Your Timeline if Needed:</strong><br />
+                                            <span className="text-gray-600">
+                                                If an asset's timeline can't be completed by the selected start date, you'll see a warning.<br />
+                                                – You can either change the go-live date, or<br />
+                                                – Manually shorten the durations of individual tasks ("accordion" your timeline) until the schedule fits.
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <strong className="text-gray-800">Undo/Redo:</strong><br />
+                                            <span className="text-gray-600">
+                                                Use Ctrl+Z to undo and Ctrl+Y to redo any changes you make.<br />
+                                                You can also use the Undo/Redo buttons in the top-right corner.
+                                            </span>
+                                        </li>
+                                    </ol>
+                                    
+                                    <div className="border-t pt-4 mt-4">
+                                        <button
+                                            onClick={() => setShowAllInstructions(false)}
+                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                        >
+                                            ← Back to quick start
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
