@@ -91,7 +91,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     }
     // Fallback: try to determine owner from task name
     const taskName = task.name.toLowerCase();
-    if (taskName.includes('live date') || taskName.includes('go-live') || taskName.includes('issue date')) {
+    if (taskName.includes('live date') || taskName.includes('go-live') || taskName.includes('issue date') || taskName.includes('send date') || taskName.includes('live')) {
       return 'l';
     }
     if (taskName.includes('client feedback') || taskName.includes('client confirms') || taskName.includes('client sign')) {
@@ -550,15 +550,19 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
       const taskNameParts = task.name.split(': ');
       const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
       
-      // Calculate duration - for single-day tasks or Go-Live tasks, use calendar days
+      // Calculate duration - for single-day tasks or final tasks (go-live equivalent), use calendar days
       let duration;
       const startDate = new Date(task.start);
       const endDate = new Date(task.end);
       const isSingleDay = startDate.toDateString() === endDate.toDateString();
-      const isGoLiveTask = task.name.toLowerCase().includes('go-live') || task.name.toLowerCase().includes('live date');
+      const isFinalTask = task.name.toLowerCase().includes('go-live') || 
+                         task.name.toLowerCase().includes('live date') ||
+                         task.name.toLowerCase().includes('issue date') ||
+                         task.name.toLowerCase().includes('send date') ||
+                         task.name.toLowerCase().includes('live');
       
-      if (isSingleDay || isGoLiveTask) {
-        // For single-day tasks or Go-Live tasks, use calendar days (1 day)
+      if (isSingleDay || isFinalTask) {
+        // For single-day tasks or final tasks (go-live equivalent), use calendar days (1 day)
         duration = 1;
       } else {
         // For multi-day tasks, use working days
@@ -703,13 +707,17 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             const taskEnd = new Date(task.end);
             const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
             
-            // Calculate duration - for single-day tasks or Go-Live tasks, use calendar days
+            // Calculate duration - for single-day tasks or final tasks (go-live equivalent), use calendar days
             let durationDays;
             const isSingleDay = taskStart.toDateString() === taskEnd.toDateString();
-            const isGoLiveTask = task.name.toLowerCase().includes('go-live') || task.name.toLowerCase().includes('live date');
+            const isFinalTask = task.name.toLowerCase().includes('go-live') || 
+                               task.name.toLowerCase().includes('live date') ||
+                               task.name.toLowerCase().includes('issue date') ||
+                               task.name.toLowerCase().includes('send date') ||
+                               task.name.toLowerCase().includes('live');
             
-            if (isSingleDay || isGoLiveTask) {
-              // For single-day tasks or Go-Live tasks, use calendar days (1 day)
+            if (isSingleDay || isFinalTask) {
+              // For single-day tasks or final tasks (go-live equivalent), use calendar days (1 day)
               durationDays = 1;
             } else {
               // For multi-day tasks, use working days
@@ -792,8 +800,8 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                     let currentDate = new Date(taskStart);
                     let workingDaysCounted = 0;
                     
-                    // For single-day or Go-Live tasks, render on the exact date regardless of working days
-                    if (isSingleDay || isGoLiveTask) {
+                    // For single-day or final tasks, render on the exact date regardless of working days
+                    if (isSingleDay || isFinalTask) {
                       const dayOffset = Math.floor((currentDate - minDate) / (1000 * 60 * 60 * 24));
                       const owner = getOwnerFromTask(task);
                       const ownerColorClasses = getOwnerColorClasses(owner);

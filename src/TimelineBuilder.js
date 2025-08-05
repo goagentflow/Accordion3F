@@ -361,11 +361,8 @@ const TimelineBuilder = () => {
             // asset: { id, type, name, startDate }
             if (!asset.startDate) return; // Skip if no start date set
 
-            // Find all tasks for this asset type from the CSV, excluding "Live Date" tasks since we'll add our own "Go-Live" task
-            const assetTasks = csvData.filter(row => 
-                row['Asset Type'] === asset.type && 
-                !row['Task'].toLowerCase().includes('live date')
-            );
+            // Get ALL tasks for this asset type from the CSV (no filtering)
+            const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
             if (assetTasks.length === 0) return;
 
             // Use the global live date if useGlobalDate is true, otherwise use the asset's individual startDate
@@ -375,53 +372,55 @@ const TimelineBuilder = () => {
                 : new Date(asset.startDate);
             if (isNaN(liveDate.getTime())) return;
 
-            // We'll build the tasks in reverse (from go-live backwards)
+            // Identify the final task (last task in the CSV for this asset type)
+            const finalTask = assetTasks[assetTasks.length - 1];
+            
+            // We'll build the tasks in reverse (from final task backwards)
             let currentEndDate = new Date(liveDate);
             const ganttTasks = [];
             let taskIndex = 0;
 
-            // Go-live task (single day) - use the exact date the user chose
-            const goLiveTaskId = `${asset.id}-go-live`;
-            ganttTasks.unshift({
-                id: goLiveTaskId,
-                name: getTaskName(goLiveTaskId, asset.name, { 'Task': 'Go-Live' }),
-                start: liveDate.toISOString().split('T')[0],
-                end: liveDate.toISOString().split('T')[0],
-                progress: 0,
-                owner: 'l', // Live Date
-            });
-            taskIndex++;
-
-            // Process all other tasks in reverse order
+            // Process all tasks in reverse order, starting with the final task
             for (let i = assetTasks.length - 1; i >= 0; i--) {
                 const taskInfo = assetTasks[i];
+                const isFinalTask = (i === assetTasks.length - 1);
+                
                 // Use custom duration if present, else default from CSV
-                // Use asset.type as the key to match CSV task names consistently
                 const customDurations = assetTaskDurations[asset.type] || {};
                 const duration = customDurations[taskInfo['Task']] !== undefined
                     ? customDurations[taskInfo['Task']]
                     : parseInt(taskInfo['Duration (Days)'], 10) || 1;
-                // Subtract working days to get the start date
-                const taskStartDate = subtractWorkingDays(currentEndDate, duration);
-                // Task ends the working day before currentEndDate
-                const taskEndDate = new Date(currentEndDate);
-                taskEndDate.setDate(taskEndDate.getDate() - 1);
-                // Ensure end date is a working day
-                let finalTaskEndDate = new Date(taskEndDate);
-                if (isNonWorkingDay(finalTaskEndDate)) {
-                    finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
+                
+                let taskStartDate, taskEndDate;
+                
+                if (isFinalTask) {
+                    // Final task goes exactly on the live date
+                    taskStartDate = new Date(liveDate);
+                    taskEndDate = new Date(liveDate);
+                } else {
+                    // Other tasks work backwards from the current end date
+                    taskStartDate = subtractWorkingDays(currentEndDate, duration);
+                    taskEndDate = new Date(currentEndDate);
+                    taskEndDate.setDate(taskEndDate.getDate() - 1);
+                    
+                    // Ensure end date is a working day (for non-final tasks)
+                    if (isNonWorkingDay(taskEndDate)) {
+                        taskEndDate = getPreviousWorkingDay(taskEndDate);
+                    }
                 }
+                
                 const taskId = `${asset.id}-task-${taskIndex}`;
                 ganttTasks.unshift({
                     id: taskId,
                     name: getTaskName(taskId, asset.name, taskInfo),
                     start: taskStartDate.toISOString().split('T')[0],
-                    end: finalTaskEndDate.toISOString().split('T')[0],
+                    end: taskEndDate.toISOString().split('T')[0],
                     progress: 0,
                     owner: taskInfo['owner'] || 'm', // Get owner from CSV, default to MMM
                 });
                 taskIndex++;
-                // Update currentEndDate for the next task
+                
+                // Update currentEndDate for the next task (working backwards)
                 currentEndDate = new Date(taskStartDate);
             }
 
@@ -816,58 +815,58 @@ useEffect(() => {
 
         selectedAssets.forEach(asset => {
             const assetName = asset.name; // Assuming asset object has a 'name' property
-            // Filter out the "Live Date" task since we'll add our own "Go-Live" task
-            const assetTasks = csvData.filter(row => 
-                row['Asset Type'] === assetName && 
-                !row['Task'].toLowerCase().includes('live date')
-            );
+            // Get ALL tasks for this asset type from the CSV (no filtering)
+            const assetTasks = csvData.filter(row => row['Asset Type'] === assetName);
             if (assetTasks.length === 0) return;
 
             // Get the correct live date for this asset - respect user's choice even if it's a non-working day
             const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
             if (isNaN(liveDate.getTime())) return;
 
-            // We'll build the tasks in reverse (from go-live backwards)
+            // Identify the final task (last task in the CSV for this asset type)
+            const finalTask = assetTasks[assetTasks.length - 1];
+            
+            // We'll build the tasks in reverse (from final task backwards)
             let currentEndDate = new Date(liveDate);
             const ganttTasks = [];
             let taskIndex = 0;
 
-            // Go-live task (single day) - use the exact date the user chose
-            ganttTasks.unshift({
-                id: `task-${taskIndex}`,
-                name: `${assetName}: Go-Live`,
-                assetType: assetName, // NEW - explicit asset type for go-live tasks
-                start: liveDate.toISOString().split('T')[0],
-                end: liveDate.toISOString().split('T')[0],
-                progress: 0,
-                owner: 'l', // Go-live tasks are always 'l'
-            });
-            taskIndex++;
-
-            // Process all other tasks in reverse order
+            // Process all tasks in reverse order, starting with the final task
             for (let i = assetTasks.length - 1; i >= 0; i--) {
                 const taskInfo = assetTasks[i];
+                const isFinalTask = (i === assetTasks.length - 1);
+                
                 const duration = parseInt(taskInfo['Duration (Days)'], 10) || 1;
-                // Subtract working days to get the start date
-                const taskStartDate = subtractWorkingDays(currentEndDate, duration);
-                // Task ends the working day before currentEndDate
-                const taskEndDate = new Date(currentEndDate);
-                taskEndDate.setDate(taskEndDate.getDate() - 1);
-                // Ensure end date is a working day
-                let finalTaskEndDate = new Date(taskEndDate);
-                if (isNonWorkingDay(finalTaskEndDate)) {
-                    finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
+                
+                let taskStartDate, taskEndDate;
+                
+                if (isFinalTask) {
+                    // Final task goes exactly on the live date
+                    taskStartDate = new Date(liveDate);
+                    taskEndDate = new Date(liveDate);
+                } else {
+                    // Other tasks work backwards from the current end date
+                    taskStartDate = subtractWorkingDays(currentEndDate, duration);
+                    taskEndDate = new Date(currentEndDate);
+                    taskEndDate.setDate(taskEndDate.getDate() - 1);
+                    
+                    // Ensure end date is a working day (for non-final tasks)
+                    if (isNonWorkingDay(taskEndDate)) {
+                        taskEndDate = getPreviousWorkingDay(taskEndDate);
+                    }
                 }
+                
                 ganttTasks.unshift({
                     id: `task-${taskIndex}`,
                     name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
                     assetType: taskInfo['Asset Type'], // NEW - explicit asset type
                     start: taskStartDate.toISOString().split('T')[0],
-                    end: finalTaskEndDate.toISOString().split('T')[0],
+                    end: taskEndDate.toISOString().split('T')[0],
                     progress: 0,
                 });
                 taskIndex++;
-                // Update currentEndDate for the next task
+                
+                // Update currentEndDate for the next task (working backwards)
                 currentEndDate = new Date(taskStartDate);
             }
 
