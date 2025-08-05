@@ -51,7 +51,7 @@ const CampaignSetup = ({
                 </label>
                 {/* Helper text for instructions, smaller than the label */}
                 <p className="text-xs text-gray-500 mb-2">
-                    If campaign elements start on different days, uncheck the box and set each asset’s start date when selected.
+                    If campaign elements start on different days, uncheck the box and set each asset's start date when selected.
                 </p>
                 <input
                     type="date"
@@ -82,11 +82,11 @@ const CampaignSetup = ({
                 </label>
             </div>
 
-            {/* Calculated Project Start Date */}
+            {/* Calculated Project Start Date - Made less prominent */}
             {projectStartDate && (
                 <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Calculated Project Start Date
+                        Earliest Work Start Date
                     </label>
                     <div className={`px-3 py-2 border rounded-md ${
                         isStartDateInPast 
@@ -104,7 +104,7 @@ const CampaignSetup = ({
                     </div>
                     {projectStartDate && !isStartDateInPast && (
                         <p className="text-xs text-gray-500 mt-1">
-                            Project can start on schedule
+                            Work can begin on this date to complete by {formatDate(globalLiveDate)}
                         </p>
                     )}
                 </div>
@@ -152,8 +152,8 @@ const CampaignSetup = ({
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <h4 className="text-sm font-medium text-blue-900 mb-1">Timeline Summary</h4>
                     <div className="text-xs text-blue-700">
-                        <p>Start: {formatDate(projectStartDate)}</p>
-                        <p>Live: {formatDate(globalLiveDate)}</p>
+                        <p><strong>Campaign Live Date:</strong> {formatDate(globalLiveDate)}</p>
+                        <p><strong>Earliest Work Start:</strong> {formatDate(projectStartDate)}</p>
                         {isStartDateInPast && (
                             <p className="text-red-600 font-medium mt-1">
                                 ⚠️ Manual task adjustment required

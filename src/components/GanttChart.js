@@ -549,7 +549,21 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
       const assetType = getAssetTypeFromTaskName(task.name);
       const taskNameParts = task.name.split(': ');
       const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
-      const duration = countWorkingDays(new Date(task.start), new Date(task.end));
+      
+      // Calculate duration - for single-day tasks or Go-Live tasks, use calendar days
+      let duration;
+      const startDate = new Date(task.start);
+      const endDate = new Date(task.end);
+      const isSingleDay = startDate.toDateString() === endDate.toDateString();
+      const isGoLiveTask = task.name.toLowerCase().includes('go-live') || task.name.toLowerCase().includes('live date');
+      
+      if (isSingleDay || isGoLiveTask) {
+        // For single-day tasks or Go-Live tasks, use calendar days (1 day)
+        duration = 1;
+      } else {
+        // For multi-day tasks, use working days
+        duration = countWorkingDays(startDate, endDate);
+      }
       
       dataWorksheet.addRow([
         task.id,
@@ -688,8 +702,20 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             const taskStart = new Date(task.start);
             const taskEnd = new Date(task.end);
             const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
-            // Calculate working days instead of calendar days for duration display
-            const durationDays = countWorkingDays(taskStart, taskEnd);
+            
+            // Calculate duration - for single-day tasks or Go-Live tasks, use calendar days
+            let durationDays;
+            const isSingleDay = taskStart.toDateString() === taskEnd.toDateString();
+            const isGoLiveTask = task.name.toLowerCase().includes('go-live') || task.name.toLowerCase().includes('live date');
+            
+            if (isSingleDay || isGoLiveTask) {
+              // For single-day tasks or Go-Live tasks, use calendar days (1 day)
+              durationDays = 1;
+            } else {
+              // For multi-day tasks, use working days
+              durationDays = countWorkingDays(taskStart, taskEnd);
+            }
+            
             const durationText = durationDays;
             return (
               <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
@@ -766,41 +792,76 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                     let currentDate = new Date(taskStart);
                     let workingDaysCounted = 0;
                     
-                    while (currentDate <= taskEnd && workingDaysCounted < durationDays) {
-                      if (!isBankHoliday(currentDate) && !isWeekend(currentDate)) {
-                        const dayOffset = Math.floor((currentDate - minDate) / (1000 * 60 * 60 * 24));
-                        const owner = getOwnerFromTask(task);
-                        const ownerColorClasses = getOwnerColorClasses(owner);
-                        const ownerColorClassesDark = getOwnerColorClassesDark(owner);
+                    // For single-day or Go-Live tasks, render on the exact date regardless of working days
+                    if (isSingleDay || isGoLiveTask) {
+                      const dayOffset = Math.floor((currentDate - minDate) / (1000 * 60 * 60 * 24));
+                      const owner = getOwnerFromTask(task);
+                      const ownerColorClasses = getOwnerColorClasses(owner);
+                      const ownerColorClassesDark = getOwnerColorClassesDark(owner);
 
-                        bars.push(
-                          <div
-                            key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
-                            className={`absolute top-1/2 -translate-y-1/2 h-10 ${ownerColorClasses} rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
-                              isDragging && draggedTaskId === task.id ? 'ring-2 ring-opacity-50 shadow-lg' : ''
-                            }`}
-                            style={{
-                              left: `${dayOffset * DAY_COLUMN_WIDTH}px`,
-                              width: `${DAY_COLUMN_WIDTH}px`,
-                            }}
-                            onMouseDown={(e) => handleMouseDown(e, task.id, task.start, task.end)}
-                            onMouseMove={handleMouseMoveOverTask}
-                            onMouseLeave={handleMouseLeave}
-                          >
-                            {workingDaysCounted === 0 && (
-                              <span className="text-white text-xs font-medium truncate">{task.name}</span>
-                            )}
-                            {/* Drag handle indicator on the last working day */}
-                            {workingDaysCounted === durationDays - 1 && (
-                              <div className={`absolute right-0 top-0 bottom-0 w-2 ${ownerColorClassesDark} rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize`}>
-                                <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                        workingDaysCounted++;
+                      bars.push(
+                        <div
+                          key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
+                          className={`absolute top-1/2 -translate-y-1/2 h-10 ${ownerColorClasses} rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
+                            isDragging && draggedTaskId === task.id ? 'ring-2 ring-opacity-50 shadow-lg' : ''
+                          }`}
+                          style={{
+                            left: `${dayOffset * DAY_COLUMN_WIDTH}px`,
+                            width: `${DAY_COLUMN_WIDTH}px`,
+                          }}
+                          onMouseDown={(e) => handleMouseDown(e, task.id, task.start, task.end)}
+                          onMouseMove={handleMouseMoveOverTask}
+                          onMouseLeave={handleMouseLeave}
+                        >
+                          {workingDaysCounted === 0 && (
+                            <span className="text-white text-xs font-medium truncate">{task.name}</span>
+                          )}
+                          {/* Drag handle indicator on the last working day */}
+                          {workingDaysCounted === durationDays - 1 && (
+                            <div className={`absolute right-0 top-0 bottom-0 w-2 ${ownerColorClassesDark} rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize`}>
+                              <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                      workingDaysCounted++;
+                    } else {
+                      while (currentDate <= taskEnd && workingDaysCounted < durationDays) {
+                        if (!isBankHoliday(currentDate) && !isWeekend(currentDate)) {
+                          const dayOffset = Math.floor((currentDate - minDate) / (1000 * 60 * 60 * 24));
+                          const owner = getOwnerFromTask(task);
+                          const ownerColorClasses = getOwnerColorClasses(owner);
+                          const ownerColorClassesDark = getOwnerColorClassesDark(owner);
+
+                          bars.push(
+                            <div
+                              key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
+                              className={`absolute top-1/2 -translate-y-1/2 h-10 ${ownerColorClasses} rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
+                                isDragging && draggedTaskId === task.id ? 'ring-2 ring-opacity-50 shadow-lg' : ''
+                              }`}
+                              style={{
+                                left: `${dayOffset * DAY_COLUMN_WIDTH}px`,
+                                width: `${DAY_COLUMN_WIDTH}px`,
+                              }}
+                              onMouseDown={(e) => handleMouseDown(e, task.id, task.start, task.end)}
+                              onMouseMove={handleMouseMoveOverTask}
+                              onMouseLeave={handleMouseLeave}
+                            >
+                              {workingDaysCounted === 0 && (
+                                <span className="text-white text-xs font-medium truncate">{task.name}</span>
+                              )}
+                              {/* Drag handle indicator on the last working day */}
+                              {workingDaysCounted === durationDays - 1 && (
+                                <div className={`absolute right-0 top-0 bottom-0 w-2 ${ownerColorClassesDark} rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize`}>
+                                  <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                          workingDaysCounted++;
+                        }
+                        currentDate.setDate(currentDate.getDate() + 1);
                       }
-                      currentDate.setDate(currentDate.getDate() + 1);
                     }
                     return bars;
                   })()}

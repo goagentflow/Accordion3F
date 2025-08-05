@@ -361,12 +361,18 @@ const TimelineBuilder = () => {
             // asset: { id, type, name, startDate }
             if (!asset.startDate) return; // Skip if no start date set
 
-            // Find all tasks for this asset type from the CSV
-            const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
+            // Find all tasks for this asset type from the CSV, excluding "Live Date" tasks since we'll add our own "Go-Live" task
+            const assetTasks = csvData.filter(row => 
+                row['Asset Type'] === asset.type && 
+                !row['Task'].toLowerCase().includes('live date')
+            );
             if (assetTasks.length === 0) return;
 
-            // Use the asset instance's startDate as the go-live date
-            const liveDate = new Date(asset.startDate);
+            // Use the global live date if useGlobalDate is true, otherwise use the asset's individual startDate
+            // Respect user's choice even if it's a non-working day
+            const liveDate = useGlobalDate 
+                ? new Date(globalLiveDate) 
+                : new Date(asset.startDate);
             if (isNaN(liveDate.getTime())) return;
 
             // We'll build the tasks in reverse (from go-live backwards)
@@ -374,7 +380,7 @@ const TimelineBuilder = () => {
             const ganttTasks = [];
             let taskIndex = 0;
 
-            // Go-live task (single day)
+            // Go-live task (single day) - use the exact date the user chose
             const goLiveTaskId = `${asset.id}-go-live`;
             ganttTasks.unshift({
                 id: goLiveTaskId,
@@ -810,10 +816,14 @@ useEffect(() => {
 
         selectedAssets.forEach(asset => {
             const assetName = asset.name; // Assuming asset object has a 'name' property
-            const assetTasks = csvData.filter(row => row['Asset Type'] === assetName);
+            // Filter out the "Live Date" task since we'll add our own "Go-Live" task
+            const assetTasks = csvData.filter(row => 
+                row['Asset Type'] === assetName && 
+                !row['Task'].toLowerCase().includes('live date')
+            );
             if (assetTasks.length === 0) return;
 
-            // Get the correct live date for this asset
+            // Get the correct live date for this asset - respect user's choice even if it's a non-working day
             const liveDate = new Date(useGlobalDate ? globalLiveDate : assetLiveDates[assetName]);
             if (isNaN(liveDate.getTime())) return;
 
@@ -822,7 +832,7 @@ useEffect(() => {
             const ganttTasks = [];
             let taskIndex = 0;
 
-            // Go-live task (single day)
+            // Go-live task (single day) - use the exact date the user chose
             ganttTasks.unshift({
                 id: `task-${taskIndex}`,
                 name: `${assetName}: Go-Live`,
