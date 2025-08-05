@@ -28,6 +28,9 @@ const TimelineBuilder = () => {
     // Add state to store custom task durations for each asset instance
     const [assetTaskDurations, setAssetTaskDurations] = useState({}); // { assetId: { taskName: duration, ... } }
 
+    // Task bank: assetId -> raw task objects (CSV only for now)
+    const [taskBank, setTaskBank] = useState({}); // { assetId: Task[] }
+
     // Add state to store custom tasks separately
     const [customTasks, setCustomTasks] = useState([]); // Array of custom task objects
 
@@ -236,6 +239,10 @@ const TimelineBuilder = () => {
 
     // Helper function to check if date is a non-working day (weekend or bank holiday)
     const isNonWorkingDay = (date) => {
+        if (!date || isNaN(date.getTime())) {
+            return true; // Treat invalid dates as non-working days
+        }
+        
         const day = date.getDay();
         const yyyy_mm_dd = date.toISOString().split('T')[0];
         return day === 0 || day === 6 || bankHolidays.includes(yyyy_mm_dd);
@@ -243,55 +250,159 @@ const TimelineBuilder = () => {
 
     // Helper function to get previous working day
     const getPreviousWorkingDay = (date) => {
+        if (!date || isNaN(date.getTime())) {
+            return new Date();
+        }
+        
         let workingDate = new Date(date);
+        let iterations = 0;
+        const maxIterations = 1000; // Prevent infinite loops
+        
         do {
             workingDate.setDate(workingDate.getDate() - 1);
+            iterations++;
+            
+            // Check if date has become invalid (before 1970)
+            if (workingDate.getFullYear() < 1970 || iterations >= maxIterations) {
+                console.warn('getPreviousWorkingDay exceeded maximum iterations or went too far back');
+                return new Date('1970-01-01');
+            }
         } while (isNonWorkingDay(workingDate));
+        
         return workingDate;
     };
 
     // Helper function to get next working day
     const getNextWorkingDay = (date) => {
+        if (!date || isNaN(date.getTime())) {
+            return new Date();
+        }
+        
         let workingDate = new Date(date);
+        let iterations = 0;
+        const maxIterations = 1000; // Prevent infinite loops
+        
         do {
             workingDate.setDate(workingDate.getDate() + 1);
+            iterations++;
+            
+            // Check if date has become too far in the future
+            if (workingDate.getFullYear() > 2100 || iterations >= maxIterations) {
+                console.warn('getNextWorkingDay exceeded maximum iterations or went too far forward');
+                return new Date('2100-12-31');
+            }
         } while (isNonWorkingDay(workingDate));
+        
         return workingDate;
     };
 
     // Helper function to subtract working days (backwards calculation)
     const subtractWorkingDays = (endDate, workingDaysToSubtract) => {
+        if (!endDate || isNaN(endDate.getTime()) || workingDaysToSubtract <= 0) {
+            return new Date(endDate);
+        }
+        
         let currentDate = new Date(endDate);
         let remainingDays = workingDaysToSubtract;
+        let iterations = 0;
+        const maxIterations = 10000; // Prevent infinite loops
+        
         // Subtract working days
-        while (remainingDays > 0) {
+        while (remainingDays > 0 && iterations < maxIterations) {
             currentDate.setDate(currentDate.getDate() - 1);
+            iterations++;
+            
+            // Check if date has become invalid (before 1970)
+            if (currentDate.getFullYear() < 1970) {
+                console.warn('Date calculation went too far back, stopping at 1970-01-01');
+                return new Date('1970-01-01');
+            }
+            
             // Only count non-non-working days
             if (!isNonWorkingDay(currentDate)) {
                 remainingDays--;
             }
         }
+        
+        if (iterations >= maxIterations) {
+            console.warn('subtractWorkingDays exceeded maximum iterations, returning original date');
+            return new Date(endDate);
+        }
+        
         return currentDate;
     };
 
     // Helper function to add working days (forward calculation for display)
     const addWorkingDays = (startDate, workingDaysToAdd) => {
-        if (workingDaysToAdd <= 0) {
+        if (!startDate || isNaN(startDate.getTime()) || workingDaysToAdd <= 0) {
             return new Date(startDate);
         }
+        
         let currentDate = new Date(startDate);
         let remainingDays = workingDaysToAdd - 1;
-        while (remainingDays > 0) {
+        let iterations = 0;
+        const maxIterations = 10000; // Prevent infinite loops
+        
+        while (remainingDays > 0 && iterations < maxIterations) {
             currentDate.setDate(currentDate.getDate() + 1);
+            iterations++;
+            
+            // Check if date has become too far in the future
+            if (currentDate.getFullYear() > 2100) {
+                console.warn('Date calculation went too far forward, stopping at 2100-12-31');
+                return new Date('2100-12-31');
+            }
+            
             if (!isNonWorkingDay(currentDate)) {
                 remainingDays--;
             }
         }
-        // Ensure the final day is a working day
-        while (isNonWorkingDay(currentDate)) {
-            currentDate.setDate(currentDate.getDate() + 1);
+        
+        if (iterations >= maxIterations) {
+            console.warn('addWorkingDays exceeded maximum iterations, returning original date');
+            return new Date(startDate);
         }
+        
+        // Ensure the final day is a working day
+        iterations = 0;
+        while (isNonWorkingDay(currentDate) && iterations < 100) {
+            currentDate.setDate(currentDate.getDate() + 1);
+            iterations++;
+        }
+        
         return currentDate;
+    };
+
+    // Pure helper: build dated timeline for a single asset
+    const buildAssetTimeline = (rawTasks = [], liveDateStr) => {
+        if (!liveDateStr || rawTasks.length === 0) return [];
+        const liveDate = new Date(liveDateStr);
+        if (isNaN(liveDate.getTime())) return [];
+        let currentEnd = new Date(liveDate);
+        const dated = [];
+        for (let i = rawTasks.length - 1; i >= 0; i--) {
+            const t = rawTasks[i];
+            const dur = t.duration || 1;
+            let startDate, endDate;
+            if (i === rawTasks.length - 1) {
+                startDate = new Date(currentEnd);
+                endDate = new Date(currentEnd);
+            } else {
+                startDate = subtractWorkingDays(currentEnd, dur);
+                endDate = new Date(currentEnd);
+                endDate.setDate(endDate.getDate() - 1);
+                if (isNonWorkingDay(endDate)) {
+                    endDate = getPreviousWorkingDay(endDate);
+                }
+            }
+            dated.unshift({
+                ...t,
+                start: safeToISOString(startDate),
+                end: safeToISOString(endDate),
+            });
+            currentEnd = new Date(startDate);
+        }
+        return dated;
     };
 
     // Load CSV data
@@ -313,6 +424,43 @@ const TimelineBuilder = () => {
             }
         });
     }, []);
+
+    // Build taskBank whenever selectedAssets or csvData change
+    useEffect(() => {
+        if (selectedAssets.length === 0 || csvData.length === 0) {
+            setTaskBank({});
+            return;
+        }
+        const bank = {};
+        selectedAssets.forEach(asset => {
+            const rows = csvData.filter(row => row['Asset Type'] === asset.type);
+            bank[asset.id] = rows.map((row, idx) => ({
+                id: `${asset.id}-template-${idx}`,
+                name: row['Task'],
+                duration: parseInt(row['Duration (Days)'], 10) || 1,
+                owner: row['owner'] || 'm',
+                assetType: asset.name,
+                isCustom: false,
+            }));
+        });
+        setTaskBank(bank);
+    }, [selectedAssets, csvData]);
+
+    // Build dated timelineTasks from taskBank + live dates
+    useEffect(() => {
+        if (Object.keys(taskBank).length === 0) {
+            setTimelineTasks([]);
+            return;
+        }
+        const all = [];
+        selectedAssets.forEach(asset => {
+            const liveDateStr = useGlobalDate ? globalLiveDate : assetLiveDates[asset.name];
+            const raw = taskBank[asset.id] || [];
+            const dated = buildAssetTimeline(raw, liveDateStr);
+            all.push(...dated);
+        });
+        setTimelineTasks(all);
+    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates]);
 
     // Fetch UK bank holidays for England and Wales on app load
     useEffect(() => {
@@ -409,19 +557,25 @@ const TimelineBuilder = () => {
                     }
                 }
                 
-                const taskId = `${asset.id}-task-${taskIndex}`;
-                ganttTasks.unshift({
-                    id: taskId,
-                    name: getTaskName(taskId, asset.name, taskInfo),
-                    start: taskStartDate.toISOString().split('T')[0],
-                    end: taskEndDate.toISOString().split('T')[0],
-                    progress: 0,
-                    owner: taskInfo['owner'] || 'm', // Get owner from CSV, default to MMM
-                });
-                taskIndex++;
-                
-                // Update currentEndDate for the next task (working backwards)
-                currentEndDate = new Date(taskStartDate);
+                // Validate dates before creating task
+                if (!isNaN(taskStartDate.getTime()) && !isNaN(taskEndDate.getTime())) {
+                    const taskId = `${asset.id}-task-${taskIndex}`;
+                    ganttTasks.unshift({
+                        id: taskId,
+                        name: getTaskName(taskId, asset.name, taskInfo),
+                        start: safeToISOString(taskStartDate),
+                        end: safeToISOString(taskEndDate),
+                        progress: 0,
+                        owner: taskInfo['owner'] || 'm', // Get owner from CSV, default to MMM
+                        assetType: asset.name, // NEW - add explicit asset type for all tasks
+                    });
+                    taskIndex++;
+                    
+                    // Update currentEndDate for the next task (working backwards)
+                    currentEndDate = new Date(taskStartDate);
+                } else {
+                    console.warn(`Invalid date calculated for task ${taskInfo['Task']}:`, { taskStartDate, taskEndDate });
+                }
             }
 
             // Add all tasks for this asset instance to the main list
@@ -445,300 +599,188 @@ const TimelineBuilder = () => {
             setProjectStartDate(earliestDate.toISOString().split('T')[0]);
         }
 
-        // Handle custom tasks by integrating them into the timeline
+        // Always process custom tasks (if any exist)
+        const tasksToProcess = [...allTasks];
+        let finalTimeline = allTasks;
+        
+        setTimelineTasks(allTasks);
+    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations, customTaskNames]);
+
+    // Separate useEffect to handle custom tasks
+    useEffect(() => {
         if (customTasks.length > 0) {
-            console.log('Processing custom tasks:', customTasks);
+            console.log('Processing custom tasks in separate useEffect:', customTasks);
             
-            // First, create a simple timeline with all asset tasks
-            const assetTimeline = [...allTasks];
-            console.log('Initial asset timeline:', assetTimeline);
-            
-            // Insert custom tasks at their specified positions
-            customTasks.forEach(customTask => {
-                let insertIndex = 0;
-                if (customTask.insertAfterTaskId) {
-                    const afterTaskIndex = assetTimeline.findIndex(task => task.id === customTask.insertAfterTaskId);
-                    console.log('Looking for insertAfterTaskId:', customTask.insertAfterTaskId, 'found at index:', afterTaskIndex);
-                    if (afterTaskIndex !== -1) {
-                        insertIndex = afterTaskIndex + 1;
+            // Use a functional update to get the current timeline tasks
+            setTimelineTasks(currentTimelineTasks => {
+                // Build per-asset task arrays from existing timeline tasks
+                const tasksByAsset = {};
+                selectedAssets.forEach(asset => {
+                    const assetTasks = currentTimelineTasks.filter(task => 
+                        task.assetType === asset.name || task.id.startsWith(`${asset.id}-`)
+                    );
+                    if (assetTasks.length > 0) {
+                        tasksByAsset[asset.id] = [...assetTasks];
                     }
-                } else if (customTask.assetType) {
-                    // User chose "At the beginning of [Asset]" - find consecutive groups of this asset type
-                    console.log('=== CUSTOM TASK POSITIONING DEBUG ===');
-                    console.log('Custom task:', customTask);
-                    console.log('Looking for asset type:', customTask.assetType);
-                    
-                    // Find all consecutive groups of this asset type
-                    const groups = [];
-                    let currentGroup = null;
-                    
-                    for (let i = 0; i < assetTimeline.length; i++) {
-                        const task = assetTimeline[i];
-                        let taskAssetType;
-                        
-                        // Get the asset type for this task
-                        if (task.assetType) {
-                            taskAssetType = task.assetType;
-                        } else {
-                            // Extract from task name (e.g., "Digital Display - Creative: Task Name" -> "Digital Display - Creative")
-                            const nameParts = task.name.split(': ');
-                            taskAssetType = nameParts.length > 1 ? nameParts[0] : 'Unknown';
-                        }
-                        
-                        if (taskAssetType === customTask.assetType) {
-                            if (!currentGroup) {
-                                // Start a new group
-                                currentGroup = { startIndex: i, endIndex: i, assetId: task.id.split('-')[0] };
-                            } else {
-                                // Continue the current group
-                                currentGroup.endIndex = i;
-                            }
-                        } else if (currentGroup) {
-                            // End the current group and save it
-                            groups.push(currentGroup);
-                            currentGroup = null;
-                        }
-                    }
-                    
-                    // Don't forget to add the last group if it exists
-                    if (currentGroup) {
-                        groups.push(currentGroup);
-                    }
-                    
-                    console.log(`Found ${groups.length} group(s) of asset type "${customTask.assetType}"`);
-                    groups.forEach((group, idx) => {
-                        console.log(`  Group ${idx}: indices ${group.startIndex}-${group.endIndex}, assetId: ${group.assetId}`);
-                    });
-                    
-                    if (groups.length > 0) {
-                        // Use the last (most recent) group as it's likely what the user is working with
-                        const targetGroup = groups[groups.length - 1];
-                        insertIndex = targetGroup.startIndex;
-                        console.log(`*** SETTING INSERT INDEX TO ${insertIndex} (beginning of last group) ***`);
-                    } else {
-                        console.log(`*** NO TASKS FOUND FOR ASSET TYPE "${customTask.assetType}" ***`);
-                        // If no tasks found, insert at the beginning
-                        insertIndex = 0;
-                    }
-                    console.log('=== END DEBUG ===');
-                }
-                
-                console.log('Inserting custom task at index:', insertIndex);
-                
-                // Insert the custom task (without dates for now)
-                assetTimeline.splice(insertIndex, 0, {
-                    ...customTask,
-                    start: '', // Will be calculated below
-                    end: ''    // Will be calculated below
                 });
-            });
-            
-            console.log('Timeline after inserting custom tasks:', assetTimeline);
-            
-            // Now rebuild the timeline backwards from go-live to maintain constraints
-            const finalTimeline = [];
-            
-            // Group tasks by asset to maintain the backwards calculation
-            const tasksByAsset = {};
-            assetTimeline.forEach((task, index) => {
-                if (task.isCustom) {
-                    // Custom tasks need to be associated with the asset they belong to
-                    let targetAssetId = null;
+
+                // Insert custom tasks into the correct asset's array
+                customTasks.forEach(customTask => {
+                    const asset = selectedAssets.find(a => a.name === customTask.assetType);
+                    if (!asset || !asset.startDate) {
+                        console.warn(`Cannot find asset or asset has no start date for custom task:`, customTask);
+                        return;
+                    }
                     
-                    if (task.insertAfterTaskId) {
-                        // If inserted after a specific task, find that task's asset
-                        const afterTask = assetTimeline.find(t => t.id === task.insertAfterTaskId);
-                        if (afterTask) {
-                            targetAssetId = afterTask.id.split('-')[0];
-                        }
-                    } else if (task.assetType) {
-                        // If placed "At the beginning of [Asset Type]", find the next non-custom task
-                        // in the timeline to determine which asset group this belongs to
-                        for (let i = index + 1; i < assetTimeline.length; i++) {
-                            const nextTask = assetTimeline[i];
-                            if (!nextTask.isCustom && !nextTask.name.includes('Custom:')) {
-                                // Check if this task matches the custom task's asset type
-                                let nextTaskAssetType;
-                                if (nextTask.assetType) {
-                                    nextTaskAssetType = nextTask.assetType;
-                                } else {
-                                    const nameParts = nextTask.name.split(': ');
-                                    nextTaskAssetType = nameParts.length > 1 ? nameParts[0] : 'Unknown';
-                                }
-                                
-                                if (nextTaskAssetType === task.assetType) {
-                                    targetAssetId = nextTask.id.split('-')[0];
-                                    console.log(`Custom task "${task.name}" associated with asset ${targetAssetId} based on next task "${nextTask.name}"`);
-                                    break;
-                                }
+                    const assetId = asset.id;
+                    if (!tasksByAsset[assetId]) tasksByAsset[assetId] = [];
+                    
+                    // Validate custom task data
+                    if (!customTask.duration || customTask.duration < 1) {
+                        console.warn(`Invalid duration for custom task:`, customTask);
+                        return;
+                    }
+                    
+                    // Check if custom task already exists
+                    const existingTask = tasksByAsset[assetId].find(t => t.id === customTask.id);
+                    if (existingTask) {
+                        console.log('Custom task already exists:', customTask.id);
+                        return;
+                    }
+                    
+                    // Insert at the beginning or after a specific task
+                    let insertIndex = 0;
+                    if (customTask.insertAfterTaskId) {
+                        const idx = tasksByAsset[assetId].findIndex(t => t.id === customTask.insertAfterTaskId);
+                        if (idx !== -1) insertIndex = idx + 1;
+                    }
+                    
+                    // Create the custom task with proper structure
+                    const customTaskWithStructure = {
+                        ...customTask,
+                        id: customTask.id || `custom-task-${Date.now()}`,
+                        name: customTask.name || `Custom: ${customTask.name}`,
+                        duration: customTask.duration || 1,
+                        owner: customTask.owner || 'm',
+                        assetType: customTask.assetType,
+                        isCustom: true,
+                        progress: 0,
+                        // These will be calculated in the recalculation step
+                        start: null,
+                        end: null
+                    };
+                    
+                    tasksByAsset[assetId].splice(insertIndex, 0, customTaskWithStructure);
+                });
+
+                // Recalculate dates for each asset's tasks
+                Object.keys(tasksByAsset).forEach(assetId => {
+                    const asset = selectedAssets.find(a => a.id === assetId);
+                    if (!asset || !asset.startDate) return;
+                    
+                    const assetTasks = tasksByAsset[assetId];
+                    if (assetTasks.length === 0) return;
+                    
+                    // Validate the current end date
+                    let currentEndDate = new Date(useGlobalDate ? globalLiveDate : asset.startDate);
+                    if (isNaN(currentEndDate.getTime())) {
+                        console.warn(`Invalid start date for asset ${assetId}:`, asset.startDate);
+                        return;
+                    }
+                    
+                    for (let i = assetTasks.length - 1; i >= 0; i--) {
+                        const task = assetTasks[i];
+                        const duration = task.duration || 1;
+                        let taskStartDate, taskEndDate;
+                        
+                        if (i === assetTasks.length - 1) {
+                            // Final task goes exactly on the live date
+                            taskStartDate = new Date(currentEndDate);
+                            taskEndDate = new Date(currentEndDate);
+                        } else {
+                            // Other tasks work backwards from the current end date
+                            taskStartDate = subtractWorkingDays(currentEndDate, duration);
+                            taskEndDate = new Date(currentEndDate);
+                            taskEndDate.setDate(taskEndDate.getDate() - 1);
+                            if (isNonWorkingDay(taskEndDate)) {
+                                taskEndDate = getPreviousWorkingDay(taskEndDate);
                             }
                         }
-                    }
-                    
-                    if (targetAssetId) {
-                        if (!tasksByAsset[targetAssetId]) tasksByAsset[targetAssetId] = [];
-                        tasksByAsset[targetAssetId].push(task);
-                    } else {
-                        // Fallback: Try to find an asset of the matching type
-                        const matchingAsset = selectedAssets.find(asset => asset.type === task.assetType);
-                        if (matchingAsset) {
-                            targetAssetId = matchingAsset.id;
-                            if (!tasksByAsset[targetAssetId]) tasksByAsset[targetAssetId] = [];
-                            tasksByAsset[targetAssetId].push(task);
+                        
+                        // Validate dates before updating
+                        if (!isNaN(taskStartDate.getTime()) && !isNaN(taskEndDate.getTime())) {
+                            assetTasks[i] = {
+                                ...task,
+                                start: safeToISOString(taskStartDate),
+                                end: safeToISOString(taskEndDate),
+                            };
+                            currentEndDate = new Date(taskStartDate);
                         } else {
-                            console.warn(`Could not find target asset for custom task: ${task.name}`);
+                            console.warn(`Invalid date calculated for task ${task.id}:`, { taskStartDate, taskEndDate });
+                            // Set fallback dates to prevent crashes
+                            assetTasks[i] = {
+                                ...task,
+                                start: safeToISOString(new Date()),
+                                end: safeToISOString(new Date()),
+                            };
                         }
                     }
-                } else {
-                    // Asset tasks are grouped by their asset ID
-                    const assetId = task.id.split('-')[0];
-                    if (!tasksByAsset[assetId]) tasksByAsset[assetId] = [];
-                    tasksByAsset[assetId].push(task);
-                }
-            });
-            
-            console.log('Tasks grouped by asset:', tasksByAsset);
-            
-            // Rebuild each asset's timeline backwards from go-live
-            selectedAssets.forEach(asset => {
-                const assetTasks = tasksByAsset[asset.id] || [];
-                if (assetTasks.length === 0) return;
+                });
+
+                // Merge all assets' tasks for display/export
+                const finalTimeline = Object.values(tasksByAsset).flat();
                 
-                console.log(`Processing asset ${asset.id} with tasks:`, assetTasks);
+                // Update calculated start dates and date errors for custom tasks
+                const finalDateErrors = [];
+                const todayForErrors = new Date();
+                todayForErrors.setHours(0, 0, 0, 0);
                 
-                // Separate go-live task from other tasks
-                const goLiveTask = assetTasks.find(task => task.name.includes('Go-Live'));
-                const regularTasks = assetTasks.filter(task => !task.name.includes('Go-Live'));
-                
-                // Build backwards from go-live to calculate dates
-                let currentEndDate = new Date(asset.startDate);
-                const calculatedTasks = [];
-                
-                // Calculate dates for regular tasks in reverse order (backwards from go-live)
-                for (let i = regularTasks.length - 1; i >= 0; i--) {
-                    const task = regularTasks[i];
-                    
-                    if (task.isCustom) {
-                        // Custom task - calculate backwards from current end date
-                        const taskStartDate = subtractWorkingDays(currentEndDate, task.duration);
-                        const taskEndDate = new Date(currentEndDate);
-                        taskEndDate.setDate(taskEndDate.getDate() - 1);
-                        
-                        // Ensure end date is a working day
-                        let finalTaskEndDate = new Date(taskEndDate);
-                        if (isNonWorkingDay(finalTaskEndDate)) {
-                            finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
-                        }
-                        
-                        calculatedTasks.unshift({
-                            ...task,
-                            start: taskStartDate.toISOString().split('T')[0],
-                            end: finalTaskEndDate.toISOString().split('T')[0]
-                        });
-                        
-                        currentEndDate = new Date(taskStartDate);
-                    } else {
-                        // Regular asset task
-                        const taskInfo = csvData.find(row => 
-                            row['Asset Type'] === asset.type && 
-                            row['Task'] === task.name.split(': ')[1]
-                        );
-                        
-                        // Use manual duration override if available
-                        const customDurations = assetTaskDurations[asset.type] || {};
-                        const duration = customDurations[taskInfo?.['Task']] !== undefined
-                            ? customDurations[taskInfo['Task']]
-                            : parseInt(taskInfo?.['Duration (Days)'], 10) || 1;
-                        
-                        const taskStartDate = subtractWorkingDays(currentEndDate, duration);
-                        const taskEndDate = new Date(currentEndDate);
-                        taskEndDate.setDate(taskEndDate.getDate() - 1);
-                        
-                        // Ensure end date is a working day
-                        let finalTaskEndDate = new Date(taskEndDate);
-                        if (isNonWorkingDay(finalTaskEndDate)) {
-                            finalTaskEndDate = getPreviousWorkingDay(finalTaskEndDate);
-                        }
-                        
-                        calculatedTasks.unshift({
-                            ...task,
-                            start: taskStartDate.toISOString().split('T')[0],
-                            end: finalTaskEndDate.toISOString().split('T')[0]
-                        });
-                        
-                        currentEndDate = new Date(taskStartDate);
-                    }
-                }
-                
-                // Add go-live task at the end
-                if (goLiveTask) {
-                    calculatedTasks.push({
-                        ...goLiveTask,
-                        start: asset.startDate,
-                        end: asset.startDate
-                    });
-                }
-                
-                // Add all tasks to final timeline in correct order
-                finalTimeline.push(...calculatedTasks);
-            });
-            
-            console.log('Final timeline with custom tasks:', finalTimeline);
-            setTimelineTasks(finalTimeline);
-            
-            // Update calculated start dates and date errors
-            const finalDateErrors = [];
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            selectedAssets.forEach(asset => {
-                // Get all tasks for this asset (including custom tasks)
-                const assetTasks = finalTimeline.filter(task => {
-                    // Regular asset tasks
-                    if (task.id.startsWith(`${asset.id}-`) && !task.name.includes('Go-Live')) {
-                        return true;
-                    }
-                    // Custom tasks that belong to this asset
-                    if (task.isCustom && task.insertAfterTaskId) {
-                        const afterTask = finalTimeline.find(t => t.id === task.insertAfterTaskId);
-                        if (afterTask && afterTask.id.startsWith(`${asset.id}-`)) {
+                selectedAssets.forEach(asset => {
+                    // Get all tasks for this asset (including custom tasks)
+                    const assetTasks = finalTimeline.filter(task => {
+                        // Regular asset tasks
+                        if (task.id.startsWith(`${asset.id}-`) && !task.name.includes('Go-Live')) {
                             return true;
                         }
-                    }
-                    return false;
-                });
-                
-                if (assetTasks.length > 0) {
-                    // Find the earliest task for this asset
-                    const earliestTask = assetTasks.reduce((earliest, task) => {
-                        return new Date(task.start) < new Date(earliest.start) ? task : earliest;
+                        // Custom tasks that belong to this asset
+                        if (task.isCustom && task.assetType === asset.name) {
+                            return true;
+                        }
+                        return false;
                     });
                     
-                    // Update calculated start date
-                    newCalculatedStartDates[asset.id] = earliestTask.start;
-                    
-                    // Check if start date is before today
-                    if (new Date(earliestTask.start) < today) {
-                        finalDateErrors.push(asset.id);
+                    if (assetTasks.length > 0) {
+                        // Find the earliest task for this asset
+                        const earliestTask = assetTasks.reduce((earliest, task) => {
+                            return new Date(task.start) < new Date(earliest.start) ? task : earliest;
+                        });
+                        
+                        // Update calculated start date
+                        setCalculatedStartDates(prev => ({
+                            ...prev,
+                            [asset.id]: earliestTask.start
+                        }));
+                        
+                        // Check if start date is before today
+                        if (new Date(earliestTask.start) < todayForErrors) {
+                            finalDateErrors.push(asset.id);
+                        }
                     }
+                });
+                
+                setDateErrors(finalDateErrors);
+                
+                // Update the global project start date to reflect the new earliest start date
+                const allFinalStartDates = Object.values(finalTimeline).map(task => new Date(task.start));
+                if (allFinalStartDates.length > 0) {
+                    const earliestDate = new Date(Math.min(...allFinalStartDates));
+                    setProjectStartDate(earliestDate.toISOString().split('T')[0]);
                 }
+                
+                return finalTimeline;
             });
-            
-            setCalculatedStartDates(newCalculatedStartDates);
-            setDateErrors(finalDateErrors);
-            
-            // Update the global project start date to reflect the new earliest start date
-            const allFinalStartDates = Object.values(newCalculatedStartDates).map(date => new Date(date));
-            if (allFinalStartDates.length > 0) {
-                const earliestDate = new Date(Math.min(...allFinalStartDates));
-                setProjectStartDate(earliestDate.toISOString().split('T')[0]);
-            }
-        } else {
-            setTimelineTasks(allTasks);
-            setCalculatedStartDates(newCalculatedStartDates);
-            setDateErrors(newDateErrors);
         }
-    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations, customTaskNames, customTasks]);
+    }, [customTasks, selectedAssets, globalLiveDate, useGlobalDate]);
 
     // Keyboard shortcuts for undo/redo
     useEffect(() => {
@@ -789,6 +831,8 @@ useEffect(() => {
     // Optionally, if unchecked, you could clear the dates or leave as-is
 }, [useGlobalDate, globalLiveDate, isUndoRedoAction]);
 
+    // (Legacy generateTimelineTasks effect removed – taskBank pipeline is now the source of timelineTasks)
+
     // Keep historyIndex in sync with history length
     useEffect(() => {
         if (historyIndex >= history.length && history.length > 0) {
@@ -802,6 +846,15 @@ useEffect(() => {
 
     // REMOVED: Custom task merging useEffect that was causing timeline disruption
     // Custom tasks are now handled properly in the main timeline calculation
+    // Helper function to safely convert date to ISO string
+    const safeToISOString = (date) => {
+        if (!date || isNaN(date.getTime())) {
+            console.warn('Invalid date detected:', date);
+            return new Date().toISOString().split('T')[0]; // Return today's date as fallback
+        }
+        return date.toISOString().split('T')[0];
+    };
+
     // Generate timeline tasks for Gantt chart
     const generateTimelineTasks = (startDates) => {
         if (selectedAssets.length === 0 || Object.keys(startDates).length === 0) {
@@ -1121,39 +1174,34 @@ useEffect(() => {
     };
 
     // Handler for adding custom tasks
-    const handleAddCustomTask = (customTaskData) => {
-        const { name, duration, owner, assetType, insertAfterTaskId } = customTaskData;
-        
-        console.log('handleAddCustomTask called with:', customTaskData);
-        
-        // Create the new custom task
-        const newTaskId = `custom-task-${Date.now()}`;
-        
-        const newTask = {
-            id: newTaskId,
+    const handleAddCustomTask = ({ name, duration, owner, assetType, insertAfterTaskId }) => {
+        const asset = selectedAssets.find(a => a.name === assetType);
+        if (!asset) {
+            console.warn('Asset not found for custom task', assetType);
+            return;
+        }
+        const rawTask = {
+            id: `custom-task-${Date.now()}`,
             name: `Custom: ${name}`,
-            duration: duration,
-            owner: owner, // Include the owner property
-            insertAfterTaskId: insertAfterTaskId,
-            assetType: assetType, // NEW - use selected asset type
+            duration: duration || 1,
+            owner: owner || 'm',
+            assetType,
             isCustom: true,
-            progress: 0
+            insertAfterTaskId: insertAfterTaskId || null,
         };
-        
-        console.log('Created new custom task:', newTask);
-        
-        // Execute the action and create snapshot with the custom task included
+
         executeAction(() => {
-            // Add to custom tasks - this will trigger the main timeline calculation useEffect
-            setCustomTasks(prev => {
-                const updated = [...prev, newTask];
-                console.log('Updated customTasks:', updated);
-                return updated;
+            setTaskBank(prev => {
+                const list = prev[asset.id] ? [...prev[asset.id]] : [];
+                let idx = 0;
+                if (insertAfterTaskId) {
+                    const i = list.findIndex(t => t.id === insertAfterTaskId);
+                    if (i !== -1) idx = i + 1;
+                }
+                list.splice(idx, 0, rawTask);
+                return { ...prev, [asset.id]: list };
             });
-            
-            // Don't manually insert into timelineTasks here - let the main useEffect handle it
-            // This ensures proper timeline recalculation and date adjustments
-        }, `Add custom task "${name}"`, newTask);
+        }, `Add custom task "${name}"`);
     };
 
         // Helper function to count working days between two dates (exclusive)
@@ -1390,15 +1438,16 @@ useEffect(() => {
 )} */}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
-                                                    <GanttChart 
-                            tasks={timelineTasks}
-                            bankHolidays={bankHolidays}
-                            onTaskDurationChange={handleTaskDurationChange}
-                            onTaskNameChange={handleRenameTask}
-                            workingDaysNeeded={calculateWorkingDaysNeeded()}
-                            assetAlerts={calculateWorkingDaysNeededPerAsset()}
-                            onAddCustomTask={handleAddCustomTask}
-                        />
+                            <GanttChart 
+                                tasks={timelineTasks}
+                                bankHolidays={bankHolidays}
+                                onTaskDurationChange={handleTaskDurationChange}
+                                onTaskNameChange={handleRenameTask}
+                                workingDaysNeeded={calculateWorkingDaysNeeded()}
+                                assetAlerts={calculateWorkingDaysNeededPerAsset()}
+                                onAddCustomTask={handleAddCustomTask}
+                                selectedAssets={selectedAssets}
+                            />
                         ) : (
                             <div className="text-center text-gray-500 py-10">
                                 <p className="text-lg">Your timeline will appear here.</p>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as ExcelJS from 'exceljs'; // Import the new library
 
-const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, assetAlerts = [], onAddCustomTask = () => {} }) => {
+const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, assetAlerts = [], onAddCustomTask = () => {}, selectedAssets = [] }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -18,20 +18,31 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskDuration, setNewTaskDuration] = useState(1);
   const [newTaskOwner, setNewTaskOwner] = useState('m'); // Default to MMM
+  const [newTaskAssetType, setNewTaskAssetType] = useState(''); // NEW - asset type for custom task
   const [insertAfterTask, setInsertAfterTask] = useState('');
 
   // Asset alerts state
   const [isAssetAlertsExpanded, setIsAssetAlertsExpanded] = useState(false);
 
   // --- CONFIGURATION ---
+
   const DAY_COLUMN_WIDTH = 48;
   const ROW_HEIGHT = 80;
   const HEADER_HEIGHT = 50;
   const TASK_NAME_WIDTH = 320;
 
+  // Helper function to safely convert date to ISO string
+  const safeToISOString = (date) => {
+    if (!date || isNaN(date.getTime())) {
+      console.warn('Invalid date detected in GanttChart:', date);
+      return new Date().toISOString().split('T')[0]; // Return today's date as fallback
+    }
+    return date.toISOString().split('T')[0];
+  };
+
   // Helper functions to check non-working days
   const isBankHoliday = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = safeToISOString(date);
     return bankHolidays.includes(dateStr);
   };
 
@@ -138,10 +149,30 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
   };
 
   // --- DATE CALCULATIONS ---
-  const startDates = tasks.map(task => new Date(task.start));
-  const endDates = tasks.map(task => new Date(task.end));
+  const startDates = tasks.map(task => {
+    const date = new Date(task.start);
+    return isNaN(date.getTime()) ? new Date() : date;
+  });
+  const endDates = tasks.map(task => {
+    const date = new Date(task.end);
+    return isNaN(date.getTime()) ? new Date() : date;
+  });
+  
+  // Handle case where no valid dates exist
+  if (startDates.length === 0 || endDates.length === 0) {
+    console.warn('No valid dates found in tasks:', tasks);
+    return <div className="text-center text-gray-500 p-8">No valid tasks to display</div>;
+  }
+  
   const minDate = new Date(Math.min(...startDates));
   const maxDate = new Date(Math.max(...endDates));
+  
+  // Validate minDate and maxDate
+  if (isNaN(minDate.getTime()) || isNaN(maxDate.getTime())) {
+    console.warn('Invalid minDate or maxDate calculated:', { minDate, maxDate, startDates, endDates });
+    return <div className="text-center text-gray-500 p-8">Error calculating timeline dates</div>;
+  }
+  
   const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
   const dateColumns = Array.from({ length: totalDays }, (_, i) => {
     const date = new Date(minDate);
@@ -185,7 +216,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     const newEndDate = addWorkingDays(startDate, newDuration);
     
     // Call the callback to update the task
-    onTaskDurationChange(draggedTaskId, newDuration, newEndDate.toISOString().split('T')[0]);
+    onTaskDurationChange(draggedTaskId, newDuration, safeToISOString(newEndDate));
   };
 
   const handleMouseUp = () => {
@@ -246,6 +277,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     setNewTaskName('');
     setNewTaskDuration(1);
     setNewTaskOwner('m'); // Default to MMM
+    setNewTaskAssetType(''); // Reset asset type
     setInsertAfterTask('');
   };
 
@@ -254,11 +286,12 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     setNewTaskName('');
     setNewTaskDuration(1);
     setNewTaskOwner('m');
+    setNewTaskAssetType(''); // Reset asset type
     setInsertAfterTask('');
   };
 
   const handleSubmitCustomTask = () => {
-    if (!newTaskName.trim() || newTaskDuration < 1) {
+    if (!newTaskName.trim() || newTaskDuration < 1 || !newTaskAssetType) {
       return;
     }
 
@@ -266,6 +299,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
       name: newTaskName.trim(),
       duration: newTaskDuration,
       owner: newTaskOwner,
+      assetType: newTaskAssetType, // Pass the asset type
       insertAfterTaskId: insertAfterTask
     });
 
@@ -312,14 +346,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
       return colorMap[owner] || colorMap['m']; // Default to MMM if no owner found
     };
 
-    // Helper function to extract asset type from task name
-    const getAssetTypeFromTaskName = (taskName) => {
-      if (taskName.startsWith('Custom:')) {
-        return 'Custom Tasks';
-      }
-      const parts = taskName.split(': ');
-      return parts.length > 1 ? parts[0] : 'Other';
-    };
+    
 
     // 1. Add professional header with client branding
     const headerRow1 = worksheet.addRow(['Mail METRO MEDIA']);
@@ -405,7 +432,8 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     
     // Group tasks by asset type
     tasks.forEach(task => {
-      const assetType = getAssetTypeFromTaskName(task.name);
+      // Use explicit assetType property if available, otherwise fall back to name parsing
+      const assetType = task.assetType || 'Other';
       if (!groupedTasks[assetType]) {
         groupedTasks[assetType] = [];
       }
@@ -535,8 +563,8 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     dataWorksheet.addRow(['Project Metadata']);
     dataWorksheet.addRow(['Generated Date', new Date().toISOString()]);
     dataWorksheet.addRow(['Total Tasks', tasks.length]);
-    dataWorksheet.addRow(['Project Start', minDate.toISOString().split('T')[0]]);
-    dataWorksheet.addRow(['Project End', maxDate.toISOString().split('T')[0]]);
+    dataWorksheet.addRow(['Project Start', safeToISOString(minDate)]);
+    dataWorksheet.addRow(['Project End', safeToISOString(maxDate)]);
     dataWorksheet.addRow(['Total Days', totalDays]);
     dataWorksheet.addRow(['Working Days', dateColumns.filter(date => !isWeekend(date) && !isBankHoliday(date)).length]);
     dataWorksheet.addRow(['']); // Empty row
@@ -546,7 +574,8 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     dataWorksheet.addRow(['Task ID', 'Task Name', 'Asset Type', 'Owner', 'Start Date', 'End Date', 'Duration (Days)', 'Is Custom', 'Progress']);
     
     tasks.forEach(task => {
-      const assetType = getAssetTypeFromTaskName(task.name);
+      // Use explicit assetType property if available, otherwise fall back to name parsing
+      const assetType = task.assetType || 'Other';
       const taskNameParts = task.name.split(': ');
       const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
       
@@ -588,7 +617,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `professional_timeline_${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.download = `professional_timeline_${safeToISOString(new Date())}.xlsx`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -701,10 +730,30 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             </div>
           </div>
           
-          {/* TASK ROWS - Original Order with Color Coding */}
+          {/* TASK ROWS */}
           {tasks.map((task) => {
             const taskStart = new Date(task.start);
             const taskEnd = new Date(task.end);
+            
+            // Handle invalid dates by providing fallbacks
+            if (isNaN(taskStart.getTime()) || isNaN(taskEnd.getTime())) {
+              console.warn(`Invalid dates for task ${task.id}:`, { start: task.start, end: task.end });
+              // Use fallback dates instead of skipping the task
+              const fallbackDate = new Date();
+              const taskStartFixed = isNaN(taskStart.getTime()) ? fallbackDate : taskStart;
+              const taskEndFixed = isNaN(taskEnd.getTime()) ? fallbackDate : taskEnd;
+              
+              return (
+                <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
+                  <div className="p-3 border-b border-r border-gray-300 font-semibold text-gray-700 bg-white flex items-center" style={{ width: `${TASK_NAME_WIDTH}px` }}>
+                    <div className="text-red-500 text-sm">
+                      {task.name} (Invalid dates - please check task configuration)
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            
             const startOffsetDays = Math.floor((taskStart - minDate) / (1000 * 60 * 60 * 24));
             
             // Calculate duration - for single-day tasks or final tasks (go-live equivalent), use calendar days
@@ -725,6 +774,12 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             }
             
             const durationText = durationDays;
+            
+            // Create display name with asset prefix
+            const displayName = task.assetType && task.assetType !== 'Other' 
+              ? `${task.assetType}: ${task.name}` 
+              : task.name;
+            
             return (
               <div key={task.id} className="group flex" style={{ height: `${ROW_HEIGHT}px` }}>
                 {/* Task name column: sticky left only */}
@@ -773,7 +828,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                         title="Click to edit task name"
                       >
                         <div className="flex items-center">
-                          <span>{task.name}</span>
+                          <span>{displayName}</span>
                           <span className="ml-2 text-xs text-gray-400" title="Click to edit">
                             ✏️
                           </span>
@@ -809,7 +864,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
 
                       bars.push(
                         <div
-                          key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
+                          key={`${task.id}-${safeToISOString(currentDate)}`}
                           className={`absolute top-1/2 -translate-y-1/2 h-10 ${ownerColorClasses} rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
                             isDragging && draggedTaskId === task.id ? 'ring-2 ring-opacity-50 shadow-lg' : ''
                           }`}
@@ -843,7 +898,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
 
                           bars.push(
                             <div
-                              key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
+                              key={`${task.id}-${safeToISOString(currentDate)}`}
                               className={`absolute top-1/2 -translate-y-1/2 h-10 ${ownerColorClasses} rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
                                 isDragging && draggedTaskId === task.id ? 'ring-2 ring-opacity-50 shadow-lg' : ''
                               }`}
@@ -1060,19 +1115,44 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Asset Type *
+                </label>
+                <select
+                  value={newTaskAssetType}
+                  onChange={(e) => {
+                    setNewTaskAssetType(e.target.value);
+                    setInsertAfterTask(''); // Clear the "Insert After" selection when asset type changes
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select an asset type</option>
+                  {selectedAssets.map((asset, index) => (
+                    <option key={asset.id} value={asset.name}>
+                      {asset.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Insert After
+                  {!newTaskAssetType && <span className="text-gray-500 text-xs"> (Select asset type first)</span>}
                 </label>
                 <select
                   value={insertAfterTask}
                   onChange={(e) => setInsertAfterTask(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={!newTaskAssetType}
                 >
                   <option value="">At the beginning</option>
-                  {tasks.map((task, index) => (
-                    <option key={task.id} value={task.id}>
-                      {task.name}
-                    </option>
-                  ))}
+                  {newTaskAssetType && tasks
+                    .filter(task => task.assetType === newTaskAssetType)
+                    .map((task, index) => (
+                      <option key={task.id} value={task.id}>
+                        {task.name}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
@@ -1086,7 +1166,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
               </button>
               <button
                 onClick={handleSubmitCustomTask}
-                disabled={!newTaskName.trim()}
+                disabled={!newTaskName.trim() || !newTaskAssetType}
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Task
