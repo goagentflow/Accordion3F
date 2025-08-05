@@ -494,9 +494,17 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
           const cell = taskRow.getCell(index + 2); // +2 because we have 3 header rows now
           
           if (date >= taskStart && date <= taskEnd) {
-            // Check if this is a working day
-            if (!isWeekend(date) && !isBankHoliday(date)) {
-              // Task is active on this working day
+            // Check if this is a final task (go-live, live date, etc.)
+            const isFinalTask = task.name.toLowerCase().includes('go-live') || 
+                               task.name.toLowerCase().includes('live date') ||
+                               task.name.toLowerCase().includes('issue date') ||
+                               task.name.toLowerCase().includes('send date') ||
+                               task.name.toLowerCase().includes('live');
+            
+            // Final tasks always show in their proper color, regardless of working days
+            // Regular tasks only show color on working days
+            if (isFinalTask || (!isWeekend(date) && !isBankHoliday(date))) {
+              // Task is active - show in proper color
               cell.fill = { 
                 type: 'pattern', 
                 pattern: 'solid', 
@@ -509,7 +517,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                 right: { style: 'thin', color: { argb: 'FF' + colors.border } }
               };
             } else {
-              // Weekend or holiday within task period - show as non-working day
+              // Weekend or holiday within regular task period - show as non-working day
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
               cell.border = {
                 top: { style: 'thin' },
