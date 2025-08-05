@@ -457,6 +457,65 @@ const TimelineBuilder = () => {
                     if (afterTaskIndex !== -1) {
                         insertIndex = afterTaskIndex + 1;
                     }
+                } else if (customTask.assetType) {
+                    // User chose "At the beginning of [Asset]" - find consecutive groups of this asset type
+                    console.log('=== CUSTOM TASK POSITIONING DEBUG ===');
+                    console.log('Custom task:', customTask);
+                    console.log('Looking for asset type:', customTask.assetType);
+                    
+                    // Find all consecutive groups of this asset type
+                    const groups = [];
+                    let currentGroup = null;
+                    
+                    for (let i = 0; i < assetTimeline.length; i++) {
+                        const task = assetTimeline[i];
+                        let taskAssetType;
+                        
+                        // Get the asset type for this task
+                        if (task.assetType) {
+                            taskAssetType = task.assetType;
+                        } else {
+                            // Extract from task name (e.g., "Digital Display - Creative: Task Name" -> "Digital Display - Creative")
+                            const nameParts = task.name.split(': ');
+                            taskAssetType = nameParts.length > 1 ? nameParts[0] : 'Unknown';
+                        }
+                        
+                        if (taskAssetType === customTask.assetType) {
+                            if (!currentGroup) {
+                                // Start a new group
+                                currentGroup = { startIndex: i, endIndex: i, assetId: task.id.split('-')[0] };
+                            } else {
+                                // Continue the current group
+                                currentGroup.endIndex = i;
+                            }
+                        } else if (currentGroup) {
+                            // End the current group and save it
+                            groups.push(currentGroup);
+                            currentGroup = null;
+                        }
+                    }
+                    
+                    // Don't forget to add the last group if it exists
+                    if (currentGroup) {
+                        groups.push(currentGroup);
+                    }
+                    
+                    console.log(`Found ${groups.length} group(s) of asset type "${customTask.assetType}"`);
+                    groups.forEach((group, idx) => {
+                        console.log(`  Group ${idx}: indices ${group.startIndex}-${group.endIndex}, assetId: ${group.assetId}`);
+                    });
+                    
+                    if (groups.length > 0) {
+                        // Use the last (most recent) group as it's likely what the user is working with
+                        const targetGroup = groups[groups.length - 1];
+                        insertIndex = targetGroup.startIndex;
+                        console.log(`*** SETTING INSERT INDEX TO ${insertIndex} (beginning of last group) ***`);
+                    } else {
+                        console.log(`*** NO TASKS FOUND FOR ASSET TYPE "${customTask.assetType}" ***`);
+                        // If no tasks found, insert at the beginning
+                        insertIndex = 0;
+                    }
+                    console.log('=== END DEBUG ===');
                 }
                 
                 console.log('Inserting custom task at index:', insertIndex);
@@ -476,15 +535,38 @@ const TimelineBuilder = () => {
             
             // Group tasks by asset to maintain the backwards calculation
             const tasksByAsset = {};
-            assetTimeline.forEach(task => {
+            assetTimeline.forEach((task, index) => {
                 if (task.isCustom) {
                     // Custom tasks need to be associated with the asset they belong to
-                    // Find which asset this custom task belongs to based on insertAfterTaskId
                     let targetAssetId = null;
+                    
                     if (task.insertAfterTaskId) {
+                        // If inserted after a specific task, find that task's asset
                         const afterTask = assetTimeline.find(t => t.id === task.insertAfterTaskId);
                         if (afterTask) {
                             targetAssetId = afterTask.id.split('-')[0];
+                        }
+                    } else if (task.assetType) {
+                        // If placed "At the beginning of [Asset Type]", find the next non-custom task
+                        // in the timeline to determine which asset group this belongs to
+                        for (let i = index + 1; i < assetTimeline.length; i++) {
+                            const nextTask = assetTimeline[i];
+                            if (!nextTask.isCustom && !nextTask.name.includes('Custom:')) {
+                                // Check if this task matches the custom task's asset type
+                                let nextTaskAssetType;
+                                if (nextTask.assetType) {
+                                    nextTaskAssetType = nextTask.assetType;
+                                } else {
+                                    const nameParts = nextTask.name.split(': ');
+                                    nextTaskAssetType = nameParts.length > 1 ? nameParts[0] : 'Unknown';
+                                }
+                                
+                                if (nextTaskAssetType === task.assetType) {
+                                    targetAssetId = nextTask.id.split('-')[0];
+                                    console.log(`Custom task "${task.name}" associated with asset ${targetAssetId} based on next task "${nextTask.name}"`);
+                                    break;
+                                }
+                            }
                         }
                     }
                     
@@ -492,11 +574,14 @@ const TimelineBuilder = () => {
                         if (!tasksByAsset[targetAssetId]) tasksByAsset[targetAssetId] = [];
                         tasksByAsset[targetAssetId].push(task);
                     } else {
-                        // Fallback: associate with the first asset
-                        const firstAssetId = selectedAssets[0]?.id;
-                        if (firstAssetId) {
-                            if (!tasksByAsset[firstAssetId]) tasksByAsset[firstAssetId] = [];
-                            tasksByAsset[firstAssetId].push(task);
+                        // Fallback: Try to find an asset of the matching type
+                        const matchingAsset = selectedAssets.find(asset => asset.type === task.assetType);
+                        if (matchingAsset) {
+                            targetAssetId = matchingAsset.id;
+                            if (!tasksByAsset[targetAssetId]) tasksByAsset[targetAssetId] = [];
+                            tasksByAsset[targetAssetId].push(task);
+                        } else {
+                            console.warn(`Could not find target asset for custom task: ${task.name}`);
                         }
                     }
                 } else {
@@ -719,6 +804,7 @@ useEffect(() => {
             return;
         }
 
+        const newCalculatedStartDates = { ...startDates };
         const allTasks = [];
         let taskIndex = 0;
 
@@ -740,9 +826,11 @@ useEffect(() => {
             ganttTasks.unshift({
                 id: `task-${taskIndex}`,
                 name: `${assetName}: Go-Live`,
+                assetType: assetName, // NEW - explicit asset type for go-live tasks
                 start: liveDate.toISOString().split('T')[0],
                 end: liveDate.toISOString().split('T')[0],
                 progress: 0,
+                owner: 'l', // Go-live tasks are always 'l'
             });
             taskIndex++;
 
@@ -763,6 +851,7 @@ useEffect(() => {
                 ganttTasks.unshift({
                     id: `task-${taskIndex}`,
                     name: `${taskInfo['Asset Type']}: ${taskInfo['Task']}`,
+                    assetType: taskInfo['Asset Type'], // NEW - explicit asset type
                     start: taskStartDate.toISOString().split('T')[0],
                     end: finalTaskEndDate.toISOString().split('T')[0],
                     progress: 0,
@@ -786,11 +875,75 @@ useEffect(() => {
             // Insert custom tasks at their specified positions
             customTasks.forEach(customTask => {
                 let insertIndex = 0;
-                if (customTask.insertAfterTaskId) {
+                
+                if (customTask.insertAfterTaskId && customTask.insertAfterTaskId !== '') {
+                    // If a specific task is specified, insert after it
                     const afterTaskIndex = allTasks.findIndex(task => task.id === customTask.insertAfterTaskId);
                     if (afterTaskIndex !== -1) {
                         insertIndex = afterTaskIndex + 1;
                     }
+                } else if (customTask.assetType) {
+                    // User chose "At the beginning of [Asset]" - find consecutive groups of this asset type
+                    console.log('=== CUSTOM TASK DEBUG ===');
+                    console.log('Custom task:', customTask);
+                    console.log('Looking for asset type:', customTask.assetType);
+                    
+                    // Find all consecutive groups of this asset type
+                    const groups = [];
+                    let currentGroup = null;
+                    
+                    for (let i = 0; i < allTasks.length; i++) {
+                        const task = allTasks[i];
+                        let taskAssetType;
+                        
+                        // Get the asset type for this task
+                        if (task.assetType) {
+                            taskAssetType = task.assetType;
+                        } else {
+                            // Extract from task name (e.g., "Digital Display - Creative: Task Name" -> "Digital Display - Creative")
+                            const nameParts = task.name.split(': ');
+                            taskAssetType = nameParts.length > 1 ? nameParts[0] : 'Unknown';
+                        }
+                        
+                        console.log(`Task ${i}: "${task.name}" -> assetType: "${taskAssetType}"`);
+                        
+                        if (taskAssetType === customTask.assetType) {
+                            if (!currentGroup) {
+                                // Start a new group
+                                currentGroup = { startIndex: i, endIndex: i, assetId: task.id.split('-')[0] };
+                            } else {
+                                // Continue the current group
+                                currentGroup.endIndex = i;
+                            }
+                        } else if (currentGroup) {
+                            // End the current group and save it
+                            groups.push(currentGroup);
+                            currentGroup = null;
+                        }
+                    }
+                    
+                    // Don't forget to add the last group if it exists
+                    if (currentGroup) {
+                        groups.push(currentGroup);
+                    }
+                    
+                    console.log(`Found ${groups.length} group(s) of asset type "${customTask.assetType}"`);
+                    groups.forEach((group, idx) => {
+                        console.log(`  Group ${idx}: indices ${group.startIndex}-${group.endIndex}, assetId: ${group.assetId}`);
+                    });
+                    
+                    if (groups.length > 0) {
+                        // Use the last (most recent) group as it's likely what the user is working with
+                        // This matches the behavior when custom tasks are inserted in the middle/end
+                        const targetGroup = groups[groups.length - 1];
+                        insertIndex = targetGroup.startIndex;
+                        console.log(`*** SETTING INSERT INDEX TO ${insertIndex} (beginning of last group) ***`);
+                    } else {
+                        console.log(`*** NO TASKS FOUND FOR ASSET TYPE "${customTask.assetType}" ***`);
+                        // If no tasks found, insert at the beginning
+                        insertIndex = 0;
+                    }
+                    console.log('=== END DEBUG ===');
                 }
                 
                 // Create a new custom task with updated dates
@@ -854,11 +1007,38 @@ useEffect(() => {
     // Handler to rename a task
     const handleRenameTask = (taskId, newName) => {
         const currentTask = timelineTasks.find(task => task.id === taskId);
+        if (!currentTask) return;
+        
+        // Preserve the assetType if it exists, otherwise try to infer it
+        let preservedAssetType = currentTask.assetType;
+        
+        // If no assetType exists, try to infer it from the current name or position
+        if (!preservedAssetType) {
+            // Try to extract from current name format (Asset Type: Task Name)
+            const nameParts = currentTask.name.split(': ');
+            if (nameParts.length > 1) {
+                preservedAssetType = nameParts[0];
+            } else {
+                // If we can't extract from name, we'll let the Excel export logic handle it
+                // by looking at nearby tasks
+                preservedAssetType = null;
+            }
+        }
+        
         executeAction(() => {
             setCustomTaskNames(prev => ({
                 ...prev,
                 [taskId]: newName
             }));
+            
+            // If we have a preserved assetType, also update the task's assetType
+            if (preservedAssetType) {
+                setTimelineTasks(prev => prev.map(task => 
+                    task.id === taskId 
+                        ? { ...task, assetType: preservedAssetType }
+                        : task
+                ));
+            }
         }, `Rename task to "${newName}"`);
     };
 
@@ -933,7 +1113,7 @@ useEffect(() => {
 
     // Handler for adding custom tasks
     const handleAddCustomTask = (customTaskData) => {
-        const { name, duration, owner, insertAfterTaskId } = customTaskData;
+        const { name, duration, owner, assetType, insertAfterTaskId } = customTaskData;
         
         console.log('handleAddCustomTask called with:', customTaskData);
         
@@ -946,6 +1126,7 @@ useEffect(() => {
             duration: duration,
             owner: owner, // Include the owner property
             insertAfterTaskId: insertAfterTaskId,
+            assetType: assetType, // NEW - use selected asset type
             isCustom: true,
             progress: 0
         };
