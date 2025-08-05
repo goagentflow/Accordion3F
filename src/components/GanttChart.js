@@ -17,6 +17,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskDuration, setNewTaskDuration] = useState(1);
+  const [newTaskOwner, setNewTaskOwner] = useState('m'); // Default to MMM
   const [insertAfterTask, setInsertAfterTask] = useState('');
 
   // Asset alerts state
@@ -244,6 +245,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     setShowAddTaskModal(true);
     setNewTaskName('');
     setNewTaskDuration(1);
+    setNewTaskOwner('m'); // Default to MMM
     setInsertAfterTask('');
   };
 
@@ -251,6 +253,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     setShowAddTaskModal(false);
     setNewTaskName('');
     setNewTaskDuration(1);
+    setNewTaskOwner('m');
     setInsertAfterTask('');
   };
 
@@ -262,6 +265,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     onAddCustomTask({
       name: newTaskName.trim(),
       duration: newTaskDuration,
+      owner: newTaskOwner,
       insertAfterTaskId: insertAfterTask
     });
 
@@ -306,6 +310,15 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     // Helper function to get color for owner
     const getOwnerColor = (owner) => {
       return colorMap[owner] || colorMap['m']; // Default to MMM if no owner found
+    };
+
+    // Helper function to extract asset type from task name
+    const getAssetTypeFromTaskName = (taskName) => {
+      if (taskName.startsWith('Custom:')) {
+        return 'Custom Tasks';
+      }
+      const parts = taskName.split(': ');
+      return parts.length > 1 ? parts[0] : 'Other';
     };
 
     // 1. Add professional header with client branding
@@ -387,56 +400,101 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
       });
     });
 
-    // 4. Add task rows in original order with color coding
+    // 4. Group tasks by asset type and add them with headers
+    const groupedTasks = {};
+    
+    // Group tasks by asset type
     tasks.forEach(task => {
-      const taskRow = worksheet.addRow([]);
+      const assetType = getAssetTypeFromTaskName(task.name);
+      if (!groupedTasks[assetType]) {
+        groupedTasks[assetType] = [];
+      }
+      groupedTasks[assetType].push(task);
+    });
+
+    // Add tasks grouped by asset type
+    Object.keys(groupedTasks).forEach(assetType => {
+      const assetTasks = groupedTasks[assetType];
       
-      // Set row height for compact display
-      taskRow.height = 20; // Reduced for more compact rows
-      
-      // Set task name in first column (remove owner prefix for cleaner display)
-      const taskNameCell = taskRow.getCell(1);
-      // Extract just the task part after the colon
-      const taskNameParts = task.name.split(': ');
-      const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
-      taskNameCell.value = cleanTaskName;
-      taskNameCell.font = { size: 12 };
-      taskNameCell.border = {
+      // Add asset type header row
+      const assetHeaderRow = worksheet.addRow([assetType]);
+      assetHeaderRow.height = 25;
+      const assetHeaderCell = assetHeaderRow.getCell(1);
+      assetHeaderCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+      assetHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E75B6' } };
+      assetHeaderCell.border = {
         top: { style: 'thin' },
         bottom: { style: 'thin' },
         left: { style: 'thin' },
         right: { style: 'thin' }
       };
-      taskNameCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-
-      // Get colors for this task
-      const colors = getOwnerColor(getOwnerFromTask(task));
+      assetHeaderCell.alignment = { horizontal: 'left', vertical: 'middle' };
       
-      // Fill timeline cells for this task
-      const taskStart = new Date(task.start);
-      const taskEnd = new Date(task.end);
+      // Merge the header cell across all date columns
+      worksheet.mergeCells(assetHeaderRow.number, 1, assetHeaderRow.number, dateColumns.length + 1);
       
-      dateColumns.forEach((date, index) => {
-        const cell = taskRow.getCell(index + 2); // +2 because we have 3 header rows now
+      // Add tasks for this asset type
+      assetTasks.forEach(task => {
+        const taskRow = worksheet.addRow([]);
         
-        if (date >= taskStart && date <= taskEnd) {
-          // Check if this is a working day
-          if (!isWeekend(date) && !isBankHoliday(date)) {
-            // Task is active on this working day
-            cell.fill = { 
-              type: 'pattern', 
-              pattern: 'solid', 
-              fgColor: { argb: 'FF' + colors.fill } 
-            };
-            cell.border = {
-              top: { style: 'thin', color: { argb: 'FF' + colors.border } },
-              bottom: { style: 'thin', color: { argb: 'FF' + colors.border } },
-              left: { style: 'thin', color: { argb: 'FF' + colors.border } },
-              right: { style: 'thin', color: { argb: 'FF' + colors.border } }
-            };
+        // Set row height for compact display
+        taskRow.height = 20; // Reduced for more compact rows
+        
+        // Set task name in first column (remove asset prefix for cleaner display)
+        const taskNameCell = taskRow.getCell(1);
+        // Extract just the task part after the colon
+        const taskNameParts = task.name.split(': ');
+        const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
+        taskNameCell.value = cleanTaskName;
+        taskNameCell.font = { size: 12 };
+        taskNameCell.border = {
+          top: { style: 'thin' },
+          bottom: { style: 'thin' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+        taskNameCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+        // Get colors for this task
+        const colors = getOwnerColor(getOwnerFromTask(task));
+        
+        // Fill timeline cells for this task
+        const taskStart = new Date(task.start);
+        const taskEnd = new Date(task.end);
+        
+        dateColumns.forEach((date, index) => {
+          const cell = taskRow.getCell(index + 2); // +2 because we have 3 header rows now
+          
+          if (date >= taskStart && date <= taskEnd) {
+            // Check if this is a working day
+            if (!isWeekend(date) && !isBankHoliday(date)) {
+              // Task is active on this working day
+              cell.fill = { 
+                type: 'pattern', 
+                pattern: 'solid', 
+                fgColor: { argb: 'FF' + colors.fill } 
+              };
+              cell.border = {
+                top: { style: 'thin', color: { argb: 'FF' + colors.border } },
+                bottom: { style: 'thin', color: { argb: 'FF' + colors.border } },
+                left: { style: 'thin', color: { argb: 'FF' + colors.border } },
+                right: { style: 'thin', color: { argb: 'FF' + colors.border } }
+              };
+            } else {
+              // Weekend or holiday within task period - show as non-working day
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+              cell.border = {
+                top: { style: 'thin' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+              };
+            }
           } else {
-            // Weekend or holiday within task period - show as non-working day
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+            // Outside task period
+            if (isWeekend(date) || isBankHoliday(date)) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+            }
             cell.border = {
               top: { style: 'thin' },
               bottom: { style: 'thin' },
@@ -444,21 +502,14 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
               right: { style: 'thin' }
             };
           }
-        } else {
-          // Outside task period
-          if (isWeekend(date) || isBankHoliday(date)) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
-          }
-          cell.border = {
-            top: { style: 'thin' },
-            bottom: { style: 'thin' },
-            left: { style: 'thin' },
-            right: { style: 'thin' }
-          };
-        }
-        
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
       });
+      
+      // Add a small gap after each asset group
+      const gapRow = worksheet.addRow(['']);
+      gapRow.height = 5;
     });
 
     // 5. Set column widths and row heights
@@ -492,21 +543,19 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     
     // Add tasks data in structured format
     dataWorksheet.addRow(['Tasks Data']);
-    dataWorksheet.addRow(['Task ID', 'Task Name', 'Owner', 'Start Date', 'End Date', 'Duration (Days)', 'Is Custom', 'Progress']);
+    dataWorksheet.addRow(['Task ID', 'Task Name', 'Asset Type', 'Owner', 'Start Date', 'End Date', 'Duration (Days)', 'Is Custom', 'Progress']);
     
     tasks.forEach(task => {
-      // Determine owner
-      const owner = getOwnerFromTask(task);
-      
-      // Calculate duration
-      const startDate = new Date(task.start);
-      const endDate = new Date(task.end);
-      const duration = countWorkingDays(startDate, endDate);
+      const assetType = getAssetTypeFromTaskName(task.name);
+      const taskNameParts = task.name.split(': ');
+      const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
+      const duration = countWorkingDays(new Date(task.start), new Date(task.end));
       
       dataWorksheet.addRow([
-        task.id || `task-${Date.now()}`,
-        task.name,
-        getOwnerDescription(owner),
+        task.id,
+        cleanTaskName,
+        assetType,
+        getOwnerFromTask(task),
         task.start,
         task.end,
         duration,
@@ -514,61 +563,18 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
         task.progress || 0
       ]);
     });
-    
-    dataWorksheet.addRow(['']); // Empty row
-    
-    // Add JSON data for easy AI parsing
-    dataWorksheet.addRow(['JSON Data (for AI processing)']);
-    const jsonData = {
-      project: {
-        generatedDate: new Date().toISOString(),
-        totalTasks: tasks.length,
-        startDate: minDate.toISOString().split('T')[0],
-        endDate: maxDate.toISOString().split('T')[0],
-        totalDays: totalDays,
-        workingDays: dateColumns.filter(date => !isWeekend(date) && !isBankHoliday(date)).length
-      },
-      tasks: tasks.map(task => {
-        const owner = getOwnerFromTask(task);
-        
-        const startDate = new Date(task.start);
-        const endDate = new Date(task.end);
-        const duration = countWorkingDays(startDate, endDate);
-        
-        return {
-          id: task.id || `task-${Date.now()}`,
-          name: task.name,
-          owner: owner,
-          startDate: task.start,
-          endDate: task.end,
-          duration: duration,
-          isCustom: task.isCustom || false,
-          progress: task.progress || 0
-        };
-      })
-    };
-    
-    dataWorksheet.addRow([JSON.stringify(jsonData, null, 2)]);
-    
-    // Set column widths for data sheet
-    dataWorksheet.getColumn(1).width = 30;
-    dataWorksheet.getColumn(2).width = 50;
-    dataWorksheet.getColumn(3).width = 20;
-    dataWorksheet.getColumn(4).width = 15;
-    dataWorksheet.getColumn(5).width = 15;
-    dataWorksheet.getColumn(6).width = 15;
-    dataWorksheet.getColumn(7).width = 15;
-    dataWorksheet.getColumn(8).width = 15;
 
     // 8. Generate and download the file
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `professional_timeline_${new Date().toISOString().split('T')[0]}.xlsx`;
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `professional_timeline_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
     window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
 
@@ -966,6 +972,21 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                   onChange={(e) => setNewTaskDuration(Math.max(1, parseInt(e.target.value) || 1))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Owner *
+                </label>
+                <select
+                  value={newTaskOwner}
+                  onChange={(e) => setNewTaskOwner(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="m">MMM</option>
+                  <option value="c">Client</option>
+                  <option value="a">Client/Agency</option>
+                </select>
               </div>
               
               <div>

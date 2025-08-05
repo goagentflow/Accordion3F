@@ -933,7 +933,7 @@ useEffect(() => {
 
     // Handler for adding custom tasks
     const handleAddCustomTask = (customTaskData) => {
-        const { name, duration, insertAfterTaskId } = customTaskData;
+        const { name, duration, owner, insertAfterTaskId } = customTaskData;
         
         console.log('handleAddCustomTask called with:', customTaskData);
         
@@ -944,6 +944,7 @@ useEffect(() => {
             id: newTaskId,
             name: `Custom: ${name}`,
             duration: duration,
+            owner: owner, // Include the owner property
             insertAfterTaskId: insertAfterTaskId,
             isCustom: true,
             progress: 0
