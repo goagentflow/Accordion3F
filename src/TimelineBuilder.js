@@ -382,6 +382,7 @@ const TimelineBuilder = () => {
                 start: liveDate.toISOString().split('T')[0],
                 end: liveDate.toISOString().split('T')[0],
                 progress: 0,
+                owner: 'l', // Live Date
             });
             taskIndex++;
 
@@ -411,6 +412,7 @@ const TimelineBuilder = () => {
                     start: taskStartDate.toISOString().split('T')[0],
                     end: finalTaskEndDate.toISOString().split('T')[0],
                     progress: 0,
+                    owner: taskInfo['owner'] || 'm', // Get owner from CSV, default to MMM
                 });
                 taskIndex++;
                 // Update currentEndDate for the next task

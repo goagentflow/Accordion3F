@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx'; // Import the new library
+import React, { useState, useRef, useEffect } from 'react';
+import * as ExcelJS from 'exceljs'; // Import the new library
 
 const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, assetAlerts = [], onAddCustomTask = () => {} }) => {
   // Drag state
@@ -81,6 +81,72 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     }
     return currentDate;
   };
+
+  // Helper function to get owner from task data
+  const getOwnerFromTask = (task) => {
+    // Check if task has owner property (from CSV)
+    if (task.owner) {
+      return task.owner;
+    }
+    // Fallback: try to determine owner from task name
+    const taskName = task.name.toLowerCase();
+    if (taskName.includes('live date') || taskName.includes('go-live') || taskName.includes('issue date')) {
+      return 'l';
+    }
+    if (taskName.includes('client feedback') || taskName.includes('client confirms') || taskName.includes('client sign')) {
+      return 'c';
+    }
+    if (taskName.includes('agency') || taskName.includes('publisher') || taskName.includes('editorial')) {
+      return 'a';
+    }
+    // Default to MMM for most tasks
+    return 'm';
+  };
+
+  // Helper function to get description for owner
+  const getOwnerDescription = (owner) => {
+    const descriptions = {
+      'm': 'MMM Action',
+      'c': 'Client Action',
+      'a': 'Client/Agency Action',
+      'l': 'Live Date'
+    };
+    return descriptions[owner] || 'Task';
+  };
+
+  // Helper function to get CSS color classes for owner
+  const getOwnerColorClasses = (owner) => {
+    const colorClasses = {
+      'm': 'bg-blue-500', // MMM Action - Blue
+      'c': 'bg-orange-500', // Client Action - Orange
+      'a': 'bg-purple-500', // Client/Agency Action - Purple
+      'l': 'bg-green-500'  // Live Date - Green
+    };
+    return colorClasses[owner] || colorClasses['m']; // Default to MMM if no owner found
+  };
+
+  // Helper function to get CSS color classes for owner (darker variant for borders/handles)
+  const getOwnerColorClassesDark = (owner) => {
+    const colorClasses = {
+      'm': 'bg-blue-600', // MMM Action - Darker Blue
+      'c': 'bg-orange-600', // Client Action - Darker Orange
+      'a': 'bg-purple-600', // Client/Agency Action - Darker Purple
+      'l': 'bg-green-600'  // Live Date - Darker Green
+    };
+    return colorClasses[owner] || colorClasses['m']; // Default to MMM if no owner found
+  };
+
+  // --- DATE CALCULATIONS ---
+  const startDates = tasks.map(task => new Date(task.start));
+  const endDates = tasks.map(task => new Date(task.end));
+  const minDate = new Date(Math.min(...startDates));
+  const maxDate = new Date(Math.max(...endDates));
+  const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+  const dateColumns = Array.from({ length: totalDays }, (_, i) => {
+    const date = new Date(minDate);
+    date.setDate(minDate.getDate() + i);
+    return date;
+  });
 
   // Mouse event handlers for drag functionality
   const handleMouseDown = (e, taskId, taskStart, taskEnd) => {
@@ -224,55 +290,288 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     );
   }
 
-  // --- DATE CALCULATIONS ---
-  const startDates = tasks.map(task => new Date(task.start));
-  const endDates = tasks.map(task => new Date(task.end));
-  const minDate = new Date(Math.min(...startDates));
-  const maxDate = new Date(Math.max(...endDates));
-  const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
-  const dateColumns = Array.from({ length: totalDays }, (_, i) => {
-    const date = new Date(minDate);
-    date.setDate(minDate.getDate() + i);
-    return date;
-  });
+  const exportToExcel = async () => {
+    // Create a new workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Timeline');
 
-  const exportToExcel = () => {
-    // 1. Create the header row for the Excel sheet
-    const header = ['Task Name', ...dateColumns.map(d => d.toLocaleDateString())];
+    // Define colors for different owners - darker and more vibrant
+    const colorMap = {
+      'm': { fill: '4F81BD', border: '2E5984' }, // MMM Action - Dark blue
+      'c': { fill: 'F79646', border: 'E67E22' }, // Client Action - Dark orange
+      'a': { fill: '9B59B6', border: '8E44AD' }, // Client/Agency Action - Dark purple
+      'l': { fill: '82B366', border: '27AE60' }  // Live Date - Dark green
+    };
+
+    // Helper function to get color for owner
+    const getOwnerColor = (owner) => {
+      return colorMap[owner] || colorMap['m']; // Default to MMM if no owner found
+    };
+
+    // 1. Add professional header with client branding
+    const headerRow1 = worksheet.addRow(['Mail METRO MEDIA']);
+    const headerRow2 = worksheet.addRow(['']);
+    const headerRow3 = worksheet.addRow(['Client:', 'Your Client Name']);
+    const headerRow4 = worksheet.addRow(['Campaign Name:', '']);
+    // Calculate live date from the latest task end date
+    const liveDate = maxDate.toLocaleDateString();
+    const headerRow5 = worksheet.addRow(['Live Date:', liveDate]);
+    const headerRow6 = worksheet.addRow(['Generated:', new Date().toLocaleDateString()]);
+    const headerRow7 = worksheet.addRow(['Total Tasks:', tasks.length]);
+    const headerRow8 = worksheet.addRow(['Project Duration:', `${totalDays} days`]);
+    const headerRow9 = worksheet.addRow(['']); // Empty row for spacing
+
+    // Style header
+    headerRow1.getCell(1).font = { bold: true, size: 18, color: { argb: 'FF2E75B6' } };
+    headerRow1.getCell(1).alignment = { horizontal: 'left' };
+    headerRow3.getCell(1).font = { bold: true, size: 12 };
+    headerRow4.getCell(1).font = { bold: true, size: 12 };
+    headerRow5.getCell(1).font = { bold: true, size: 12 };
+
+    // 2. Add dynamic legend based on actual tasks
+    const legendRow1 = worksheet.addRow(['Legend:']);
     
-    // 2. Create a data row for each task
-    const data = tasks.map(task => {
-      const taskRow = Array(header.length).fill(''); // Create an empty row
-      taskRow[0] = task.name; // Set the task name in the first column
+    // Get unique owners from actual tasks
+    const usedOwners = [...new Set(tasks.map(task => getOwnerFromTask(task)))];
+    
+    // Add legend rows only for owners that are actually used
+    usedOwners.forEach((owner, index) => {
+      const legendRow = worksheet.addRow([getOwnerDescription(owner)]);
+      const colorCell = legendRow.getCell(1);
+      colorCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + colorMap[owner].fill } };
+      colorCell.border = {
+        top: { style: 'thin' },
+        bottom: { style: 'thin' },
+        left: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+    
+    const legendRow6 = worksheet.addRow(['']); // Empty row for spacing
 
-      const taskStart = new Date(task.start);
-      const taskEnd = new Date(task.end);
+    // Style legend header
+    legendRow1.getCell(1).font = { bold: true, size: 14 };
 
-      // 3. Place a marker ('X') in the date columns where the task is active
-      dateColumns.forEach((date, index) => {
-        if (date >= taskStart && date <= taskEnd) {
-          taskRow[index + 1] = 'X'; // +1 to account for the 'Task Name' column
-        }
+    // 3. Add timeline header rows (three-row header like their format)
+    const dayHeader = ['Task Name'];
+    const dateHeader = [''];
+    const monthHeader = [''];
+    
+    dateColumns.forEach(date => {
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayNumber = date.getDate();
+      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+      
+      dayHeader.push(dayName);
+      dateHeader.push(dayNumber.toString());
+      monthHeader.push(monthName);
+    });
+    
+    const dayHeaderRow = worksheet.addRow(dayHeader);
+    const dateHeaderRow = worksheet.addRow(dateHeader);
+    const monthHeaderRow = worksheet.addRow(monthHeader);
+
+    // Style all header rows
+    [dayHeaderRow, dateHeaderRow, monthHeaderRow].forEach(headerRow => {
+      headerRow.height = 20; // Compact header rows
+      headerRow.eachCell((cell, colNumber) => {
+        cell.font = { bold: true, size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        cell.border = {
+          top: { style: 'thin' },
+          bottom: { style: 'thin' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
-      return taskRow;
     });
 
-    // 4. Combine header and data into a single array for the worksheet
-    const worksheetData = [header, ...data];
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    // 4. Add task rows in original order with color coding
+    tasks.forEach(task => {
+      const taskRow = worksheet.addRow([]);
+      
+      // Set row height for compact display
+      taskRow.height = 20; // Reduced for more compact rows
+      
+      // Set task name in first column (remove owner prefix for cleaner display)
+      const taskNameCell = taskRow.getCell(1);
+      // Extract just the task part after the colon
+      const taskNameParts = task.name.split(': ');
+      const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
+      taskNameCell.value = cleanTaskName;
+      taskNameCell.font = { size: 12 };
+      taskNameCell.border = {
+        top: { style: 'thin' },
+        bottom: { style: 'thin' },
+        left: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+      taskNameCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
-    // 5. Set column widths for better readability
-    const columnWidths = [
-      { wch: 60 }, // Task Name column
-      ...dateColumns.map(() => ({ wch: 12 })) // Date columns
-    ];
-    worksheet['!cols'] = columnWidths;
+      // Get colors for this task
+      const colors = getOwnerColor(getOwnerFromTask(task));
+      
+      // Fill timeline cells for this task
+      const taskStart = new Date(task.start);
+      const taskEnd = new Date(task.end);
+      
+      dateColumns.forEach((date, index) => {
+        const cell = taskRow.getCell(index + 2); // +2 because we have 3 header rows now
+        
+        if (date >= taskStart && date <= taskEnd) {
+          // Check if this is a working day
+          if (!isWeekend(date) && !isBankHoliday(date)) {
+            // Task is active on this working day
+            cell.fill = { 
+              type: 'pattern', 
+              pattern: 'solid', 
+              fgColor: { argb: 'FF' + colors.fill } 
+            };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FF' + colors.border } },
+              bottom: { style: 'thin', color: { argb: 'FF' + colors.border } },
+              left: { style: 'thin', color: { argb: 'FF' + colors.border } },
+              right: { style: 'thin', color: { argb: 'FF' + colors.border } }
+            };
+          } else {
+            // Weekend or holiday within task period - show as non-working day
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+            cell.border = {
+              top: { style: 'thin' },
+              bottom: { style: 'thin' },
+              left: { style: 'thin' },
+              right: { style: 'thin' }
+            };
+          }
+        } else {
+          // Outside task period
+          if (isWeekend(date) || isBankHoliday(date)) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+          }
+          cell.border = {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        }
+        
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+    });
+
+    // 5. Set column widths and row heights
+    worksheet.getColumn(1).width = 80; // Wider column to avoid text wrapping
+    dateColumns.forEach((_, index) => {
+      worksheet.getColumn(index + 2).width = 6; // Narrower date columns for better density
+    });
+
+    // 6. Add summary section at the bottom
+    const summaryRow1 = worksheet.addRow(['']);
+    const summaryRow2 = worksheet.addRow(['Summary']);
+    const summaryRow3 = worksheet.addRow(['Earliest Start:', minDate.toLocaleDateString()]);
+    const summaryRow4 = worksheet.addRow(['Latest End:', maxDate.toLocaleDateString()]);
+    const summaryRow5 = worksheet.addRow(['Total Working Days:', dateColumns.filter(date => !isWeekend(date) && !isBankHoliday(date)).length]);
+
+    // Style summary
+    summaryRow2.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF2E75B6' } };
+
+    // 7. Add machine-readable data sheet for AI processing
+    const dataWorksheet = workbook.addWorksheet('Data');
     
-    // 6. Create the workbook and trigger the download
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Timeline');
-    XLSX.writeFile(workbook, `timeline_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Add project metadata
+    dataWorksheet.addRow(['Project Metadata']);
+    dataWorksheet.addRow(['Generated Date', new Date().toISOString()]);
+    dataWorksheet.addRow(['Total Tasks', tasks.length]);
+    dataWorksheet.addRow(['Project Start', minDate.toISOString().split('T')[0]]);
+    dataWorksheet.addRow(['Project End', maxDate.toISOString().split('T')[0]]);
+    dataWorksheet.addRow(['Total Days', totalDays]);
+    dataWorksheet.addRow(['Working Days', dateColumns.filter(date => !isWeekend(date) && !isBankHoliday(date)).length]);
+    dataWorksheet.addRow(['']); // Empty row
+    
+    // Add tasks data in structured format
+    dataWorksheet.addRow(['Tasks Data']);
+    dataWorksheet.addRow(['Task ID', 'Task Name', 'Owner', 'Start Date', 'End Date', 'Duration (Days)', 'Is Custom', 'Progress']);
+    
+    tasks.forEach(task => {
+      // Determine owner
+      const owner = getOwnerFromTask(task);
+      
+      // Calculate duration
+      const startDate = new Date(task.start);
+      const endDate = new Date(task.end);
+      const duration = countWorkingDays(startDate, endDate);
+      
+      dataWorksheet.addRow([
+        task.id || `task-${Date.now()}`,
+        task.name,
+        getOwnerDescription(owner),
+        task.start,
+        task.end,
+        duration,
+        task.isCustom ? 'Yes' : 'No',
+        task.progress || 0
+      ]);
+    });
+    
+    dataWorksheet.addRow(['']); // Empty row
+    
+    // Add JSON data for easy AI parsing
+    dataWorksheet.addRow(['JSON Data (for AI processing)']);
+    const jsonData = {
+      project: {
+        generatedDate: new Date().toISOString(),
+        totalTasks: tasks.length,
+        startDate: minDate.toISOString().split('T')[0],
+        endDate: maxDate.toISOString().split('T')[0],
+        totalDays: totalDays,
+        workingDays: dateColumns.filter(date => !isWeekend(date) && !isBankHoliday(date)).length
+      },
+      tasks: tasks.map(task => {
+        const owner = getOwnerFromTask(task);
+        
+        const startDate = new Date(task.start);
+        const endDate = new Date(task.end);
+        const duration = countWorkingDays(startDate, endDate);
+        
+        return {
+          id: task.id || `task-${Date.now()}`,
+          name: task.name,
+          owner: owner,
+          startDate: task.start,
+          endDate: task.end,
+          duration: duration,
+          isCustom: task.isCustom || false,
+          progress: task.progress || 0
+        };
+      })
+    };
+    
+    dataWorksheet.addRow([JSON.stringify(jsonData, null, 2)]);
+    
+    // Set column widths for data sheet
+    dataWorksheet.getColumn(1).width = 30;
+    dataWorksheet.getColumn(2).width = 50;
+    dataWorksheet.getColumn(3).width = 20;
+    dataWorksheet.getColumn(4).width = 15;
+    dataWorksheet.getColumn(5).width = 15;
+    dataWorksheet.getColumn(6).width = 15;
+    dataWorksheet.getColumn(7).width = 15;
+    dataWorksheet.getColumn(8).width = 15;
+
+    // 8. Generate and download the file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `professional_timeline_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
   };
+
+
 
   return (
     <div className="w-full">
@@ -355,7 +654,30 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
               );
             })}
           </div>
-          {/* TASK ROWS */}
+          
+          {/* Color Legend */}
+          <div className="flex items-center justify-center py-2 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center space-x-6 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                <span>Client Action</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                <span>MMM Action</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-purple-500 rounded"></div>
+                <span>Client/Agency Action</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-green-500 rounded"></div>
+                <span>Live Date</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* TASK ROWS - Original Order with Color Coding */}
           {tasks.map((task) => {
             const taskStart = new Date(task.start);
             const taskEnd = new Date(task.end);
@@ -441,11 +763,15 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                     while (currentDate <= taskEnd && workingDaysCounted < durationDays) {
                       if (!isBankHoliday(currentDate) && !isWeekend(currentDate)) {
                         const dayOffset = Math.floor((currentDate - minDate) / (1000 * 60 * 60 * 24));
+                        const owner = getOwnerFromTask(task);
+                        const ownerColorClasses = getOwnerColorClasses(owner);
+                        const ownerColorClassesDark = getOwnerColorClassesDark(owner);
+
                         bars.push(
                           <div
                             key={`${task.id}-${currentDate.toISOString().split('T')[0]}`}
-                            className={`absolute top-1/2 -translate-y-1/2 h-10 bg-blue-500 rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
-                              isDragging && draggedTaskId === task.id ? 'ring-2 ring-blue-300 ring-opacity-50 shadow-lg' : ''
+                            className={`absolute top-1/2 -translate-y-1/2 h-10 ${ownerColorClasses} rounded shadow-sm flex items-center justify-start px-2 cursor-pointer transition-all ${
+                              isDragging && draggedTaskId === task.id ? 'ring-2 ring-opacity-50 shadow-lg' : ''
                             }`}
                             style={{
                               left: `${dayOffset * DAY_COLUMN_WIDTH}px`,
@@ -460,7 +786,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
                             )}
                             {/* Drag handle indicator on the last working day */}
                             {workingDaysCounted === durationDays - 1 && (
-                              <div className="absolute right-0 top-0 bottom-0 w-2 bg-blue-600 rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize">
+                              <div className={`absolute right-0 top-0 bottom-0 w-2 ${ownerColorClassesDark} rounded-r opacity-0 hover:opacity-100 transition-opacity cursor-ew-resize`}>
                                 <div className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white text-xs">⋮</div>
                               </div>
                             )}
@@ -587,10 +913,10 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
         <h4 className="text-sm font-medium text-gray-700 mb-3">Export Timeline</h4>
         <div className="flex space-x-3">
           <button 
-            onClick={exportToExcel} // UPDATED BUTTON
+            onClick={exportToExcel}
             className="px-4 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
           >
-            📊 Export to Excel
+            📊 Export Professional Timeline
           </button>
           <button 
             onClick={() => window.print()}
