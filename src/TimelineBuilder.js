@@ -374,7 +374,7 @@ const TimelineBuilder = () => {
     };
 
     // Pure helper: build dated timeline for a single asset
-    const buildAssetTimeline = (rawTasks = [], liveDateStr) => {
+    const buildAssetTimeline = (rawTasks = [], liveDateStr, assetType) => {
         if (!liveDateStr || rawTasks.length === 0) {
             return [];
         }
@@ -389,7 +389,13 @@ const TimelineBuilder = () => {
         const dated = [];
         for (let i = rawTasks.length - 1; i >= 0; i--) {
             const t = rawTasks[i];
-            const dur = t.duration || 1;
+            
+            // Apply custom durations from assetTaskDurations if available
+            const customDurations = assetTaskDurations[assetType] || {};
+            const taskName = t.name;
+            const dur = customDurations[taskName] !== undefined 
+                ? customDurations[taskName] 
+                : (t.duration || 1);
             let startDate, endDate;
             if (i === rawTasks.length - 1) {
                 // Final task goes exactly on the live date
@@ -479,12 +485,61 @@ const TimelineBuilder = () => {
                 return;
             }
             
-            const dated = buildAssetTimeline(raw, liveDateStr);
+            const dated = buildAssetTimeline(raw, liveDateStr, asset.type);
             all.push(...dated);
         });
         
         setTimelineTasks(all);
-    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate]);
+    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate, assetTaskDurations]);
+
+    // Calculate project start dates and error detection from timelineTasks
+    useEffect(() => {
+        if (timelineTasks.length === 0 || selectedAssets.length === 0) {
+            setCalculatedStartDates({});
+            setDateErrors([]);
+            setProjectStartDate('');
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const newCalculatedStartDates = {};
+        const newDateErrors = [];
+        const allStartDates = [];
+
+        // Calculate start dates for each asset
+        selectedAssets.forEach(asset => {
+            const assetTasks = timelineTasks.filter(task => 
+                task.assetType === asset.name || task.id.startsWith(`${asset.id}-`)
+            );
+            
+            if (assetTasks.length > 0) {
+                // Find the earliest task for this asset
+                const earliestTask = assetTasks.reduce((earliest, task) => {
+                    return new Date(task.start) < new Date(earliest.start) ? task : earliest;
+                });
+                
+                // Store calculated start date
+                newCalculatedStartDates[asset.id] = earliestTask.start;
+                allStartDates.push(new Date(earliestTask.start));
+                
+                // Check if start date is before today
+                if (new Date(earliestTask.start) < today) {
+                    newDateErrors.push(asset.id);
+                }
+            }
+        });
+
+        // Set the earliest project start date
+        if (allStartDates.length > 0) {
+            const earliestDate = new Date(Math.min(...allStartDates));
+            setProjectStartDate(earliestDate.toISOString().split('T')[0]);
+        }
+
+        setCalculatedStartDates(newCalculatedStartDates);
+        setDateErrors(newDateErrors);
+    }, [timelineTasks, selectedAssets]);
 
     // Fetch UK bank holidays for England and Wales on app load
     useEffect(() => {
@@ -1174,17 +1229,19 @@ useEffect(() => {
         if (taskIndex === -1) return;
 
         const task = timelineTasks[taskIndex];
-        const taskName = task.name.split(': ')[1]; // Get task name after the colon
-        const assetName = task.name.split(': ')[0]; // Get asset name before the colon
         
-        // Find the asset by name
-        const asset = selectedAssets.find(a => a.name === assetName);
-        if (!asset) return;
+        // For tasks from taskBank, use the task's original name property
+        const taskName = task.name; // Use the direct name from task bank
+        
+        // Find the asset this task belongs to
+        const asset = selectedAssets.find(a => a.name === task.assetType);
+        if (!asset) {
+            console.warn('No asset found for task:', task);
+            return;
+        }
         
         executeAction(() => {
-            // Update the assetTaskDurations state to trigger the same recalculation logic
-            // that the manual duration editing uses
-            // Use asset.type as the key to match CSV task names consistently
+            // Update the assetTaskDurations state to trigger recalculation
             setAssetTaskDurations(prev => {
                 const currentDurations = prev[asset.type] || {};
                 return {
@@ -1442,25 +1499,28 @@ useEffect(() => {
 >
                         <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Generated Timeline</h2>
                         
-                     {/* Error Messages - Temporarily Disabled */}
-{/* {dateErrors.length > 0 && (
-    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-        <h3 className="text-red-800 font-medium mb-2">⚠️ Timeline Conflicts</h3>
-        <p className="text-red-700 text-sm mb-2">
-            The following assets cannot be completed by their live dates:
-        </p>
-        <ul className="text-red-700 text-sm">
-            {dateErrors.map(asset => (
-                <li key={asset} className="ml-4">
-                    • {asset} (would need to start on {calculatedStartDates[asset]})
-                </li>
-            ))}
-        </ul>
-        <p className="text-red-700 text-sm mt-2 font-medium">
-            Manual adjustment of task durations required.
-        </p>
-    </div>
-)} */}
+                        {/* Timeline Conflict Warnings */}
+                        {dateErrors.length > 0 && (
+                            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                                <h3 className="text-red-800 font-medium mb-2">⚠️ Timeline Conflicts</h3>
+                                <p className="text-red-700 text-sm mb-2">
+                                    The following assets cannot be completed by their live dates:
+                                </p>
+                                <ul className="text-red-700 text-sm">
+                                    {dateErrors.map(assetId => {
+                                        const asset = selectedAssets.find(a => a.id === assetId);
+                                        return (
+                                            <li key={assetId} className="ml-4">
+                                                • {asset?.name || 'Unknown Asset'} (would need to start on {calculatedStartDates[assetId]})
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                                <p className="text-red-700 text-sm mt-2 font-medium">
+                                    Manual adjustment of task durations required.
+                                </p>
+                            </div>
+                        )}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
                                                     <GanttChart 
