@@ -172,6 +172,14 @@ const CampaignSetup = ({
                     </div>
                 </div>
             )}
+
+            {/* Import/Export Workflow Tip */}
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <h4 className="text-sm font-medium text-green-900 mb-1">💡 Client Revision Workflow</h4>
+                <div className="text-xs text-green-700">
+                    <p>Export timelines to Excel for client review. When they request changes, import the same Excel file to restore your timeline and make updates.</p>
+                </div>
+            </div>
         </div>
     );
 };

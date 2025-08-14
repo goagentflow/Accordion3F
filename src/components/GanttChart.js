@@ -1,7 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as ExcelJS from 'exceljs'; // Import the new library
 
-const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {}, onTaskNameChange = () => {}, workingDaysNeeded = null, assetAlerts = [], onAddCustomTask = () => {}, selectedAssets = [] }) => {
+const GanttChart = ({ 
+  tasks, 
+  bankHolidays = [], 
+  onTaskDurationChange = () => {}, 
+  onTaskNameChange = () => {}, 
+  workingDaysNeeded = null, 
+  assetAlerts = [], 
+  onAddCustomTask = () => {}, 
+  selectedAssets = [],
+  // New props for timeline state preservation
+  timelineState = null,
+  onImportTimeline = () => {}
+}) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -20,6 +32,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
   const [newTaskOwner, setNewTaskOwner] = useState('m'); // Default to MMM
   const [newTaskAssetType, setNewTaskAssetType] = useState(''); // NEW - asset type for custom task
   const [insertAfterTask, setInsertAfterTask] = useState('');
+
 
   // Asset alerts state
   const [isAssetAlertsExpanded, setIsAssetAlertsExpanded] = useState(false);
@@ -619,6 +632,24 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
       ]);
     });
 
+    // Add timeline state for import functionality (hidden from user view)
+    if (timelineState) {
+      dataWorksheet.addRow(['']); // Empty row
+      dataWorksheet.addRow(['Timeline State Data (For Import)']);
+      dataWorksheet.addRow(['Version', '1.0']);
+      dataWorksheet.addRow(['State JSON', JSON.stringify(timelineState)]);
+      
+      // Hide the timeline state section by making it very small and light gray
+      const stateStartRow = dataWorksheet.rowCount - 2;
+      for (let i = stateStartRow; i <= dataWorksheet.rowCount; i++) {
+        const row = dataWorksheet.getRow(i);
+        row.height = 12;
+        row.eachCell(cell => {
+          cell.font = { size: 8, color: { argb: 'FFD3D3D3' } };
+        });
+      }
+    }
+
     // 8. Generate and download the file
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -631,6 +662,7 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   };
+
 
 
 
@@ -1063,7 +1095,11 @@ const GanttChart = ({ tasks, bankHolidays = [], onTaskDurationChange = () => {},
             🖨️ Print Timeline
           </button>
         </div>
+        <p className="text-xs text-gray-500">
+          Export creates a shareable Excel file with embedded timeline data for client sharing and future editing.
+        </p>
       </div>
+
 
       {/* Add Custom Task Modal */}
       {showAddTaskModal && (

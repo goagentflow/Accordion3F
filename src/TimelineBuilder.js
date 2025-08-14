@@ -374,7 +374,7 @@ const TimelineBuilder = () => {
     };
 
     // Pure helper: build dated timeline for a single asset
-    const buildAssetTimeline = (rawTasks = [], liveDateStr) => {
+    const buildAssetTimeline = (rawTasks = [], liveDateStr, assetType) => {
         if (!liveDateStr || rawTasks.length === 0) {
             return [];
         }
@@ -389,7 +389,18 @@ const TimelineBuilder = () => {
         const dated = [];
         for (let i = rawTasks.length - 1; i >= 0; i--) {
             const t = rawTasks[i];
-            const dur = t.duration || 1;
+            
+            // Apply custom durations from assetTaskDurations if available
+            const customDurations = assetTaskDurations[assetType] || {};
+            const taskName = t.name; // Task name from CSV or custom task
+            const dur = customDurations[taskName] !== undefined 
+                ? customDurations[taskName] 
+                : (t.duration || 1);
+            
+            // Debug logging
+            if (customDurations[taskName] !== undefined) {
+                console.log(`Applied custom duration for ${taskName}: ${dur} days (was ${t.duration})`);
+            }
             let startDate, endDate;
             if (i === rawTasks.length - 1) {
                 // Final task goes exactly on the live date
@@ -479,12 +490,61 @@ const TimelineBuilder = () => {
                 return;
             }
             
-            const dated = buildAssetTimeline(raw, liveDateStr);
+            const dated = buildAssetTimeline(raw, liveDateStr, asset.type);
             all.push(...dated);
         });
         
         setTimelineTasks(all);
-    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate]);
+    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate, assetTaskDurations]);
+
+    // Calculate project start dates and error detection from timelineTasks
+    useEffect(() => {
+        if (timelineTasks.length === 0 || selectedAssets.length === 0) {
+            setCalculatedStartDates({});
+            setDateErrors([]);
+            setProjectStartDate('');
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const newCalculatedStartDates = {};
+        const newDateErrors = [];
+        const allStartDates = [];
+
+        // Calculate start dates for each asset
+        selectedAssets.forEach(asset => {
+            const assetTasks = timelineTasks.filter(task => 
+                task.assetType === asset.name || task.id.startsWith(`${asset.id}-`)
+            );
+            
+            if (assetTasks.length > 0) {
+                // Find the earliest task for this asset
+                const earliestTask = assetTasks.reduce((earliest, task) => {
+                    return new Date(task.start) < new Date(earliest.start) ? task : earliest;
+                });
+                
+                // Store calculated start date
+                newCalculatedStartDates[asset.id] = earliestTask.start;
+                allStartDates.push(new Date(earliestTask.start));
+                
+                // Check if start date is before today
+                if (new Date(earliestTask.start) < today) {
+                    newDateErrors.push(asset.id);
+                }
+            }
+        });
+
+        // Set the earliest project start date
+        if (allStartDates.length > 0) {
+            const earliestDate = new Date(Math.min(...allStartDates));
+            setProjectStartDate(earliestDate.toISOString().split('T')[0]);
+        }
+
+        setCalculatedStartDates(newCalculatedStartDates);
+        setDateErrors(newDateErrors);
+    }, [timelineTasks, selectedAssets]);
 
     // Fetch UK bank holidays for England and Wales on app load
     useEffect(() => {
@@ -1174,17 +1234,22 @@ useEffect(() => {
         if (taskIndex === -1) return;
 
         const task = timelineTasks[taskIndex];
-        const taskName = task.name.split(': ')[1]; // Get task name after the colon
-        const assetName = task.name.split(': ')[0]; // Get asset name before the colon
+        console.log('Drag resize - task found:', task);
         
-        // Find the asset by name
-        const asset = selectedAssets.find(a => a.name === assetName);
-        if (!asset) return;
+        // For tasks from taskBank, use the task's original name property
+        const taskName = task.name; // Use the direct name from task bank
+        
+        // Find the asset this task belongs to
+        const asset = selectedAssets.find(a => a.name === task.assetType);
+        if (!asset) {
+            console.warn('No asset found for task:', task);
+            return;
+        }
+        
+        console.log('Updating duration for:', { taskName, assetType: asset.type, newDuration });
         
         executeAction(() => {
-            // Update the assetTaskDurations state to trigger the same recalculation logic
-            // that the manual duration editing uses
-            // Use asset.type as the key to match CSV task names consistently
+            // Update the assetTaskDurations state to trigger recalculation
             setAssetTaskDurations(prev => {
                 const currentDurations = prev[asset.type] || {};
                 return {
@@ -1227,6 +1292,88 @@ useEffect(() => {
                 return { ...prev, [asset.id]: list };
             });
         }, `Add custom task "${name}"`);
+    };
+
+    // Handler for importing timeline from Excel file
+    const handleImportTimeline = (importedState) => {
+        executeAction(() => {
+            // Restore all timeline state
+            if (importedState.selectedAssets) setSelectedAssets(importedState.selectedAssets);
+            if (importedState.globalLiveDate) setGlobalLiveDate(importedState.globalLiveDate);
+            if (importedState.useGlobalDate !== undefined) setUseGlobalDate(importedState.useGlobalDate);
+            if (importedState.assetLiveDates) setAssetLiveDates(importedState.assetLiveDates);
+            if (importedState.assetTaskDurations) setAssetTaskDurations(importedState.assetTaskDurations);
+            if (importedState.customTaskNames) setCustomTaskNames(importedState.customTaskNames);
+            if (importedState.customTasks) setCustomTasks(importedState.customTasks);
+            if (importedState.showInfoBox !== undefined) setShowInfoBox(importedState.showInfoBox);
+        }, 'Import timeline from Excel');
+    };
+
+    // Import handler for header button (uses same logic as GanttChart)
+    const handleImportFromHeader = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            const ExcelJS = await import('exceljs');
+            const buffer = await file.arrayBuffer();
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(buffer);
+            
+            // Look for the Data worksheet
+            const dataWorksheet = workbook.getWorksheet('Data');
+            if (!dataWorksheet) {
+                alert('Invalid timeline file: No data sheet found. Please select a timeline file exported from this application.');
+                return;
+            }
+
+            // Find the timeline state data
+            let timelineStateJson = null;
+            let foundStateSection = false;
+            
+            dataWorksheet.eachRow((row, rowNumber) => {
+                const firstCell = row.getCell(1).value;
+                const secondCell = row.getCell(2).value;
+                
+                if (firstCell === 'Timeline State Data (For Import)') {
+                    foundStateSection = true;
+                } else if (foundStateSection && firstCell === 'State JSON') {
+                    timelineStateJson = secondCell;
+                }
+            });
+
+            if (!timelineStateJson) {
+                alert('This Excel file does not contain timeline state data. Only files exported from this application can be imported.');
+                return;
+            }
+
+            // Parse and validate the timeline state
+            let importedState;
+            try {
+                importedState = JSON.parse(timelineStateJson);
+            } catch (error) {
+                alert('Timeline state data is corrupted and cannot be imported.');
+                return;
+            }
+
+            // Validate required fields
+            if (!importedState.selectedAssets || !Array.isArray(importedState.selectedAssets)) {
+                alert('Invalid timeline data: Missing or corrupted asset information.');
+                return;
+            }
+
+            // Call the import handler
+            handleImportTimeline(importedState);
+            
+            // Show detailed success message
+            const assetCount = importedState.selectedAssets ? importedState.selectedAssets.length : 0;
+            const customTaskCount = importedState.customTasks ? importedState.customTasks.length : 0;
+            alert(`Timeline imported successfully!\n\n✅ ${assetCount} asset${assetCount !== 1 ? 's' : ''} restored\n✅ ${customTaskCount} custom task${customTaskCount !== 1 ? 's' : ''} restored\n✅ All settings and dates restored\n\nYou can now make changes and export an updated timeline.`);
+            
+        } catch (error) {
+            console.error('Error importing timeline:', error);
+            alert('Error importing timeline file. Please check that the file is not corrupted.');
+        }
     };
 
         // Helper function to count working days between two dates (exclusive)
@@ -1383,14 +1530,32 @@ useEffect(() => {
                             </button>
                         </div>
                     </div>
-                    {/* Getting Started Button */}
+                    {/* Getting Started and Import Buttons */}
                     <div className="mt-4 text-center">
-                        <button
-                            onClick={() => setShowGettingStarted(true)}
-                            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                        >
-                            🚀 Getting Started
-                        </button>
+                        <div className="flex justify-center space-x-4">
+                            <button
+                                onClick={() => setShowGettingStarted(true)}
+                                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                            >
+                                🚀 Getting Started
+                            </button>
+                            {/* Only show import when no timeline exists */}
+                            {timelineTasks.length === 0 && (
+                                <button
+                                    onClick={() => {
+                                        // Create a temporary file input for import
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = '.xlsx,.xls';
+                                        input.onchange = (e) => handleImportFromHeader(e);
+                                        input.click();
+                                    }}
+                                    className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+                                >
+                                    📁 Import Existing Timeline
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
@@ -1442,25 +1607,28 @@ useEffect(() => {
 >
                         <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Generated Timeline</h2>
                         
-                     {/* Error Messages - Temporarily Disabled */}
-{/* {dateErrors.length > 0 && (
-    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-        <h3 className="text-red-800 font-medium mb-2">⚠️ Timeline Conflicts</h3>
-        <p className="text-red-700 text-sm mb-2">
-            The following assets cannot be completed by their live dates:
-        </p>
-        <ul className="text-red-700 text-sm">
-            {dateErrors.map(asset => (
-                <li key={asset} className="ml-4">
-                    • {asset} (would need to start on {calculatedStartDates[asset]})
-                </li>
-            ))}
-        </ul>
-        <p className="text-red-700 text-sm mt-2 font-medium">
-            Manual adjustment of task durations required.
-        </p>
-    </div>
-)} */}
+                        {/* Timeline Conflict Warnings */}
+                        {dateErrors.length > 0 && (
+                            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                                <h3 className="text-red-800 font-medium mb-2">⚠️ Timeline Conflicts</h3>
+                                <p className="text-red-700 text-sm mb-2">
+                                    The following assets cannot be completed by their live dates:
+                                </p>
+                                <ul className="text-red-700 text-sm">
+                                    {dateErrors.map(assetId => {
+                                        const asset = selectedAssets.find(a => a.id === assetId);
+                                        return (
+                                            <li key={assetId} className="ml-4">
+                                                • {asset?.name || 'Unknown Asset'} (would need to start on {calculatedStartDates[assetId]})
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                                <p className="text-red-700 text-sm mt-2 font-medium">
+                                    Manual adjustment of task durations required.
+                                </p>
+                            </div>
+                        )}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
                                                     <GanttChart 
@@ -1472,6 +1640,17 @@ useEffect(() => {
                             assetAlerts={calculateWorkingDaysNeededPerAsset()}
                             onAddCustomTask={handleAddCustomTask}
                                 selectedAssets={selectedAssets}
+                            timelineState={{
+                              selectedAssets,
+                              globalLiveDate,
+                              useGlobalDate,
+                              assetLiveDates,
+                              assetTaskDurations,
+                              customTaskNames,
+                              customTasks,
+                              showInfoBox
+                            }}
+                            onImportTimeline={handleImportTimeline}
                         />
                         ) : (
                             <div className="text-center text-gray-500 py-10">
