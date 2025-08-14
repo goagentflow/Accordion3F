@@ -11,17 +11,25 @@ This application helps marketing agencies and teams manage multi-asset campaign 
 - **Schedule Optimization**: "Accordion" timelines by adjusting task durations when deadlines are tight
 - **Visual Planning**: Interactive Gantt chart with drag-to-resize functionality
 - **Professional Excel Export**: Generate well-formatted, styled Excel files for client and team sharing
+- **Excel Round-Trip Workflow** *(save-capability branch)*: Save and restore complete timeline configurations for client revision workflows
 - **Team Collaboration**: Share timelines via professional Excel output with proper formatting and colors
 
 ## Key Features
 
+### Core Functionality (main branch)
 - **CSV-Driven Asset Database**: Tasks and durations loaded from `Group_Asset_Task_Time.csv`
 - **Business Day Calculations**: Respects weekends and UK bank holidays
 - **Flexible Date Management**: Global launch dates or individual asset go-live dates
 - **Custom Task Support**: Add bespoke tasks to standard workflows
 - **Undo/Redo System**: Full history tracking with keyboard shortcuts
 - **Timeline Warnings**: Alerts when schedules conflict with available time
-- **High-Quality Excel Export**: Uses ExcelJS library to create professional spreadsheets with proper styling, not basic CSV files
+- **High-Quality Excel Export**: Uses ExcelJS library to create professional spreadsheets with proper styling
+
+### Enhanced Features (save-capability branch)
+- **Excel Round-Trip Save/Restore**: Import previously exported Excel files to restore complete timeline configurations
+- **Client Revision Workflow**: Export → client review → import → edit → re-export cycle
+- **Embedded State Preservation**: Timeline state invisibly embedded in Excel files for seamless restoration
+- **Safe Import UX**: Import only available on empty timelines to prevent accidental data loss
 
 ## Architecture
 
