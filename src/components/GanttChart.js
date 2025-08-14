@@ -578,7 +578,20 @@ const GanttChart = ({
     summaryRow2.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF2E75B6' } };
 
     // 7. Add machine-readable data sheet for AI processing
-    const dataWorksheet = workbook.addWorksheet('Data');
+    const dataWorksheet = workbook.addWorksheet('Data - DO NOT EDIT');
+    
+    // Add prominent warning at the top
+    const warningRow1 = dataWorksheet.addRow(['⚠️ WARNING: DO NOT EDIT THIS TAB ⚠️']);
+    const warningRow2 = dataWorksheet.addRow(['This tab contains data required for timeline import functionality.']);
+    const warningRow3 = dataWorksheet.addRow(['Editing or deleting anything on this tab will prevent timeline import.']);
+    const warningRow4 = dataWorksheet.addRow(['Only edit the "Timeline" tab for client presentations.']);
+    const warningRow5 = dataWorksheet.addRow(['']);
+    
+    // Style warning rows with bold red text
+    [warningRow1, warningRow2, warningRow3, warningRow4].forEach(row => {
+      row.getCell(1).font = { bold: true, size: 14, color: { argb: 'FFFF0000' } };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    });
     
     // Add project metadata
     dataWorksheet.addRow(['Project Metadata']);
