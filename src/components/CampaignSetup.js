@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const CampaignSetup = ({ 
+const CampaignSetup = React.memo(({ 
     globalLiveDate, 
     onGlobalLiveDateChange, 
     useGlobalDate, 
@@ -59,6 +59,7 @@ const CampaignSetup = ({
                     onChange={handleLiveDateChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    data-testid="global-live-date"
                 />
                 {globalLiveDate && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -75,6 +76,7 @@ const CampaignSetup = ({
                         checked={useGlobalDate}
                         onChange={handleUseGlobalToggle}
                         className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        data-testid="use-global-date-checkbox"
                     />
                     <span className="text-sm text-gray-700">
                         Use same live date for all assets
@@ -174,6 +176,17 @@ const CampaignSetup = ({
             )}
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison - only re-render when relevant props change
+    return (
+        prevProps.globalLiveDate === nextProps.globalLiveDate &&
+        prevProps.useGlobalDate === nextProps.useGlobalDate &&
+        prevProps.projectStartDate === nextProps.projectStartDate &&
+        prevProps.dateErrors?.length === nextProps.dateErrors?.length &&
+        JSON.stringify(prevProps.workingDaysNeeded) === JSON.stringify(nextProps.workingDaysNeeded)
+    );
+});
+
+CampaignSetup.displayName = 'CampaignSetup';
 
 export default CampaignSetup;

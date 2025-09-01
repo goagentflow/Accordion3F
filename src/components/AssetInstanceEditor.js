@@ -60,7 +60,7 @@ const AssetInstanceEditor = ({
   const isCustomName = asset.name !== asset.type;
 
   return (
-    <div className="border rounded p-3 mb-4 bg-gray-50" style={{ minWidth: 320 }}>
+    <div className="border rounded p-3 mb-4 bg-gray-50" style={{ minWidth: 320 }} data-testid={`asset-${asset.id}`}>
       <div className="flex items-start mb-2">
         <div className="flex flex-col mr-2 flex-1">
           <div className="flex items-center mb-1">
@@ -78,6 +78,7 @@ const AssetInstanceEditor = ({
             placeholder="Enter asset name..."
             className="text-sm border rounded px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Click to edit asset name"
+            data-testid={`asset-name-input-${asset.id}`}
           />
           <div className="text-xs text-gray-500 mt-1">
             💡 Click to edit - this name will appear in your timeline
@@ -91,6 +92,7 @@ const AssetInstanceEditor = ({
             onChange={e => onAssetStartDateChange(asset.id, e.target.value)}
             className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
             disabled={useGlobalDate}
+            data-testid={`asset-live-date-${asset.id}`}
           />
         </div>
       </div>
@@ -173,6 +175,7 @@ const AssetInstanceEditor = ({
       <button
         className="px-2 py-1 bg-red-500 text-white rounded text-xs mt-2 w-full"
         onClick={() => onRemoveAsset(asset.id)}
+        data-testid={`remove-asset-${asset.id}`}
       >
         Remove
       </button>

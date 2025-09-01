@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import AssetSelector from './components/AssetSelector';
 import CampaignSetup from './components/CampaignSetup';
 import GanttChart from './components/GanttChart';
+import { exportToExcel } from './services/ExcelExporter';
+import { importFromExcel, validateExcelFile, getImportPreview } from './services/ExcelImporter';
 
 const TimelineBuilder = () => {
     // CSV and asset data
@@ -48,6 +50,14 @@ const TimelineBuilder = () => {
     // State for progressive disclosure
     const [showGettingStarted, setShowGettingStarted] = useState(false);
     const [showAllInstructions, setShowAllInstructions] = useState(false);
+    
+    // Excel import/export state
+    const [isImporting, setIsImporting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+    const [importError, setImportError] = useState(null);
+    const [showImportConfirm, setShowImportConfirm] = useState(false);
+    const [importPreview, setImportPreview] = useState(null);
+    const fileInputRef = useRef(null);
 
     // Helper function to get task name (custom or default)
     const getTaskName = (taskId, assetName, taskInfo) => {
@@ -374,7 +384,7 @@ const TimelineBuilder = () => {
     };
 
     // Pure helper: build dated timeline for a single asset
-    const buildAssetTimeline = (rawTasks = [], liveDateStr, assetType) => {
+    const buildAssetTimeline = (rawTasks = [], liveDateStr, assetType, customDurations = {}) => {
         if (!liveDateStr || rawTasks.length === 0) {
             return [];
         }
@@ -385,38 +395,39 @@ const TimelineBuilder = () => {
             return [];
         }
         
-        let currentEnd = new Date(liveDate);
-        const dated = [];
+        let currentEndDate = new Date(liveDate);
+        const timelineTasks = [];
+        
+        // Loop backwards through the tasks from the CSV
         for (let i = rawTasks.length - 1; i >= 0; i--) {
-            const t = rawTasks[i];
+            const task = rawTasks[i];
             
-            // Apply custom durations from assetTaskDurations if available
-            const customDurations = assetTaskDurations[assetType] || {};
-            const taskName = t.name;
-            const dur = customDurations[taskName] !== undefined 
+            // Apply custom durations if available
+            const taskName = task.name;
+            const duration = customDurations[taskName] !== undefined 
                 ? customDurations[taskName] 
-                : (t.duration || 1);
-            let startDate, endDate;
-            if (i === rawTasks.length - 1) {
-                // Final task goes exactly on the live date
-                startDate = new Date(currentEnd);
-                endDate = new Date(currentEnd);
-            } else {
-                startDate = subtractWorkingDays(currentEnd, dur);
-                endDate = new Date(currentEnd);
-                endDate.setDate(endDate.getDate() - 1);
-                if (isNonWorkingDay(endDate)) {
-                    endDate = getPreviousWorkingDay(endDate);
-                }
-            }
-            dated.unshift({
-                ...t,
+                : (task.duration || 1);
+            
+            // Task's end date is the current end date
+            const endDate = new Date(currentEndDate);
+            
+            // Task's start date is calculated by subtracting (duration - 1) from end date
+            // This ensures correct span: 1-day task spans 1 day, 3-day task spans 3 days
+            const startDate = subtractWorkingDays(endDate, duration - 1);
+            
+            // Add task to timeline
+            timelineTasks.unshift({
+                ...task,
+                duration: duration, // Use calculated duration, not original task.duration
                 start: safeToISOString(startDate),
                 end: safeToISOString(endDate),
             });
-            currentEnd = new Date(startDate);
+            
+            // The end date for the PREVIOUS task is the day before the current one starts
+            currentEndDate = getPreviousWorkingDay(startDate);
         }
-        return dated;
+        
+        return timelineTasks;
     };
 
     // Load CSV data
@@ -439,12 +450,15 @@ const TimelineBuilder = () => {
         });
     }, []);
 
-    // Build taskBank whenever selectedAssets or csvData change
+    // Build taskBank whenever selectedAssets, csvData, or customTasks change
     useEffect(() => {
         if (selectedAssets.length === 0 || csvData.length === 0) {
             setTaskBank({});
             return;
         }
+        
+        console.log('🔨 Rebuilding taskBank with custom tasks:', customTasks);
+        
         const bank = {};
         selectedAssets.forEach(asset => {
             const rows = csvData.filter(row => row['Asset Type'] === asset.type);
@@ -457,8 +471,53 @@ const TimelineBuilder = () => {
                 isCustom: false,
             }));
         });
+        
+        // Insert custom tasks into the appropriate asset's task list
+        customTasks.forEach(customTask => {
+            const asset = selectedAssets.find(a => a.name === customTask.assetType);
+            if (asset && bank[asset.id]) {
+                console.log(`📝 Inserting custom task "${customTask.name}" into asset "${asset.name}"`);
+                
+                // Find insertion point using task name (stable) or ID (fallback)
+                let insertIndex = 0;
+                let positionFound = false;
+                
+                // First try: Use task name (stable across import/export)
+                if (customTask.insertAfterTaskName) {
+                    const idx = bank[asset.id].findIndex(t => t.name === customTask.insertAfterTaskName);
+                    if (idx !== -1) {
+                        insertIndex = idx + 1;
+                        positionFound = true;
+                        console.log(`   ✅ Found position by task name "${customTask.insertAfterTaskName}" at index ${insertIndex}`);
+                    }
+                }
+                
+                // Fallback: Try using task ID (may not work after import due to ID changes)
+                if (!positionFound && customTask.insertAfterTaskId) {
+                    const idx = bank[asset.id].findIndex(t => t.id === customTask.insertAfterTaskId);
+                    if (idx !== -1) {
+                        insertIndex = idx + 1;
+                        positionFound = true;
+                        console.log(`   ⚠️ Found position by task ID "${customTask.insertAfterTaskId}" at index ${insertIndex}`);
+                    }
+                }
+                
+                if (!positionFound) {
+                    console.log(`   ❌ Could not find insertion point for custom task, defaulting to beginning (index ${insertIndex})`);
+                    console.log(`      - insertAfterTaskName: "${customTask.insertAfterTaskName || 'none'}"`);
+                    console.log(`      - insertAfterTaskId: "${customTask.insertAfterTaskId || 'none'}"`);
+                    console.log(`      - Available task names:`, bank[asset.id].map(t => t.name));
+                }
+                
+                // Insert the custom task
+                bank[asset.id].splice(insertIndex, 0, customTask);
+            } else {
+                console.warn(`Cannot insert custom task "${customTask.name}": asset "${customTask.assetType}" not found or has no task bank`);
+            }
+        });
+        
         setTaskBank(bank);
-    }, [selectedAssets, csvData]);
+    }, [selectedAssets, csvData, customTasks]);
 
     // Build dated timelineTasks from taskBank + live dates
     useEffect(() => {
@@ -471,22 +530,23 @@ const TimelineBuilder = () => {
         selectedAssets.forEach(asset => {
             // Get the correct live date for this asset
             let liveDateStr;
-            if (useGlobalDate) {
+            if (useGlobalDate && globalLiveDate) {
+                // When using global date, always use globalLiveDate regardless of asset.startDate
                 liveDateStr = globalLiveDate;
             } else {
                 // For individual dates, use the asset's startDate property
-                liveDateStr = asset.startDate || globalLiveDate;
+                liveDateStr = asset.startDate;
             }
             
             const raw = taskBank[asset.id] || [];
             
             if (!liveDateStr) {
-                console.warn(`No live date found for asset ${asset.name}, skipping`);
+                console.warn(`No live date found for asset ${asset.name} (useGlobalDate: ${useGlobalDate}, globalLiveDate: ${globalLiveDate}, asset.startDate: ${asset.startDate}), skipping`);
                 return;
             }
             
-            const dated = buildAssetTimeline(raw, liveDateStr, asset.type);
-            all.push(...dated);
+            const timelineTasks = buildAssetTimeline(raw, liveDateStr, asset.type, assetTaskDurations[asset.type] || {});
+            all.push(...timelineTasks);
         });
         
         setTimelineTasks(all);
@@ -587,8 +647,7 @@ const TimelineBuilder = () => {
         // Loop over each selected asset instance (not just type)
         selectedAssets.forEach(asset => {
             // asset: { id, type, name, startDate }
-            if (!asset.startDate) return; // Skip if no start date set
-
+            
             // Get ALL tasks for this asset type from the CSV (no filtering)
             const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
             if (assetTasks.length === 0) return;
@@ -598,7 +657,7 @@ const TimelineBuilder = () => {
             const liveDate = useGlobalDate 
                 ? new Date(globalLiveDate) 
                 : new Date(asset.startDate);
-            if (isNaN(liveDate.getTime())) return;
+            if (isNaN(liveDate.getTime())) return; // Skip if no valid date available
 
             // Identify the final task (last task in the CSV for this asset type)
             const finalTask = assetTasks[assetTasks.length - 1];
@@ -686,8 +745,9 @@ const TimelineBuilder = () => {
         setTimelineTasks(allTasks);
     }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, csvData, assetTaskDurations, customTaskNames]);*/
 
-    // Separate useEffect to handle custom tasks
-    useEffect(() => {
+    // REMOVED: Separate useEffect to handle custom tasks - was overriding correct timeline
+    // Custom tasks now integrated into taskBank system
+    /*useEffect(() => {
         if (customTasks.length > 0) {
             console.log('Processing custom tasks in separate useEffect:', customTasks);
             
@@ -860,7 +920,7 @@ const TimelineBuilder = () => {
                 return finalTimeline;
             });
         }
-    }, [customTasks, selectedAssets, globalLiveDate, useGlobalDate]);
+    }, [customTasks, selectedAssets, globalLiveDate, useGlobalDate]);*/
 
     // Keyboard shortcuts for undo/redo
     useEffect(() => {
@@ -1413,16 +1473,293 @@ useEffect(() => {
         };
     };
 
+    // Excel Import/Export Handlers
+    const handleExportExcel = async () => {
+        if (timelineTasks.length === 0) {
+            setImportError('No timeline to export. Please add some assets first.');
+            return;
+        }
 
+        setIsExporting(true);
+        setImportError(null);
+
+        try {
+            // Calculate date columns for export
+            const dates = timelineTasks.reduce((acc, task) => {
+                if (task.start) acc.push(new Date(task.start));
+                if (task.end) acc.push(new Date(task.end));
+                return acc;
+            }, []);
+
+            const minDate = dates.length > 0 ? new Date(Math.min(...dates)) : new Date();
+            const maxDate = dates.length > 0 ? new Date(Math.max(...dates)) : new Date();
+            
+            // Add padding
+            minDate.setDate(minDate.getDate() - 2);
+            maxDate.setDate(maxDate.getDate() + 5);
+
+            const dateColumns = [];
+            const current = new Date(minDate);
+            while (current <= maxDate) {
+                dateColumns.push(new Date(current));
+                current.setDate(current.getDate() + 1);
+            }
+
+            // Debug: Log current state before export
+            console.log('=== EXPORT DEBUG ===');
+            console.log('selectedAssets:', selectedAssets);
+            console.log('selectedAssets.length:', selectedAssets.length);
+            console.log('timelineTasks.length:', timelineTasks.length);
+            console.log('Sample task assetTypes:', timelineTasks.slice(0, 3).map(t => t.assetType));
+
+            // Prepare application state for export
+            let applicationState = {
+                selectedAssets,
+                globalLiveDate,
+                assetLiveDates,
+                useGlobalDate,
+                customTasks,
+                assetTaskDurations,
+                customTaskNames
+            };
+
+            // If selectedAssets is empty but we have tasks, reconstruct assets from tasks
+            if (selectedAssets.length === 0 && timelineTasks.length > 0) {
+                console.log('⚠️ selectedAssets is empty, reconstructing from tasks...');
+                
+                // Get unique asset types from tasks
+                const assetTypesFromTasks = [...new Set(timelineTasks.map(t => t.assetType).filter(Boolean))];
+                console.log('Asset types found in tasks:', assetTypesFromTasks);
+                
+                // Reconstruct assets
+                const reconstructedAssets = assetTypesFromTasks.map(assetType => ({
+                    id: generateAssetId(),
+                    type: assetType, // This should match CSV "Asset Type" 
+                    name: assetType,
+                    startDate: globalLiveDate || ''
+                }));
+                
+                console.log('Reconstructed assets:', reconstructedAssets);
+                applicationState.selectedAssets = reconstructedAssets;
+            }
+
+            // Extract custom tasks from timeline (they might not be in customTasks state)
+            const customTasksFromTimeline = timelineTasks.filter(task => task.isCustom);
+            if (customTasksFromTimeline.length > 0) {
+                console.log('📝 Extracting custom tasks from timeline:', customTasksFromTimeline);
+                
+                // Enhance custom tasks with task name references for positioning
+                const enhancedCustomTasks = customTasksFromTimeline.map(customTask => {
+                    if (customTask.insertAfterTaskId) {
+                        // Find the task that this custom task should be inserted after
+                        const afterTask = timelineTasks.find(t => t.id === customTask.insertAfterTaskId);
+                        if (afterTask) {
+                            console.log(`🔗 Custom task "${customTask.name}" should insert after task "${afterTask.name}"`);
+                            return {
+                                ...customTask,
+                                insertAfterTaskName: afterTask.name // Add task name for stable reference
+                            };
+                        }
+                    }
+                    return customTask;
+                });
+                
+                applicationState.customTasks = enhancedCustomTasks;
+            }
+
+            await exportToExcel(timelineTasks, dateColumns, bankHolidays, minDate, maxDate, applicationState);
+        } catch (error) {
+            console.error('Export error:', error);
+            setImportError('Failed to export timeline. Please try again.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleImportFileSelect = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setImportError(null);
+        setIsImporting(true);
+
+        try {
+            if (!validateExcelFile(file)) {
+                throw new Error('Please select a valid Excel file (.xlsx or .xls).');
+            }
+
+            const preview = await getImportPreview(file);
+            if (!preview.success) {
+                throw new Error(preview.error || 'Failed to read Excel file.');
+            }
+
+            setImportPreview({ file, preview });
+            setShowImportConfirm(true);
+        } catch (error) {
+            console.error('Import validation error:', error);
+            setImportError(error.message || 'Failed to process Excel file.');
+        } finally {
+            setIsImporting(false);
+            // Reset file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        if (!importPreview?.file) return;
+
+        setIsImporting(true);
+        setShowImportConfirm(false);
+
+        try {
+            const importedData = await importFromExcel(importPreview.file);
+            console.log('Imported data:', importedData);
+            
+            // Restore application state from imported data
+            console.log('=== IMPORT DEBUG ===');
+            console.log('importedData.selectedAssets:', importedData.selectedAssets);
+            console.log('importedData.selectedAssets.length:', importedData.selectedAssets?.length || 0);
+            console.log('importedData.tasks.length:', importedData.tasks?.length || 0);
+            
+            // Restore or reconstruct selectedAssets
+            if (importedData.selectedAssets && importedData.selectedAssets.length > 0) {
+                console.log('✅ Restoring selectedAssets directly:', importedData.selectedAssets);
+                setSelectedAssets(importedData.selectedAssets);
+            } else if (importedData.tasks && importedData.tasks.length > 0) {
+                console.log('⚠️ selectedAssets empty, reconstructing from imported tasks...');
+                
+                // Get unique asset types from imported tasks
+                const assetTypesFromTasks = [...new Set(importedData.tasks.map(t => t.assetType).filter(Boolean))];
+                console.log('Asset types found in imported tasks:', assetTypesFromTasks);
+                
+                // Reconstruct assets with unique IDs
+                const reconstructedAssets = assetTypesFromTasks.map(assetType => ({
+                    id: generateAssetId(),
+                    type: assetType, // This should match CSV "Asset Type"
+                    name: assetType,
+                    startDate: importedData.globalLiveDate || ''
+                }));
+                
+                console.log('Reconstructed assets from import:', reconstructedAssets);
+                setSelectedAssets(reconstructedAssets);
+            }
+            
+            if (importedData.globalLiveDate) {
+                console.log('Restoring globalLiveDate:', importedData.globalLiveDate);
+                setGlobalLiveDate(importedData.globalLiveDate);
+            }
+            
+            if (importedData.assetLiveDates) {
+                console.log('Restoring assetLiveDates:', importedData.assetLiveDates);
+                setAssetLiveDates(importedData.assetLiveDates);
+            }
+            
+            if (importedData.useGlobalDate !== undefined) {
+                console.log('Restoring useGlobalDate:', importedData.useGlobalDate);
+                setUseGlobalDate(importedData.useGlobalDate);
+            }
+            
+            // Restore custom tasks - both from customTasks array and extract from timeline
+            let finalCustomTasks = [];
+            
+            if (importedData.customTasks && importedData.customTasks.length > 0) {
+                console.log('Restoring customTasks from metadata:', importedData.customTasks);
+                finalCustomTasks = importedData.customTasks;
+            } else {
+                // Fallback: extract custom tasks from imported timeline
+                const customTasksFromImportedTimeline = importedData.tasks.filter(t => t.isCustom);
+                if (customTasksFromImportedTimeline.length > 0) {
+                    console.log('📝 Extracting custom tasks from imported timeline:', customTasksFromImportedTimeline);
+                    finalCustomTasks = customTasksFromImportedTimeline;
+                }
+            }
+            
+            if (finalCustomTasks.length > 0) {
+                setCustomTasks(finalCustomTasks);
+            }
+            
+            // Note: We no longer directly set timelineTasks here because the taskBank rebuild
+            // will now properly include custom tasks and rebuild the timeline correctly
+            
+            if (importedData.assetTaskDurations) {
+                console.log('Restoring assetTaskDurations:', importedData.assetTaskDurations);
+                setAssetTaskDurations(importedData.assetTaskDurations);
+            }
+            
+            if (importedData.customTaskNames) {
+                console.log('Restoring customTaskNames:', importedData.customTaskNames);
+                setCustomTaskNames(importedData.customTaskNames);
+            }
+            
+            // Timeline tasks will be rebuilt automatically by useEffect hooks once assets are restored
+            setImportError(null);
+            
+            // Get final asset count (either from imported data or reconstructed)
+            const finalAssetCount = (importedData.selectedAssets && importedData.selectedAssets.length > 0) 
+                ? importedData.selectedAssets.length 
+                : [...new Set(importedData.tasks.map(t => t.assetType).filter(Boolean))].length;
+                
+            const customTaskCount = finalCustomTasks.length;
+            const totalTasks = importedData.tasks.length;
+            const customTaskText = customTaskCount > 0 ? ` (including ${customTaskCount} custom task${customTaskCount === 1 ? '' : 's'})` : '';
+                
+            alert(`Successfully imported timeline with ${finalAssetCount} assets and ${totalTasks} tasks${customTaskText}!`);
+        } catch (error) {
+            console.error('Import error:', error);
+            setImportError(error.message || 'Failed to import timeline.');
+        } finally {
+            setIsImporting(false);
+            setImportPreview(null);
+        }
+    };
+
+    const handleCancelImport = () => {
+        setShowImportConfirm(false);
+        setImportPreview(null);
+        setImportError(null);
+    };
 
     return (
-        <div className="bg-gray-100 min-h-screen font-sans">
+        <div className="bg-gray-100 min-h-screen font-sans" data-testid="timeline-builder">
             <header className="bg-white shadow-md">
                 <div className="container mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <h1 className="text-3xl font-bold text-gray-800">Accordion Timeline Builder</h1>
                         <div className="flex items-center space-x-2">
+                            {/* Excel Import/Export */}
                             <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isImporting}
+                                className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                title="Import Timeline from Excel"
+                            >
+                                {isImporting ? '⏳ Importing...' : '📥 Import'}
+                            </button>
+                            <button
+                                data-testid="export-excel"
+                                onClick={handleExportExcel}
+                                disabled={isExporting || timelineTasks.length === 0}
+                                className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                title="Export Timeline to Excel"
+                            >
+                                {isExporting ? '⏳ Exporting...' : '📊 Export'}
+                            </button>
+                            
+                            {/* Hidden file input */}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={handleImportFileSelect}
+                                data-testid="import-excel-input"
+                                className="hidden"
+                            />
+                            
+                            {/* Undo/Redo */}
+                            <button
+                                data-testid="undo-button"
                                 onClick={undo}
                                 disabled={historyIndex <= 0}
                                 className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
@@ -1431,6 +1768,7 @@ useEffect(() => {
                                 ↩️ Undo
                             </button>
                             <button
+                                data-testid="redo-button"
                                 onClick={redo}
                                 disabled={historyIndex >= history.length - 1}
                                 className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
@@ -1440,6 +1778,23 @@ useEffect(() => {
                             </button>
                         </div>
                     </div>
+                    
+                    {/* Error Messages */}
+                    {importError && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                            <div className="flex items-center">
+                                <span className="text-red-500 mr-2">⚠️</span>
+                                <span className="text-red-700 text-sm">{importError}</span>
+                                <button
+                                    onClick={() => setImportError(null)}
+                                    className="ml-auto text-red-400 hover:text-red-600 text-lg"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
                     {/* Getting Started Button */}
                     <div className="mt-4 text-center">
                         <button
@@ -1542,6 +1897,51 @@ useEffect(() => {
                     </div>
                 </div>
             </main>
+            
+            {/* Import Confirmation Modal */}
+            {showImportConfirm && importPreview && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-md w-full">
+                        <div className="p-6">
+                            <div className="flex items-center mb-4">
+                                <span className="text-yellow-500 mr-3 text-2xl">⚠️</span>
+                                <h2 className="text-xl font-bold text-gray-800">Confirm Timeline Import</h2>
+                            </div>
+                            
+                            <div className="space-y-3 mb-6">
+                                <p className="text-gray-600">
+                                    This will replace your current timeline with the imported data:
+                                </p>
+                                <div className="bg-gray-50 p-3 rounded text-sm">
+                                    <div><strong>File:</strong> {importPreview.preview.fileName}</div>
+                                    <div><strong>Tasks:</strong> {importPreview.preview.taskCount}</div>
+                                    <div><strong>Exported:</strong> {importPreview.preview.exportDate ? new Date(importPreview.preview.exportDate).toLocaleDateString() : 'Unknown'}</div>
+                                </div>
+                                <p className="text-red-600 text-sm font-medium">
+                                    Your current work will be lost unless you export it first.
+                                </p>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={handleCancelImport}
+                                    className="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmImport}
+                                    disabled={isImporting}
+                                    data-testid="confirm-import"
+                                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+                                >
+                                    {isImporting ? 'Importing...' : 'Import Timeline'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Progressive Disclosure Modal */}
             {showGettingStarted && (
