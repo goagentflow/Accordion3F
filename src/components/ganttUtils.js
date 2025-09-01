@@ -172,3 +172,11 @@ export const calculateTaskPosition = (task, minDate) => {
     width: spanDays * GANTT_CONFIG.DAY_COLUMN_WIDTH,
   };
 };
+
+// Check if asset type requires Sunday-only go-live dates
+export const isSundayOnlyAsset = (assetType) => {
+  const sundayOnlyAssets = [
+    'Print - Supplements Full Page'
+  ];
+  return sundayOnlyAssets.includes(assetType);
+};

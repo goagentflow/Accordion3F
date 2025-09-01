@@ -93,6 +93,9 @@ const GanttTaskRow = memo(({
             {task.assetPrefix && (
               <span className="ml-2 text-xs text-gray-500">({task.assetPrefix})</span>
             )}
+            {task.isCustom && (
+              <span className="ml-2 text-xs text-gray-600">(Cu)</span>
+            )}
             {task.isLiveTask && (
               <span className="ml-2 text-xs text-green-600">📍 Live</span>
             )}

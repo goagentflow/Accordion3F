@@ -12,6 +12,7 @@ const AssetSelector = ({
     onAssetLiveDateChange = () => {},
     calculatedStartDates = {},
     dateErrors = [],
+    sundayDateErrors = [],
     onRenameAsset = () => {},
     onAssetStartDateChange = () => {},
     csvData = [], // <-- add this prop
@@ -149,6 +150,7 @@ const AssetSelector = ({
                         csvData={csvData}
                         useGlobalDate={useGlobalDate}
                         dateErrors={dateErrors}
+                        sundayDateErrors={sundayDateErrors}
                         onRenameAsset={onRenameAsset}
                         onAssetStartDateChange={onAssetStartDateChange}
                         onRemoveAsset={onRemoveAsset}

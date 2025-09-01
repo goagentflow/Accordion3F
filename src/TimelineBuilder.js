@@ -5,6 +5,7 @@ import CampaignSetup from './components/CampaignSetup';
 import GanttChart from './components/GanttChart';
 import { exportToExcel } from './services/ExcelExporter';
 import { importFromExcel, validateExcelFile, getImportPreview } from './services/ExcelImporter';
+import { isSundayOnlyAsset } from './components/ganttUtils';
 
 const TimelineBuilder = () => {
     // CSV and asset data
@@ -22,6 +23,7 @@ const TimelineBuilder = () => {
     const [calculatedStartDates, setCalculatedStartDates] = useState({}); // {assetName: 'YYYY-MM-DD'}
     const [projectStartDate, setProjectStartDate] = useState(''); // Earliest start date across all assets
     const [dateErrors, setDateErrors] = useState([]); // Array of asset names that start before today
+    const [sundayDateErrors, setSundayDateErrors] = useState([]); // Array of asset IDs that violate Sunday-only rule
     
     // Final timeline for display
     const [timelineTasks, setTimelineTasks] = useState([]);
@@ -799,7 +801,7 @@ const TimelineBuilder = () => {
                     const customTaskWithStructure = {
                     ...customTask,
                         id: customTask.id || `custom-task-${Date.now()}`,
-                        name: customTask.name || `Custom: ${customTask.name}`,
+                        name: customTask.name, // Clean name without "Custom:" prefix
                         duration: customTask.duration || 1,
                         owner: customTask.owner || 'm',
                         assetType: customTask.assetType,
@@ -986,6 +988,29 @@ useEffect(() => {
 
     // REMOVED: Custom task merging useEffect that was causing timeline disruption
     // Custom tasks are now handled properly in the main timeline calculation
+    // Sunday-only validation for supplement assets
+    useEffect(() => {
+        if (!useGlobalDate || !globalLiveDate) {
+            setSundayDateErrors([]);
+            return;
+        }
+
+        const globalDate = new Date(globalLiveDate);
+        const isSunday = globalDate.getDay() === 0;
+        
+        if (isSunday) {
+            setSundayDateErrors([]);
+            return;
+        }
+
+        // Find all selected assets that require Sunday-only dates
+        const violatingAssets = selectedAssets.filter(asset => 
+            isSundayOnlyAsset(asset.type)
+        );
+        
+        setSundayDateErrors(violatingAssets.map(asset => asset.id));
+    }, [globalLiveDate, selectedAssets, useGlobalDate]);
+
     // Helper function to safely convert date to ISO string
     const safeToISOString = (date) => {
         if (!date || isNaN(date.getTime())) {
@@ -1324,7 +1349,7 @@ useEffect(() => {
         }
         const rawTask = {
             id: `custom-task-${Date.now()}`,
-            name: `Custom: ${name}`,
+            name: name, // Clean name without "Custom:" prefix
             duration: duration || 1,
             owner: owner || 'm',
             assetType,
@@ -1838,6 +1863,7 @@ useEffect(() => {
     onAssetLiveDateChange={handleAssetLiveDateChange}
     calculatedStartDates={calculatedStartDates || {}}
     dateErrors={dateErrors || []}
+    sundayDateErrors={sundayDateErrors || []}
     onRenameAsset={handleRenameAsset}
     onAssetStartDateChange={handleAssetStartDateChange}
     csvData={csvData}
@@ -1877,6 +1903,37 @@ useEffect(() => {
                             </div>
                         )}
 
+                        {/* Sunday Date Validation Error Banner */}
+                        {sundayDateErrors.length > 0 && (
+                            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                                <div className="flex items-start">
+                                    <div className="mr-3 mt-0.5">
+                                        <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                                            <span className="text-red-600 text-sm font-bold">!</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-red-800 mb-2">Date Conflict</h3>
+                                        <p className="text-red-700 text-sm mb-3">
+                                            Print Supplements require a Sunday Go-Live date, but your global date is set to {' '}
+                                            <span className="font-medium">
+                                                {globalLiveDate && new Date(globalLiveDate).toLocaleDateString('en-GB', { 
+                                                    weekday: 'long', 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric' 
+                                                })}
+                                            </span>.
+                                        </p>
+                                        <div className="bg-red-100 border border-red-300 rounded p-3 text-sm text-red-800">
+                                            <p className="font-medium mb-1">To fix this:</p>
+                                            <p>Uncheck "Use same live date for all assets" and set individual Sunday dates for your Print Supplement assets below.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {timelineTasks && timelineTasks.length > 0 ? (
                                                     <GanttChart 
                             tasks={timelineTasks}
@@ -1886,7 +1943,8 @@ useEffect(() => {
                             workingDaysNeeded={calculateWorkingDaysNeeded()}
                             assetAlerts={calculateWorkingDaysNeededPerAsset()}
                             onAddCustomTask={handleAddCustomTask}
-                                selectedAssets={selectedAssets}
+                            selectedAssets={selectedAssets}
+                            isExportDisabled={sundayDateErrors.length > 0}
                         />
                         ) : (
                             <div className="text-center text-gray-500 py-10">

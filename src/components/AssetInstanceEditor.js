@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import DatePicker from 'react-datepicker';
+import { isSundayOnlyAsset } from './ganttUtils';
 
 const AssetInstanceEditor = ({
   asset,
   csvData,
   useGlobalDate,
   dateErrors = [],
+  sundayDateErrors = [],
   onRenameAsset = () => {},
   onAssetStartDateChange = () => {},
   onRemoveAsset = () => {},
@@ -14,6 +17,8 @@ const AssetInstanceEditor = ({
 }) => {
   // Check if this asset has a date conflict
   const hasConflict = dateErrors.includes(asset.id);
+  // Check if this asset has a Sunday validation error
+  const hasSundayError = sundayDateErrors.includes(asset.id);
 
   // Local state for duration editor
   const [showDurationEditor, setShowDurationEditor] = useState(false);
@@ -21,7 +26,9 @@ const AssetInstanceEditor = ({
   const [saveConfirmation, setSaveConfirmation] = useState(false);
 
   // Add a warning if go-live date is a non-working day
-  const goLiveDateIsNonWorking = asset.startDate && isNonWorkingDay && isNonWorkingDay(new Date(asset.startDate));
+  // BUT don't warn about Sundays for Sunday-only assets (they SHOULD be on Sunday)
+  const goLiveDateIsNonWorking = asset.startDate && isNonWorkingDay && isNonWorkingDay(new Date(asset.startDate)) &&
+    !(isSundayOnlyAsset(asset.type) && new Date(asset.startDate).getDay() === 0);
 
   // Get the list of tasks for this asset type from csvData
   const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
@@ -86,19 +93,42 @@ const AssetInstanceEditor = ({
         </div>
         <div className="flex flex-col">
           <label className="text-xs text-gray-600 mb-1">Go-Live Date</label>
-          <input
-            type="date"
-            value={asset.startDate}
-            onChange={e => onAssetStartDateChange(asset.id, e.target.value)}
-            className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          <DatePicker
+            selected={asset.startDate ? new Date(asset.startDate) : null}
+            onChange={date => onAssetStartDateChange(asset.id, date ? date.toISOString().split('T')[0] : '')}
+            dateFormat="yyyy-MM-dd"
+            className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
             disabled={useGlobalDate}
             data-testid={`asset-live-date-${asset.id}`}
+            placeholderText="Select date"
+            filterDate={isSundayOnlyAsset(asset.type) ? date => date.getDay() === 0 : undefined}
           />
         </div>
       </div>
       {goLiveDateIsNonWorking && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-2 mb-2 text-xs">
-          ⚠️ The selected go-live date is a weekend or bank holiday. Consider choosing a working day.
+          ⚠️ {isSundayOnlyAsset(asset.type) && asset.startDate && new Date(asset.startDate).getDay() === 6 
+            ? 'This asset requires Sunday, not Saturday.' 
+            : 'The selected go-live date is a weekend or bank holiday. Consider choosing a working day.'
+          }
+        </div>
+      )}
+      {/* Sunday validation error for supplement assets */}
+      {hasSundayError && (
+        <div className="bg-red-50 border border-red-300 text-red-800 rounded p-3 mb-2 text-xs">
+          <div className="flex items-start">
+            <span className="text-red-500 mr-2 text-lg">⚠️</span>
+            <div className="flex-1">
+              <p className="font-semibold mb-1">Sunday Go-Live Required</p>
+              <p className="mb-2">
+                Print Supplements must go live on a Sunday, but you're using a global date that falls on a {' '}
+                {new Date(asset.startDate || '').toLocaleDateString('en-GB', { weekday: 'long' })}.
+              </p>
+              <p className="text-xs font-medium">
+                Switch to individual dates and select a Sunday for this asset.
+              </p>
+            </div>
+          </div>
         </div>
       )}
       {/* If there is a conflict, show the warning and options */}

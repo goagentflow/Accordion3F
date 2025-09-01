@@ -18,7 +18,8 @@ const GanttChart = ({
   workingDaysNeeded = null, 
   assetAlerts = [], 
   onAddCustomTask = () => {}, 
-  selectedAssets = [] 
+  selectedAssets = [],
+  isExportDisabled = false
 }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
@@ -154,7 +155,13 @@ const GanttChart = ({
             </button>
             <button
               onClick={handleExportToExcel}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center"
+              disabled={isExportDisabled}
+              className={`px-4 py-2 rounded-md transition-colors flex items-center ${
+                isExportDisabled 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+              title={isExportDisabled ? 'Export disabled due to validation errors. Please fix date conflicts first.' : 'Export to Excel'}
             >
               <span className="mr-2">📊</span>
               Export to Excel
