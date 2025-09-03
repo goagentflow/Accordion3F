@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import Papa from 'papaparse';
 import AssetSelector from './components/AssetSelector';
 import CampaignSetup from './components/CampaignSetup';
 import GanttChart from './components/GanttChart';
+import RecoveryPrompt from './components/RecoveryPrompt';
+import SaveIndicator from './components/SaveIndicator';
 import { exportToExcel } from './services/ExcelExporter';
 import { importFromExcel, validateExcelFile, getImportPreview } from './services/ExcelImporter';
+import { useAutoSave } from './hooks/useAutoSave';
+import { useBeforeUnload } from './hooks/useBeforeUnload';
+import { flatToNested, nestedToFlat, createStateSnapshot, hasStateChanged } from './utils/stateAdapters';
 import { isSundayOnlyAsset } from './components/ganttUtils';
 
 const TimelineBuilder = () => {
@@ -25,15 +31,13 @@ const TimelineBuilder = () => {
     const [dateErrors, setDateErrors] = useState([]); // Array of asset names that start before today
     const [sundayDateErrors, setSundayDateErrors] = useState([]); // Array of asset IDs that violate Sunday-only rule
     
-    // Final timeline for display
-    const [timelineTasks, setTimelineTasks] = useState([]);
+    // timelineTasks will be derived using useMemo - no longer state
     const [showInfoBox, setShowInfoBox] = useState(true); // Add state for info box
 
     // Add state to store custom task durations for each asset instance
     const [assetTaskDurations, setAssetTaskDurations] = useState({}); // { assetId: { taskName: duration, ... } }
 
-    // Task bank: assetId -> raw task objects (CSV only for now)
-    const [taskBank, setTaskBank] = useState({}); // { assetId: Task[] }
+    // Task bank will be derived using useMemo - no longer state
 
     // Add state to store custom tasks separately
     const [customTasks, setCustomTasks] = useState([]); // Array of custom task objects
@@ -43,6 +47,9 @@ const TimelineBuilder = () => {
 
     // Add state to store bank holidays
     const [bankHolidays, setBankHolidays] = useState([]); // Array of YYYY-MM-DD strings
+
+    // State for parallel task configuration (empty for now, ready for future use)
+    const [parallelConfig, setParallelConfig] = useState({}); // { taskName: { parallelWith: string, startOffset: number } }
 
     // State for undo/redo functionality
     const [history, setHistory] = useState([]);
@@ -60,6 +67,89 @@ const TimelineBuilder = () => {
     const [showImportConfirm, setShowImportConfirm] = useState(false);
     const [importPreview, setImportPreview] = useState(null);
     const fileInputRef = useRef(null);
+
+    // State change tracking for dirty state detection
+    const [initialStateSnapshot, setInitialStateSnapshot] = useState(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Function to get current flat state dynamically
+    const getCurrentFlatState = useCallback(() => {
+        return {
+            selectedAssets,
+            globalLiveDate,
+            useGlobalDate,
+            assetLiveDates,
+            assetTaskDurations,
+            // taskBank is now derived data, not source data - don't save it
+            customTasks,
+            customTaskNames,
+            bankHolidays,
+            parallelConfig,
+            availableAssetTypes: uniqueAssets,
+            // timelineTasks is now derived data, not source data - don't save it
+            showInfoBox
+        };
+    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, assetTaskDurations, customTasks, customTaskNames, bankHolidays, parallelConfig, uniqueAssets, showInfoBox]);
+
+    // Memoized nested state for auto-save
+    const currentNestedState = useMemo(() => {
+        return flatToNested(getCurrentFlatState());
+    }, [getCurrentFlatState]);
+
+    // Auto-save integration with proper nested state
+    const {
+        saveStatus,
+        saveNow,
+        triggerSave,
+        recoverSession,
+        discardRecovery,
+        showRecoveryPrompt,
+        recoveryPreview
+    } = useAutoSave(currentNestedState, true); // Enable auto-save
+
+    // Handle session recovery
+    const handleRecover = useCallback(() => {
+        const recoveredNestedState = recoverSession();
+        if (recoveredNestedState) {
+            // Convert nested state back to flat structure
+            const recoveredFlatState = nestedToFlat(recoveredNestedState);
+            
+            // Restore flat state to component state
+            if (recoveredFlatState.selectedAssets) setSelectedAssets(recoveredFlatState.selectedAssets);
+            if (recoveredFlatState.globalLiveDate) setGlobalLiveDate(recoveredFlatState.globalLiveDate);
+            if (recoveredFlatState.useGlobalDate !== undefined) setUseGlobalDate(recoveredFlatState.useGlobalDate);
+            if (recoveredFlatState.assetLiveDates) setAssetLiveDates(recoveredFlatState.assetLiveDates);
+            if (recoveredFlatState.assetTaskDurations) setAssetTaskDurations(recoveredFlatState.assetTaskDurations);
+            // taskBank is now derived from customTasks, so we don't need to restore it separately
+            if (recoveredFlatState.customTasks) setCustomTasks(recoveredFlatState.customTasks);
+            if (recoveredFlatState.customTaskNames) setCustomTaskNames(recoveredFlatState.customTaskNames);
+            if (recoveredFlatState.bankHolidays) setBankHolidays(recoveredFlatState.bankHolidays);
+            if (recoveredFlatState.parallelConfig) setParallelConfig(recoveredFlatState.parallelConfig);
+            if (recoveredFlatState.showInfoBox !== undefined) setShowInfoBox(recoveredFlatState.showInfoBox);
+            
+            // Reset dirty state after recovery
+            setHasUnsavedChanges(false);
+            const newSnapshot = createStateSnapshot(recoveredFlatState);
+            setInitialStateSnapshot(newSnapshot);
+        }
+    }, [recoverSession]);
+
+    // Track state changes for dirty state detection
+    useEffect(() => {
+        const currentSnapshot = createStateSnapshot(getCurrentFlatState());
+        
+        if (initialStateSnapshot === null) {
+            // Set initial snapshot on first render
+            setInitialStateSnapshot(currentSnapshot);
+        } else {
+            // Check if state has changed from initial
+            const isDirty = hasStateChanged(initialStateSnapshot, currentSnapshot);
+            setHasUnsavedChanges(isDirty);
+        }
+    }, [getCurrentFlatState, initialStateSnapshot]);
+
+    // Browser warning for unsaved changes (only when actually dirty)
+    useBeforeUnload(hasUnsavedChanges, "You have unsaved changes. Are you sure you want to leave?");
 
     // Helper function to get task name (custom or default)
     const getTaskName = (taskId, assetName, taskInfo) => {
@@ -452,15 +542,26 @@ const TimelineBuilder = () => {
         });
     }, []);
 
-    // Build taskBank whenever selectedAssets, csvData, or customTasks change
-    useEffect(() => {
+    // Helper function to safely convert date to ISO string
+    const safeToISOString = (date) => {
+        if (!date || isNaN(date.getTime())) {
+            console.warn('Invalid date detected:', date);
+            return new Date().toISOString().split('T')[0]; // Return today's date as fallback
+        }
+        return date.toISOString().split('T')[0];
+    };
+
+    // Memoized taskBank calculation - derived from source states
+    const taskBank = useMemo(() => {
+        console.log('🔨 Recalculating taskBank from source data...');
+        
+        // Early returns for empty states
         if (selectedAssets.length === 0 || csvData.length === 0) {
-            setTaskBank({});
-            return;
+            console.log('   ⏸️ No assets or CSV data - returning empty taskBank');
+            return {};
         }
         
-        console.log('🔨 Rebuilding taskBank with custom tasks:', customTasks);
-        
+        // Build base taskBank from CSV data
         const bank = {};
         selectedAssets.forEach(asset => {
             const rows = csvData.filter(row => row['Asset Type'] === asset.type);
@@ -474,7 +575,7 @@ const TimelineBuilder = () => {
             }));
         });
         
-        // Insert custom tasks into the appropriate asset's task list
+        // Insert custom tasks at their specified positions
         customTasks.forEach(customTask => {
             const asset = selectedAssets.find(a => a.name === customTask.assetType);
             if (asset && bank[asset.id]) {
@@ -518,14 +619,16 @@ const TimelineBuilder = () => {
             }
         });
         
-        setTaskBank(bank);
+        console.log('✅ taskBank calculated:', bank);
+        return bank;
     }, [selectedAssets, csvData, customTasks]);
 
-    // Build dated timelineTasks from taskBank + live dates
-    useEffect(() => {
+    // Build timelineTasks from taskBank + live dates
+    const timelineTasks = useMemo(() => {
+        console.log('📅 Recalculating timelineTasks from taskBank...');
+        
         if (Object.keys(taskBank).length === 0) {
-            setTimelineTasks([]);
-            return;
+            return [];
         }
         
         const all = [];
@@ -551,8 +654,10 @@ const TimelineBuilder = () => {
             all.push(...timelineTasks);
         });
         
-        setTimelineTasks(all);
+        console.log('✅ timelineTasks calculated:', all.length, 'tasks');
+        return all;
     }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate, assetTaskDurations]);
+
 
     // Calculate project start dates and error detection from timelineTasks
     useEffect(() => {
@@ -1011,19 +1116,11 @@ useEffect(() => {
         setSundayDateErrors(violatingAssets.map(asset => asset.id));
     }, [globalLiveDate, selectedAssets, useGlobalDate]);
 
-    // Helper function to safely convert date to ISO string
-    const safeToISOString = (date) => {
-        if (!date || isNaN(date.getTime())) {
-            console.warn('Invalid date detected:', date);
-            return new Date().toISOString().split('T')[0]; // Return today's date as fallback
-        }
-        return date.toISOString().split('T')[0];
-    };
 
     // Generate timeline tasks for Gantt chart
     const generateTimelineTasks = (startDates) => {
         if (selectedAssets.length === 0 || Object.keys(startDates).length === 0) {
-            setTimelineTasks([]);
+            // Legacy function - timelineTasks are now derived
             return;
         }
 
@@ -1191,8 +1288,7 @@ useEffect(() => {
             // based on the new timeline structure
         }
         
-        setCalculatedStartDates(newCalculatedStartDates);
-        setTimelineTasks(allTasks);
+        // Legacy function - these setters no longer exist
     };
 
     // Helper to generate a unique id (could use a counter or Date.now())
@@ -1209,6 +1305,7 @@ useEffect(() => {
             };
             setSelectedAssets(prev => [...prev, newAsset]);
         }, `Add ${assetType} asset`);
+        saveNow(`Added ${assetType} asset`);
     };
 
     // Remove an asset instance by id
@@ -1217,6 +1314,7 @@ useEffect(() => {
         executeAction(() => {
             setSelectedAssets(prev => prev.filter(asset => asset.id !== assetId));
         }, `Remove ${assetToRemove?.name || 'asset'}`);
+        saveNow(`Removed ${assetToRemove?.name || 'asset'}`);
     };
 
     // Handler to rename an asset instance by id
@@ -1229,6 +1327,7 @@ useEffect(() => {
                 )
             );
         }, `Rename asset to "${newName}"`);
+        triggerSave(`Renamed asset to "${newName}"`);
     };
 
     // Handler to rename a task
@@ -1258,15 +1357,9 @@ useEffect(() => {
                 [taskId]: newName
             }));
             
-            // If we have a preserved assetType, also update the task's assetType
-            if (preservedAssetType) {
-                setTimelineTasks(prev => prev.map(task => 
-                    task.id === taskId 
-                        ? { ...task, assetType: preservedAssetType }
-                        : task
-                ));
-            }
+            // assetType is now derived automatically from the timeline calculation
         }, `Rename task to "${newName}"`);
+        triggerSave(`Renamed task to "${newName}"`);
     };
 
     const handleAssetLiveDateChange = (assetName, date) => {
@@ -1276,6 +1369,7 @@ useEffect(() => {
                 [assetName]: date
             }));
         }, `Change ${assetName} go-live date to ${date}`);
+        saveNow(`Changed ${assetName} live date to ${date}`);
     };
 
     const handleAssetStartDateChange = (assetId, newDate) => {
@@ -1287,6 +1381,7 @@ useEffect(() => {
                 )
             );
         }, `Change ${assetToUpdate?.name || 'asset'} go-live date to ${newDate}`);
+        saveNow(`Changed ${assetToUpdate?.name || 'asset'} start date to ${newDate}`);
     };
 
     // Handler to save custom task durations for an asset
@@ -1301,10 +1396,10 @@ useEffect(() => {
                 [assetToUpdate.type]: durations 
             }));
             
-            // Preserve custom tasks before timeline recalculation
-            const currentCustomTasks = timelineTasks.filter(task => task.isCustom);
-            setCustomTasks(currentCustomTasks);
+            // REMOVED: The line that was overwriting customTasks
+            // Custom tasks are already properly maintained in the customTasks array
         }, `Update task durations for ${assetToUpdate?.name || 'asset'}`);
+        saveNow(`Changed task durations for ${assetToUpdate?.name || 'asset'}`);
     };
 
     // Handler for drag-to-resize task duration
@@ -1338,6 +1433,9 @@ useEffect(() => {
                 };
             });
         }, `Change ${taskName} duration to ${newDuration} days`);
+        
+        // Trigger debounced save for continuous action
+        triggerSave(`Adjusted ${taskName} duration to ${newDuration} days`);
     };
 
     // Handler for adding custom tasks
@@ -1357,18 +1455,36 @@ useEffect(() => {
             insertAfterTaskId: insertAfterTaskId || null,
         };
         
-        executeAction(() => {
-            setTaskBank(prev => {
-                const list = prev[asset.id] ? [...prev[asset.id]] : [];
-                let idx = 0;
+        // FIRST: Update customTasks array for persistence (before executeAction)
+        // Use flushSync to ensure state update happens immediately
+        flushSync(() => {
+            setCustomTasks(prev => {
+                // Find the name of the task we're inserting after for stable positioning
+                let insertAfterTaskName = null;
                 if (insertAfterTaskId) {
-                    const i = list.findIndex(t => t.id === insertAfterTaskId);
-                    if (i !== -1) idx = i + 1;
+                    // Look through all tasks to find the name of the task we're inserting after
+                    const allTasks = Object.values(taskBank).flat();
+                    const insertAfterTask = allTasks.find(t => t.id === insertAfterTaskId);
+                    if (insertAfterTask) {
+                        insertAfterTaskName = insertAfterTask.name;
+                    }
                 }
-                list.splice(idx, 0, rawTask);
-                return { ...prev, [asset.id]: list };
+                
+                const customTaskForArray = {
+                    ...rawTask,
+                    insertAfterTaskName, // Store task name for stable positioning
+                    insertAfterTaskId    // Keep ID as fallback
+                };
+                
+                return [...prev, customTaskForArray];
             });
-        }, `Add custom task "${name}"`);
+        });
+
+        // The useEffect will automatically rebuild taskBank with the custom task
+        // No need to update taskBank directly since it gets rebuilt from customTasks
+        
+        // Trigger immediate save for important action
+        saveNow(`Add custom task "${name}"`);
     };
 
         // Helper function to count working days between two dates (exclusive)
@@ -1748,6 +1864,21 @@ useEffect(() => {
 
     return (
         <div className="bg-gray-100 min-h-screen font-sans" data-testid="timeline-builder">
+            {/* Recovery Prompt */}
+            <RecoveryPrompt
+                isOpen={showRecoveryPrompt}
+                preview={recoveryPreview}
+                onRecover={handleRecover}
+                onDiscard={discardRecovery}
+            />
+            
+            {/* Save Status Indicator */}
+            <SaveIndicator
+                status={saveStatus.status}
+                lastSaved={saveStatus.lastSaved}
+                message={saveStatus.message}
+            />
+
             <header className="bg-white shadow-md">
                 <div className="container mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">

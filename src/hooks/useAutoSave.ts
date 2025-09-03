@@ -26,6 +26,10 @@ export const useAutoSave = (
 
   const managerRef = useRef<AutoSaveManager | null>(null);
   const lastActionRef = useRef<string>('');
+  const stateRef = useRef<TimelineState>(state);
+
+  // Update state ref on every render
+  stateRef.current = state;
 
   // Initialize manager
   useEffect(() => {
@@ -52,17 +56,6 @@ export const useAutoSave = (
     }
   }, []);
 
-  // Auto-save effect
-  useEffect(() => {
-    if (!enabled || !managerRef.current) return;
-
-    // Start auto-save
-    managerRef.current.startAutoSave(() => state);
-
-    return () => {
-      managerRef.current?.stopAutoSave();
-    };
-  }, [state, enabled]);
 
   // Track meaningful state changes for debounced save
   // We'll use this more selectively in the action dispatchers
@@ -73,20 +66,20 @@ export const useAutoSave = (
     setSaveStatus(prev => ({ ...prev, isDirty: true }));
     
     lastActionRef.current = action;
-    managerRef.current.debouncedSave(state, { 
+    managerRef.current.debouncedSave(stateRef.current, { 
       lastAction: action 
     });
-  }, [state, enabled]);
+  }, [enabled]);
 
   // Manual save function
   const saveNow = useCallback((action?: string) => {
     if (!managerRef.current) return false;
     
     lastActionRef.current = action || 'manual-save';
-    return managerRef.current.saveState(state, { 
+    return managerRef.current.immediatelySave(stateRef.current, { 
       lastAction: lastActionRef.current 
     });
-  }, [state]);
+  }, []);
 
   // Recover session
   const recoverSession = useCallback(() => {

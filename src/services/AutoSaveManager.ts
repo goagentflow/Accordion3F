@@ -3,7 +3,6 @@ import { TimelineState } from '../types/timeline.types';
 // Constants
 const STORAGE_KEY = 'accordion_timeline_state';
 const STORAGE_VERSION = '1.0.0';
-const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 const DEBOUNCE_DELAY = 1000; // 1 second
 
 interface SavedState {
@@ -18,7 +17,6 @@ interface SavedState {
 }
 
 export class AutoSaveManager {
-  private saveTimer: NodeJS.Timeout | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
   private saveCount = 0;
   private onSaveCallback?: (status: 'saving' | 'saved' | 'error') => void;
@@ -133,25 +131,16 @@ export class AutoSaveManager {
   }
 
   /**
-   * Start auto-save timer
+   * Save immediately without debounce delay
    */
-  startAutoSave(getState: () => TimelineState): void {
-    this.stopAutoSave();
-    
-    this.saveTimer = setInterval(() => {
-      const state = getState();
-      this.saveState(state, { lastAction: 'auto-save' });
-    }, AUTO_SAVE_INTERVAL);
-  }
-
-  /**
-   * Stop auto-save timer
-   */
-  stopAutoSave(): void {
-    if (this.saveTimer) {
-      clearInterval(this.saveTimer);
-      this.saveTimer = null;
+  immediatelySave(state: TimelineState, metadata?: { lastAction?: string }): boolean {
+    // Clear any pending debounced save
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
     }
+    
+    return this.saveState(state, metadata);
   }
 
   /**
@@ -231,11 +220,15 @@ export class AutoSaveManager {
     const saved = this.loadState();
     if (!saved) return null;
 
+    // Defensive checks for nested structure
+    const assets = saved.state.assets || {} as any;
+    const tasks = saved.state.tasks || {} as any;
+    
     return {
       timestamp: new Date(saved.timestamp),
-      assetCount: saved.state.assets.selected.length,
-      taskCount: saved.state.tasks.timeline.length,
-      lastAction: saved.metadata.lastAction
+      assetCount: Array.isArray(assets.selected) ? assets.selected.length : 0,
+      taskCount: Array.isArray(tasks.timeline) ? tasks.timeline.length : 0,
+      lastAction: saved.metadata?.lastAction
     };
   }
 }

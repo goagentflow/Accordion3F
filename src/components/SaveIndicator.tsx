@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface SaveIndicatorProps {
   status: 'idle' | 'saving' | 'saved' | 'error';
@@ -7,7 +7,46 @@ interface SaveIndicatorProps {
 }
 
 const SaveIndicator: React.FC<SaveIndicatorProps> = ({ status, lastSaved, message }) => {
-  if (status === 'idle') return null;
+  const [isVisible, setIsVisible] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    if (status === 'idle') {
+      // Start fade out immediately for idle
+      setIsVisible(false);
+      // Remove from DOM after animation completes
+      setTimeout(() => setShouldRender(false), 300);
+      return;
+    }
+
+    // Show the toast
+    setShouldRender(true);
+    setIsVisible(true);
+
+    // Auto-dismiss logic based on status
+    let dismissTimer: NodeJS.Timeout;
+    
+    if (status === 'saved') {
+      // Auto-dismiss "saved" after 3 seconds
+      dismissTimer = setTimeout(() => {
+        setIsVisible(false);
+        setTimeout(() => setShouldRender(false), 300);
+      }, 3000);
+    } else if (status === 'error') {
+      // Keep errors visible longer (10 seconds)
+      dismissTimer = setTimeout(() => {
+        setIsVisible(false);
+        setTimeout(() => setShouldRender(false), 300);
+      }, 10000);
+    }
+    // 'saving' status stays visible until it changes
+
+    return () => {
+      if (dismissTimer) clearTimeout(dismissTimer);
+    };
+  }, [status]);
+
+  if (!shouldRender) return null;
 
   const getIcon = () => {
     switch (status) {
@@ -52,7 +91,11 @@ const SaveIndicator: React.FC<SaveIndicatorProps> = ({ status, lastSaved, messag
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 bg-white rounded-lg shadow-md px-3 py-2 transition-all duration-300">
+    <div className={`fixed bottom-4 right-4 z-50 flex items-center space-x-2 bg-white rounded-lg shadow-lg border px-3 py-2 transition-all duration-300 transform ${
+      isVisible 
+        ? 'translate-y-0 opacity-100 scale-100' 
+        : 'translate-y-2 opacity-0 scale-95'
+    }`}>
       {getIcon()}
       <span className={`text-sm ${getTextColor()}`}>
         {message}
