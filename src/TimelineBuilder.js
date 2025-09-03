@@ -522,22 +522,115 @@ const TimelineBuilder = () => {
         return timelineTasks;
     };
 
+    // Configure CSV source based on environment
+    const getCSVSource = () => {
+        const csvSource = process.env.REACT_APP_CSV_SOURCE || 'local';
+        
+        const CSV_SOURCES = {
+            'local': `${window.location.origin}/Group_Asset_Task_Time.csv`,
+            'github': 'https://raw.githubusercontent.com/YOUR_ACCOUNT/accordion-config/main/Group_Asset_Task_Time.csv',
+            'production': process.env.REACT_APP_CSV_URL || `${window.location.origin}/Group_Asset_Task_Time.csv`
+        };
+        
+        return CSV_SOURCES[csvSource] || CSV_SOURCES['local'];
+    };
+
+    // Validate CSV structure
+    const validateCSVData = (data) => {
+        if (!data || data.length === 0) {
+            return { valid: false, error: 'CSV file is empty' };
+        }
+
+        const requiredColumns = ['Category', 'Asset Type', 'Task', 'Duration (Days)', 'owner'];
+        const firstRow = data[0];
+        
+        if (!firstRow) {
+            return { valid: false, error: 'CSV file has no data rows' };
+        }
+
+        const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+        if (missingColumns.length > 0) {
+            return { 
+                valid: false, 
+                error: `Missing required columns: ${missingColumns.join(', ')}` 
+            };
+        }
+
+        // Check for valid data in key columns
+        const invalidRows = data.filter((row, index) => {
+            const duration = row['Duration (Days)'];
+            const owner = row['owner'];
+            const assetType = row['Asset Type'];
+            
+            return !assetType || 
+                   !duration || 
+                   isNaN(Number(duration)) || 
+                   !owner || 
+                   !['c', 'm', 'a', 'l'].includes(owner.toLowerCase());
+        });
+
+        if (invalidRows.length > 0) {
+            return { 
+                valid: false, 
+                error: `Found ${invalidRows.length} rows with invalid data (check Duration and owner columns)` 
+            };
+        }
+
+        return { valid: true };
+    };
+
     // Load CSV data
     useEffect(() => {
-        Papa.parse(`${window.location.origin}/Group_Asset_Task_Time.csv`, {
+        const csvUrl = getCSVSource();
+        console.log('Loading CSV from:', csvUrl);
+        
+        Papa.parse(csvUrl, {
             download: true,
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
+                if (results.errors && results.errors.length > 0) {
+                    console.error('CSV parsing errors:', results.errors);
+                }
+                
                 const parsedData = results.data;
+                
+                // Validate CSV structure
+                const validation = validateCSVData(parsedData);
+                if (!validation.valid) {
+                    console.error('CSV validation failed:', validation.error);
+                    alert(`Error loading CSV configuration: ${validation.error}`);
+                    return;
+                }
+                
+                // Process valid data
                 setCsvData(parsedData);
                 
                 // Extract unique asset types from CSV
                 const assetTypes = [...new Set(parsedData.map(row => row['Asset Type']))].filter(type => type);
                 setUniqueAssets(assetTypes);
+                console.log('Successfully loaded CSV with', parsedData.length, 'rows and', assetTypes.length, 'asset types');
             },
             error: (error) => {
                 console.error("Error parsing CSV file:", error);
+                // Fallback to local CSV if external source fails
+                if (csvUrl !== `${window.location.origin}/Group_Asset_Task_Time.csv`) {
+                    console.log('Falling back to local CSV file...');
+                    Papa.parse(`${window.location.origin}/Group_Asset_Task_Time.csv`, {
+                        download: true,
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            const parsedData = results.data;
+                            setCsvData(parsedData);
+                            const assetTypes = [...new Set(parsedData.map(row => row['Asset Type']))].filter(type => type);
+                            setUniqueAssets(assetTypes);
+                        },
+                        error: (fallbackError) => {
+                            console.error("Error parsing fallback CSV file:", fallbackError);
+                        }
+                    });
+                }
             }
         });
     }, []);
