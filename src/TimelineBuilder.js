@@ -12,6 +12,11 @@ import { useAutoSave } from './hooks/useAutoSave';
 import { useBeforeUnload } from './hooks/useBeforeUnload';
 import { flatToNested, nestedToFlat, createStateSnapshot, hasStateChanged } from './utils/stateAdapters';
 import { isSundayOnlyAsset } from './components/ganttUtils';
+import { buildAssetTimeline as buildAssetTimelineCalculator } from './services/TimelineCalculator';
+import { TimelineActions } from './actions/timelineActions';
+// import DependencyManagementButton from './components/DependencyManagementButton';
+import TimelineCompressionMetrics from './components/TimelineCompressionMetrics.tsx';
+import SimpleAnalytics from './components/SimpleAnalytics';
 
 const TimelineBuilder = () => {
     // CSV and asset data
@@ -36,6 +41,8 @@ const TimelineBuilder = () => {
 
     // Add state to store custom task durations for each asset instance
     const [assetTaskDurations, setAssetTaskDurations] = useState({}); // { assetId: { taskName: duration, ... } }
+    // Add state to store task dependencies for DAG calculation
+    const [taskDependencies, setTaskDependencies] = useState({}); // { taskId: [{predecessorId, type, lag}, ...] }
 
     // Task bank will be derived using useMemo - no longer state
 
@@ -65,6 +72,7 @@ const TimelineBuilder = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [importError, setImportError] = useState(null);
     const [showImportConfirm, setShowImportConfirm] = useState(false);
+    const [showAnalytics, setShowAnalytics] = useState(false);
     const [importPreview, setImportPreview] = useState(null);
     const fileInputRef = useRef(null);
 
@@ -80,6 +88,7 @@ const TimelineBuilder = () => {
             useGlobalDate,
             assetLiveDates,
             assetTaskDurations,
+            taskDependencies,
             // taskBank is now derived data, not source data - don't save it
             customTasks,
             customTaskNames,
@@ -89,7 +98,7 @@ const TimelineBuilder = () => {
             // timelineTasks is now derived data, not source data - don't save it
             showInfoBox
         };
-    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, assetTaskDurations, customTasks, customTaskNames, bankHolidays, parallelConfig, uniqueAssets, showInfoBox]);
+    }, [selectedAssets, globalLiveDate, useGlobalDate, assetLiveDates, assetTaskDurations, taskDependencies, customTasks, customTaskNames, bankHolidays, parallelConfig, uniqueAssets, showInfoBox]);
 
     // Memoized nested state for auto-save
     const currentNestedState = useMemo(() => {
@@ -120,6 +129,7 @@ const TimelineBuilder = () => {
             if (recoveredFlatState.useGlobalDate !== undefined) setUseGlobalDate(recoveredFlatState.useGlobalDate);
             if (recoveredFlatState.assetLiveDates) setAssetLiveDates(recoveredFlatState.assetLiveDates);
             if (recoveredFlatState.assetTaskDurations) setAssetTaskDurations(recoveredFlatState.assetTaskDurations);
+            if (recoveredFlatState.taskDependencies) setTaskDependencies(recoveredFlatState.taskDependencies);
             // taskBank is now derived from customTasks, so we don't need to restore it separately
             if (recoveredFlatState.customTasks) setCustomTasks(recoveredFlatState.customTasks);
             if (recoveredFlatState.customTaskNames) setCustomTaskNames(recoveredFlatState.customTaskNames);
@@ -475,51 +485,17 @@ const TimelineBuilder = () => {
         return currentDate;
     };
 
-    // Pure helper: build dated timeline for a single asset
+    // Pure helper: build dated timeline for a single asset using factory-pattern calculator
+    // This now routes to either sequential or DAG calculator based on feature flags
     const buildAssetTimeline = (rawTasks = [], liveDateStr, assetType, customDurations = {}) => {
-        if (!liveDateStr || rawTasks.length === 0) {
-            return [];
-        }
+        // Inject dependencies into tasks before calculation
+        const tasksWithDependencies = rawTasks.map(task => ({
+            ...task,
+            dependencies: taskDependencies[task.id] || []
+        }));
         
-        const liveDate = new Date(liveDateStr);
-        if (isNaN(liveDate.getTime())) {
-            console.error('Invalid live date:', liveDateStr);
-            return [];
-        }
-        
-        let currentEndDate = new Date(liveDate);
-        const timelineTasks = [];
-        
-        // Loop backwards through the tasks from the CSV
-        for (let i = rawTasks.length - 1; i >= 0; i--) {
-            const task = rawTasks[i];
-            
-            // Apply custom durations if available
-            const taskName = task.name;
-            const duration = customDurations[taskName] !== undefined 
-                ? customDurations[taskName] 
-                : (task.duration || 1);
-            
-            // Task's end date is the current end date
-            const endDate = new Date(currentEndDate);
-            
-            // Task's start date is calculated by subtracting (duration - 1) from end date
-            // This ensures correct span: 1-day task spans 1 day, 3-day task spans 3 days
-            const startDate = subtractWorkingDays(endDate, duration - 1);
-            
-            // Add task to timeline
-            timelineTasks.unshift({
-                ...task,
-                duration: duration, // Use calculated duration, not original task.duration
-                start: safeToISOString(startDate),
-                end: safeToISOString(endDate),
-            });
-            
-            // The end date for the PREVIOUS task is the day before the current one starts
-            currentEndDate = getPreviousWorkingDay(startDate);
-        }
-        
-        return timelineTasks;
+        // Use factory-pattern calculator that handles both sequential and DAG calculations
+        return buildAssetTimelineCalculator(tasksWithDependencies, liveDateStr, customDurations, bankHolidays);
     };
 
     // Load CSV data
@@ -656,7 +632,7 @@ const TimelineBuilder = () => {
         
         console.log('✅ timelineTasks calculated:', all.length, 'tasks');
         return all;
-    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate, assetTaskDurations]);
+    }, [taskBank, selectedAssets, globalLiveDate, useGlobalDate, assetTaskDurations, taskDependencies]);
 
 
     // Calculate project start dates and error detection from timelineTasks
@@ -1438,6 +1414,76 @@ useEffect(() => {
         triggerSave(`Adjusted ${taskName} duration to ${newDuration} days`);
     };
 
+    // Handler for drag-to-move task start date
+    const handleTaskMove = (taskId, newStartDate, assetType, taskName) => {
+        console.log(`[DEBUG] handleTaskMove called: ${taskId}, ${newStartDate}, ${assetType}, ${taskName}`);
+        
+        // Find the task being moved and its current position
+        const taskIndex = timelineTasks.findIndex(task => task.id === taskId);
+        if (taskIndex === -1) {
+            console.warn('Task not found for move:', taskId);
+            return;
+        }
+        
+        const currentTask = timelineTasks[taskIndex];
+        const currentStartDate = new Date(currentTask.start);
+        const targetStartDate = new Date(newStartDate);
+        
+        // Calculate days difference (positive = moving forward, negative = moving backward)
+        const daysDifference = Math.round((targetStartDate - currentStartDate) / (24 * 60 * 60 * 1000));
+        
+        console.log(`[DEBUG] Moving ${taskName}: ${daysDifference} days from ${currentStartDate.toDateString()} to ${targetStartDate.toDateString()}`);
+        
+        if (daysDifference === 0) {
+            console.log(`[DEBUG] No movement needed for ${taskName}`);
+            return;
+        }
+        
+        // Find the predecessor task (the task that comes immediately before in the timeline)
+        // Look for tasks in the same asset that end before the current task starts
+        const assetTasks = timelineTasks
+            .filter(task => task.assetType === assetType)
+            .sort((a, b) => new Date(a.start) - new Date(b.start));
+        
+        const currentTaskAssetIndex = assetTasks.findIndex(task => task.id === taskId);
+        
+        if (currentTaskAssetIndex > 0) {
+            const predecessorTask = assetTasks[currentTaskAssetIndex - 1];
+            
+            // Calculate the overlap: negative = overlap, positive = gap
+            // If moving forward (daysDifference > 0), we create overlap
+            // If moving backward (daysDifference < 0), we create gap
+            const overlapDays = Math.abs(daysDifference);
+            
+            console.log(`[DEBUG] Creating dependency: ${predecessorTask.id} -> ${taskId} with ${overlapDays} overlap days`);
+            
+            executeAction(() => {
+                // Add or update the dependency
+                setTaskDependencies(prev => {
+                    const existingDeps = prev[taskId] || [];
+                    
+                    // Remove any existing dependency from this predecessor
+                    const filteredDeps = existingDeps.filter(dep => dep.predecessorId !== predecessorTask.id);
+                    
+                    // Add the new dependency with calculated overlap
+                    const newDependency = {
+                        predecessorId: predecessorTask.id,
+                        type: 'FS', // Finish-to-Start
+                        lag: -overlapDays // Negative lag creates overlap
+                    };
+                    
+                    return {
+                        ...prev,
+                        [taskId]: [...filteredDeps, newDependency]
+                    };
+                });
+            }, `Move ${taskName} to create ${overlapDays}-day ${daysDifference > 0 ? 'overlap' : 'gap'} with ${predecessorTask.name}`);
+            
+        } else {
+            console.log(`[DEBUG] Cannot move ${taskName} - no predecessor task found`);
+        }
+    };
+
     // Handler for adding custom tasks
     const handleAddCustomTask = ({ name, duration, owner, assetType, insertAfterTaskId }) => {
         const asset = selectedAssets.find(a => a.name === assetType);
@@ -1903,6 +1949,16 @@ useEffect(() => {
                                 {isExporting ? '⏳ Exporting...' : '📊 Export'}
                             </button>
                             
+                            {/* Analytics Button */}
+                            <button
+                                onClick={() => setShowAnalytics(true)}
+                                disabled={timelineTasks.length === 0}
+                                className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                title="View Analytics"
+                            >
+                                📊 Analytics
+                            </button>
+                            
                             {/* Hidden file input */}
                             <input
                                 ref={fileInputRef}
@@ -2066,10 +2122,27 @@ useEffect(() => {
                         )}
 
                         {timelineTasks && timelineTasks.length > 0 ? (
-                                                    <GanttChart 
+                            <div className="space-y-4">
+                                {/* Timeline Compression Tools */}
+                                <div className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg">
+                                    <div>
+                                        <h3 className="font-medium text-gray-800">Timeline Compression</h3>
+                                        <p className="text-sm text-gray-600">Create task overlaps to fit more work into less time</p>
+                                    </div>
+                                    {/* <DependencyManagementButton variant="primary" size="medium" /> */}
+                                </div>
+
+                                {/* Timeline Compression Metrics */}
+                                <TimelineCompressionMetrics 
+                                    tasks={timelineTasks}
+                                    originalDuration={calculateWorkingDaysNeeded()}
+                                />
+
+                                <GanttChart 
                             tasks={timelineTasks}
                             bankHolidays={bankHolidays}
                             onTaskDurationChange={handleTaskDurationChange}
+                            onTaskMove={handleTaskMove}
                             onTaskNameChange={handleRenameTask}
                             workingDaysNeeded={calculateWorkingDaysNeeded()}
                             assetAlerts={calculateWorkingDaysNeededPerAsset()}
@@ -2077,6 +2150,7 @@ useEffect(() => {
                             selectedAssets={selectedAssets}
                             isExportDisabled={sundayDateErrors.length > 0}
                         />
+                            </div>
                         ) : (
                             <div className="text-center text-gray-500 py-10">
                                 <p className="text-lg">Your timeline will appear here.</p>
@@ -2286,6 +2360,13 @@ useEffect(() => {
                     </div>
                 </div>
             )}
+            
+            {/* Simple Analytics Modal */}
+            <SimpleAnalytics
+                tasks={timelineTasks}
+                isOpen={showAnalytics}
+                onClose={() => setShowAnalytics(false)}
+            />
         </div>
     );
 };

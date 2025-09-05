@@ -4,31 +4,46 @@ import GanttLegend from './GanttLegend';
 import GanttTaskRow from './GanttTaskRow';
 import GanttAddTaskModal from './GanttAddTaskModal';
 import GanttAssetAlerts from './GanttAssetAlerts';
+import GanttDependencyVisuals from './GanttDependencyVisuals';
+import DragDropDependencyOverlay from './DragDropDependencyOverlay';
+// import { useDragDropDependency } from '../hooks/useDragDropDependency';
 import { exportToExcel } from '../services/ExcelExporter';
+// Conditional import for dependency management (only available in new context system)
+// import { useDependencies } from '../hooks/useDependencies';
 import { 
   GANTT_CONFIG,
   generateDateColumns
 } from './ganttUtils';
+
 
 const GanttChart = ({ 
   tasks, 
   bankHolidays = [], 
   onTaskDurationChange = () => {}, 
   onTaskNameChange = () => {}, 
+  onTaskMove = null, // Optional callback for moving tasks (changing start date)
   workingDaysNeeded = null, 
   assetAlerts = [], 
   onAddCustomTask = () => {}, 
   selectedAssets = [],
-  isExportDisabled = false
+  isExportDisabled = false,
+  // Optional dependency function for move mode (only available with new context system)
+  addDependency = null
 }) => {
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [originalDuration, setOriginalDuration] = useState(0);
+  // New drag mode state for move vs resize
+  const [dragMode, setDragMode] = useState(null); // 'resize-left', 'resize-right', 'move'
+  const [originalStartDate, setOriginalStartDate] = useState(null);
   
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  
+  // Dependency functionality is now passed as prop (addDependency)
+  // This allows graceful fallback when TimelineProvider is not available
   
   const containerRef = useRef(null);
 
@@ -54,39 +69,80 @@ const GanttChart = ({
   }, [tasks]); // Only recalculate when tasks change
 
   // Memoized drag handlers to prevent recreation on every render
-  const handleMouseDown = useCallback((e, taskId, taskStart, taskEnd) => {
+  const handleMouseDown = useCallback((e, taskId, taskStart, taskEnd, mode = 'resize-right') => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
+    
     const task = tasks.find(t => t.id === taskId);
     if (task && !task.isLiveTask) {
       setIsDragging(true);
       setDraggedTaskId(taskId);
       setDragStartX(e.clientX);
       setOriginalDuration(task.duration);
+      setDragMode(mode);
+      setOriginalStartDate(new Date(taskStart));
+      
+      // Different cursor styles for different modes
+      if (mode === 'move') {
+        document.body.style.cursor = 'move';
+      } else if (mode === 'resize-left') {
+        document.body.style.cursor = 'w-resize';
+      } else {
+        document.body.style.cursor = 'e-resize';
+      }
     }
   }, [tasks]); // Depend on tasks to ensure we have current task data
 
   const handleMouseMove = useCallback((e) => {
-    if (isDragging && draggedTaskId) {
+    if (isDragging && draggedTaskId && dragMode) {
       const deltaX = e.clientX - dragStartX;
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.DAY_COLUMN_WIDTH);
       
       if (daysDelta !== 0) {
-        const newDuration = Math.max(1, Math.min(365, originalDuration + daysDelta));
-        if (newDuration !== originalDuration) {
-          const task = tasks.find(t => t.id === draggedTaskId);
-          if (task) {
-            onTaskDurationChange(draggedTaskId, newDuration, task.assetType, task.name);
+        const task = tasks.find(t => t.id === draggedTaskId);
+        if (task) {
+          if (dragMode === 'move') {
+            // Move mode: Reposition task by changing start date (keeping same duration)
+            console.log(`[DEBUG] Move mode: shifting task ${task.name} by ${daysDelta} days`);
+            
+            if (onTaskMove) {
+              // Calculate the new start date
+              const currentStart = new Date(task.start);
+              const newStartDate = new Date(currentStart.getTime() + (daysDelta * 24 * 60 * 60 * 1000));
+              
+              console.log(`[DEBUG] Current start: ${currentStart.toDateString()}, New start: ${newStartDate.toDateString()}`);
+              
+              // Call the move callback with the new start date
+              onTaskMove(draggedTaskId, newStartDate.toISOString().split('T')[0], task.assetType, task.name);
+            } else {
+              console.log(`[DEBUG] Move mode disabled - onTaskMove callback not provided`);
+            }
+            
+          } else if (dragMode === 'resize-right') {
+            // Right resize mode: Change duration (existing behavior)
+            const newDuration = Math.max(1, Math.min(365, originalDuration + daysDelta));
+            if (newDuration !== task.duration) {
+              // Fix parameter mismatch - need to calculate new end date
+              const currentStart = new Date(task.start);
+              const newEndDate = new Date(currentStart.getTime() + (newDuration * 24 * 60 * 60 * 1000));
+              onTaskDurationChange(draggedTaskId, newDuration, newEndDate.toISOString().split('T')[0]);
+            }
           }
         }
       }
     }
-  }, [isDragging, draggedTaskId, dragStartX, originalDuration, tasks, onTaskDurationChange]);
+  }, [isDragging, draggedTaskId, dragStartX, originalDuration, dragMode, tasks, onTaskDurationChange, onTaskMove]);
 
   const handleMouseUp = useCallback(() => {
+    // Restore cursor
+    document.body.style.cursor = 'default';
+    
     setIsDragging(false);
     setDraggedTaskId(null);
     setDragStartX(0);
     setOriginalDuration(0);
+    setDragMode(null);
+    setOriginalStartDate(null);
   }, []); // No dependencies needed for simple state setters
 
   // Memoized modal handlers to prevent child re-renders
@@ -108,7 +164,57 @@ const GanttChart = ({
     await exportToExcel(tasks, dateColumns, bankHolidays, minDate, maxDate);
   }, [tasks, dateColumns, bankHolidays, minDate, maxDate]);
 
-  // Setup drag event listeners
+  // Drag-drop dependency functionality
+  const availableTasksForDependency = useMemo(() => 
+    tasks.map(task => ({
+      id: task.id,
+      name: task.name,
+      assetId: task.assetId || task.id, // Fallback to ID if no assetId
+      duration: task.duration
+    })), [tasks]
+  );
+
+  // Fallback values for drag-drop dependency functionality without context
+  const dragState = { isDragging: false, sourceTaskId: null, sourceTaskName: '' };
+  const isDragDropEnabled = false;
+  const handleTaskDragStart = useCallback(() => {}, []);
+  const handleTaskDragEnd = useCallback(() => {}, []);
+  const handleDependencyMouseMove = useCallback(() => {}, []);
+  const handleDependencyMouseUp = useCallback(() => {}, []);
+  const getDragLineCoordinates = useCallback(() => ({ x1: 0, y1: 0, x2: 0, y2: 0 }), []);
+  const getDropValidation = useCallback(() => ({ isValid: false, reason: '' }), []);
+
+  // Calculate task positions for dependency visuals
+  const taskPositions = useMemo(() => {
+    const TASK_HEIGHT = 50; // Height per task row including margin
+    const HEADER_HEIGHT = 80; // Combined height of header and legend
+    const LEFT_COLUMN_WIDTH = 350; // Width of the task name column
+    
+    return tasks.map((task, index) => {
+      const taskStart = task.start ? new Date(task.start) : null;
+      const taskEnd = task.end ? new Date(task.end) : null;
+      
+      if (!taskStart || !taskEnd) {
+        return null; // Skip tasks without proper dates
+      }
+      
+      const daysDiff = Math.ceil((taskStart - minDate) / (1000 * 60 * 60 * 24));
+      const duration = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
+      
+      return {
+        id: task.id,
+        name: task.name,
+        left: LEFT_COLUMN_WIDTH + (daysDiff * GANTT_CONFIG.DAY_COLUMN_WIDTH),
+        width: duration * GANTT_CONFIG.DAY_COLUMN_WIDTH,
+        top: HEADER_HEIGHT + (index * TASK_HEIGHT),
+        height: TASK_HEIGHT - 10, // Subtract margin
+        isCritical: task.isCritical || false,
+        dependencies: task.dependencies || []
+      };
+    }).filter(Boolean); // Remove null entries
+  }, [tasks, minDate]);
+
+  // Setup drag event listeners (for duration dragging)
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -120,6 +226,19 @@ const GanttChart = ({
       };
     }
   }, [isDragging, draggedTaskId, dragStartX, originalDuration]);
+
+  // Setup dependency drag event listeners
+  useEffect(() => {
+    if (dragState.sourceTaskId) {
+      document.addEventListener('mousemove', handleDependencyMouseMove);
+      document.addEventListener('mouseup', handleDependencyMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleDependencyMouseMove);
+        document.removeEventListener('mouseup', handleDependencyMouseUp);
+      };
+    }
+  }, [dragState.sourceTaskId, handleDependencyMouseMove, handleDependencyMouseUp]);
 
   // Empty state
   if (!tasks || tasks.length === 0) {
@@ -202,9 +321,22 @@ const GanttChart = ({
                 onMouseDown={handleMouseDown}
                 isDragging={isDragging}
                 draggedTaskId={draggedTaskId}
+                // Dependency drag-drop props
+                onDependencyDragStart={handleTaskDragStart}
+                onDependencyDragEnd={handleTaskDragEnd}
+                isDependencyDragEnabled={isDragDropEnabled}
+                dragState={dragState}
+                getDropValidation={getDropValidation}
               />
             ))}
           </div>
+
+          {/* Dependency Visuals Overlay */}
+          <GanttDependencyVisuals
+            tasks={taskPositions}
+            containerWidth={350 + (dateColumns.length * GANTT_CONFIG.DAY_COLUMN_WIDTH)}
+            containerHeight={80 + (tasks.length * 50)}
+          />
         </div>
       </div>
 
@@ -215,6 +347,13 @@ const GanttChart = ({
         onSubmit={handleSubmitCustomTask}
         selectedAssets={selectedAssets}
         tasks={tasks}
+      />
+
+      {/* Drag-Drop Dependency Overlay */}
+      <DragDropDependencyOverlay
+        isVisible={dragState.isDragging}
+        coordinates={getDragLineCoordinates()}
+        sourceTaskName={dragState.sourceTaskName}
       />
     </div>
   );
