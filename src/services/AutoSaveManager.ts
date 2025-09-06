@@ -2,6 +2,7 @@ import { TimelineState } from '../types/timeline.types';
 
 // Constants
 const STORAGE_KEY = 'accordion_timeline_state';
+const LEGACY_STORAGE_KEY = 'timeline-state'; // Back-compat for existing E2E and older flows
 const STORAGE_VERSION = '1.0.0';
 const DEBOUNCE_DELAY = 1000; // 1 second
 
@@ -72,7 +73,10 @@ export class AutoSaveManager {
         }
       };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedState));
+      const payload = JSON.stringify(savedState);
+      localStorage.setItem(STORAGE_KEY, payload);
+      // Mirror to legacy key for compatibility with older tests/tools
+      try { localStorage.setItem(LEGACY_STORAGE_KEY, payload); } catch (_) { /* ignore */ }
       this.lastSavedState = stateString;
 
       // Notify save complete
@@ -99,7 +103,8 @@ export class AutoSaveManager {
    */
   loadState(): SavedState | null {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      // Prefer new key; fall back to legacy
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (!saved) return null;
 
       const parsed = JSON.parse(saved) as SavedState;
@@ -123,6 +128,7 @@ export class AutoSaveManager {
   clearState(): void {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (_) { /* ignore */ }
       this.lastSavedState = null;
       this.saveCount = 0;
     } catch (error) {
@@ -169,8 +175,9 @@ export class AutoSaveManager {
     // Calculate approximate storage usage
     let storageUsed = 0;
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      storageUsed = data ? new Blob([data]).size : 0;
+      const dataNew = localStorage.getItem(STORAGE_KEY) || '';
+      const dataLegacy = localStorage.getItem(LEGACY_STORAGE_KEY) || '';
+      storageUsed = new Blob([dataNew]).size + new Blob([dataLegacy]).size;
     } catch (e) {
       // Ignore
     }

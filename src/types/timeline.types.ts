@@ -23,12 +23,23 @@ export interface Task {
   assetType: string;    // Denormalized for easier filtering
   isCustom: boolean;
   insertAfterTaskId?: string | null;
+  
+  // NEW: Optional dependency tracking for DAG calculator (null/undefined for sequential tasks)
+  dependencies?: Array<{
+    predecessorId: string;    // Which task this depends on
+    type: 'FS';              // Start with Finish-Start only
+    lag: number;             // Negative = overlap days (e.g. -2 = overlap by 2 days)
+  }>;
 }
 
 export interface TimelineTask extends Task {
   start: string;        // ISO date string
   end: string;          // ISO date string
   progress: number;     // 0-100
+  
+  // DAG-specific properties (added by TimelineCalculatorDAG)
+  isCritical?: boolean;     // True if task is on critical path
+  totalFloat?: number;      // Float time available for task scheduling
 }
 
 // ============================================
@@ -71,6 +82,7 @@ export interface TimelineState {
   tasks: TasksState;
   dates: DatesState;
   ui: UIState;
+  status: 'loading' | 'ready' | 'error' | 'hydrating';
 }
 
 // ============================================
@@ -91,6 +103,17 @@ export enum ActionType {
   RENAME_TASK = 'RENAME_TASK',
   UPDATE_TASK_BANK = 'UPDATE_TASK_BANK',
   BULK_UPDATE_DURATIONS = 'BULK_UPDATE_DURATIONS',
+  
+  // NEW: Dependency actions for DAG calculator
+  ADD_DEPENDENCY = 'ADD_DEPENDENCY',
+  REMOVE_DEPENDENCY = 'REMOVE_DEPENDENCY',
+  UPDATE_DEPENDENCY = 'UPDATE_DEPENDENCY',
+  CLEAR_ALL_DEPENDENCIES = 'CLEAR_ALL_DEPENDENCIES',
+  RECALCULATE_WITH_DEPENDENCIES = 'RECALCULATE_WITH_DEPENDENCIES',
+  
+  // Bulk dependency actions (for proper undo/redo)
+  BULK_ADD_DEPENDENCIES = 'BULK_ADD_DEPENDENCIES',
+  BULK_REMOVE_DEPENDENCIES = 'BULK_REMOVE_DEPENDENCIES',
   
   // Date actions
   SET_GLOBAL_LIVE_DATE = 'SET_GLOBAL_LIVE_DATE',
@@ -113,7 +136,15 @@ export enum ActionType {
   IMPORT_STATE = 'IMPORT_STATE',
   RESET_STATE = 'RESET_STATE',
   CLEAR_ALL = 'CLEAR_ALL',
-  IMPORT_TIMELINE = 'IMPORT_TIMELINE'
+  IMPORT_TIMELINE = 'IMPORT_TIMELINE',
+  
+  // NEW: Manipulation bug fix actions
+  DRAG_TASK = 'DRAG_TASK',
+  HYDRATE_FROM_STORAGE = 'HYDRATE_FROM_STORAGE',
+  
+  // NEW: Undo/redo actions  
+  UNDO = 'UNDO',
+  REDO = 'REDO'
 }
 
 // ============================================
@@ -298,6 +329,91 @@ export interface SetProjectStartDateAction {
   };
 }
 
+// NEW: Dependency action payloads for DAG calculator
+export interface AddDependencyAction {
+  type: ActionType.ADD_DEPENDENCY;
+  payload: {
+    predecessorId: string;
+    successorId: string;
+    overlapDays: number; // Positive number (converted to negative lag internally)
+  };
+}
+
+export interface RemoveDependencyAction {
+  type: ActionType.REMOVE_DEPENDENCY;
+  payload: {
+    successorId: string;
+    predecessorId?: string; // If not provided, remove all dependencies for successor
+  };
+}
+
+export interface UpdateDependencyAction {
+  type: ActionType.UPDATE_DEPENDENCY;
+  payload: {
+    predecessorId: string;
+    successorId: string;
+    overlapDays: number;
+  };
+}
+
+export interface ClearAllDependenciesAction {
+  type: ActionType.CLEAR_ALL_DEPENDENCIES;
+  payload?: never;
+}
+
+export interface BulkAddDependenciesAction {
+  type: ActionType.BULK_ADD_DEPENDENCIES;
+  payload: {
+    dependencies: Array<{
+      predecessorId: string;
+      successorId: string;
+      overlapDays: number;
+    }>;
+    description?: string; // Optional description for undo/redo display
+  };
+}
+
+export interface BulkRemoveDependenciesAction {
+  type: ActionType.BULK_REMOVE_DEPENDENCIES;
+  payload: {
+    dependencies: Array<{
+      predecessorId: string;
+      successorId: string;
+    }>;
+    description?: string;
+  };
+}
+
+export interface RecalculateWithDependenciesAction {
+  type: ActionType.RECALCULATE_WITH_DEPENDENCIES;
+  payload?: never;
+}
+
+// NEW: Manipulation bug fix action payloads
+export interface DragTaskAction {
+  type: ActionType.DRAG_TASK;
+  payload: {
+    taskId: string;
+    deltaX: number; // Horizontal drag distance in pixels
+    deltaY: number; // Vertical drag distance in pixels
+  };
+}
+
+export interface HydrateFromStorageAction {
+  type: ActionType.HYDRATE_FROM_STORAGE;
+  payload: Partial<TimelineState>;
+}
+
+export interface UndoAction {
+  type: ActionType.UNDO;
+  payload?: never;
+}
+
+export interface RedoAction {
+  type: ActionType.REDO;
+  payload?: never;
+}
+
 // Union type of all actions
 export type TimelineAction =
   | AddAssetAction
@@ -324,7 +440,35 @@ export type TimelineAction =
   | ToggleInfoBoxAction
   | SetGettingStartedAction
   | SetAllInstructionsAction
-  | SetProjectStartDateAction;
+  | SetProjectStartDateAction
+  | AddDependencyAction
+  | RemoveDependencyAction
+  | UpdateDependencyAction
+  | ClearAllDependenciesAction
+  | BulkAddDependenciesAction
+  | BulkRemoveDependenciesAction
+  | RecalculateWithDependenciesAction
+  | DragTaskAction
+  | HydrateFromStorageAction
+  | UndoAction
+  | RedoAction;
+
+// ============================================
+// Dependency Validation Types
+// ============================================
+
+export interface DependencyValidationResult {
+  valid: boolean;
+  error?: string;
+  warnings?: string[];
+}
+
+export interface DependencyValidationError {
+  taskId: string;
+  dependencyIndex: number;
+  error: string;
+  severity: 'error' | 'warning';
+}
 
 // ============================================
 // Context Types
