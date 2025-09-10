@@ -60,10 +60,16 @@ const AssetSelector = ({
     // Use the passed function or fall back to local implementation
     const calculateWorkingDaysBetweenLocal = (startDate, endDate) => {
         if (calculateWorkingDaysBetween) {
+            // V2 passes a bank-holiday aware function - always prefer it
             return calculateWorkingDaysBetween(startDate, endDate);
         }
         
-        // Fallback implementation (same as TimelineBuilder)
+        // Safe fallback for V1/storybook contexts (weekend-only for backwards compatibility)
+        // Note: In production V2, this fallback should not be reached
+        if (process.env.NODE_ENV !== 'production') {
+            console.warn('[AssetSelector] Using weekend-only fallback - bank holidays ignored. Pass calculateWorkingDaysBetween prop for accurate calculations.');
+        }
+        
         if (!startDate || !endDate) return 0;
        
         const start = new Date(startDate);
@@ -77,6 +83,7 @@ const AssetSelector = ({
         while (currentDate < end) {
             const dayOfWeek = currentDate.getDay();
             // Count if not weekend (0 = Sunday, 6 = Saturday)
+            // Note: This fallback does NOT exclude bank holidays
             if (dayOfWeek !== 0 && dayOfWeek !== 6) {
                 workingDays++;
             }

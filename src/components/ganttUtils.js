@@ -80,6 +80,8 @@ export const addWorkingDays = (startDate, workingDaysToAdd, bankHolidays = []) =
   return result;
 };
 
+// Get the next working day on/after a given date
+
 // Get owner from task
 export const getOwnerFromTask = (task) => {
   if (!task) return 'm';
@@ -179,4 +181,14 @@ export const isSundayOnlyAsset = (assetType) => {
     'Print - Supplements Full Page'
   ];
   return sundayOnlyAssets.includes(assetType);
+};
+
+// Detect if a task should be treated as the final live task
+// Centralized helper to avoid scattered heuristics
+export const isFinalLiveTask = (task) => {
+  if (!task) return false;
+  if (task.isLiveTask) return true;
+  if (task.owner === 'l') return true;
+  const name = (task.name || '').toLowerCase();
+  return /\blive\b|issue date|send date|go-?live/.test(name);
 };

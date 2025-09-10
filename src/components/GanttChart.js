@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import GanttHeader from './GanttHeader';
 import GanttLegend from './GanttLegend';
 import GanttTaskRow from './GanttTaskRow';
+import AssetGroupSection from './AssetGroupSection';
 import GanttAddTaskModal from './GanttAddTaskModal';
 import GanttAssetAlerts from './GanttAssetAlerts';
 import GanttDependencyVisuals from './GanttDependencyVisuals';
@@ -14,6 +15,7 @@ import {
   GANTT_CONFIG,
   generateDateColumns
 } from './ganttUtils';
+import useGanttDrag from '../hooks/useGanttDrag';
 
 
 const GanttChart = ({ 
@@ -28,16 +30,16 @@ const GanttChart = ({
   selectedAssets = [],
   isExportDisabled = false,
   // Optional dependency function for move mode (only available with new context system)
-  addDependency = null
+  addDependency = null,
+  onExportExcel = null
 }) => {
-  // Drag state
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedTaskId, setDraggedTaskId] = useState(null);
-  const [dragStartX, setDragStartX] = useState(0);
-  const [originalDuration, setOriginalDuration] = useState(0);
-  // New drag mode state for move vs resize
-  const [dragMode, setDragMode] = useState(null); // 'resize-left', 'resize-right', 'move'
-  const [originalStartDate, setOriginalStartDate] = useState(null);
+  // Drag state moved into hook (Golden Rule #2)
+  const { isDragging, draggedTaskId, dragMode, moveDaysDelta, handleMouseDown } = useGanttDrag({
+    tasks,
+    bankHolidays,
+    onTaskMove,
+    onTaskDurationChange
+  });
   
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -68,82 +70,31 @@ const GanttChart = ({
     return { minDate, maxDate, dateColumns, totalDays };
   }, [tasks]); // Only recalculate when tasks change
 
-  // Memoized drag handlers to prevent recreation on every render
-  const handleMouseDown = useCallback((e, taskId, taskStart, taskEnd, mode = 'resize-right') => {
-    e.preventDefault();
-    e.stopPropagation(); // Prevent event bubbling
-    
-    const task = tasks.find(t => t.id === taskId);
-    if (task && !task.isLiveTask) {
-      setIsDragging(true);
-      setDraggedTaskId(taskId);
-      setDragStartX(e.clientX);
-      setOriginalDuration(task.duration);
-      setDragMode(mode);
-      setOriginalStartDate(new Date(taskStart));
-      
-      // Different cursor styles for different modes
-      if (mode === 'move') {
-        document.body.style.cursor = 'move';
-      } else if (mode === 'resize-left') {
-        document.body.style.cursor = 'w-resize';
-      } else {
-        document.body.style.cursor = 'e-resize';
+  // Group tasks by asset for clearer visual separation
+  const assetGroups = useMemo(() => {
+    if (!Array.isArray(tasks) || tasks.length === 0) return [];
+    const groups = [];
+    let current = null;
+    tasks.forEach((t) => {
+      const groupKey = t.assetId || t.assetType || 'unknown';
+      if (!current || current.key !== groupKey) {
+        // Prefer asset name from selectedAssets when available; fallback to assetType
+        const asset = Array.isArray(selectedAssets)
+          ? selectedAssets.find(a => a.id === groupKey)
+          : null;
+        current = {
+          key: groupKey,
+          label: asset?.name || t.assetType || 'Asset',
+          tasks: []
+        };
+        groups.push(current);
       }
-    }
-  }, [tasks]); // Depend on tasks to ensure we have current task data
+      current.tasks.push(t);
+    });
+    return groups;
+  }, [tasks, selectedAssets]);
 
-  const handleMouseMove = useCallback((e) => {
-    if (isDragging && draggedTaskId && dragMode) {
-      const deltaX = e.clientX - dragStartX;
-      const daysDelta = Math.round(deltaX / GANTT_CONFIG.DAY_COLUMN_WIDTH);
-      
-      if (daysDelta !== 0) {
-        const task = tasks.find(t => t.id === draggedTaskId);
-        if (task) {
-          if (dragMode === 'move') {
-            // Move mode: Reposition task by changing start date (keeping same duration)
-            console.log(`[DEBUG] Move mode: shifting task ${task.name} by ${daysDelta} days`);
-            
-            if (onTaskMove) {
-              // Calculate the new start date
-              const currentStart = new Date(task.start);
-              const newStartDate = new Date(currentStart.getTime() + (daysDelta * 24 * 60 * 60 * 1000));
-              
-              console.log(`[DEBUG] Current start: ${currentStart.toDateString()}, New start: ${newStartDate.toDateString()}`);
-              
-              // Call the move callback with the new start date
-              onTaskMove(draggedTaskId, newStartDate.toISOString().split('T')[0], task.assetType, task.name);
-            } else {
-              console.log(`[DEBUG] Move mode disabled - onTaskMove callback not provided`);
-            }
-            
-          } else if (dragMode === 'resize-right') {
-            // Right resize mode: Change duration (existing behavior)
-            const newDuration = Math.max(1, Math.min(365, originalDuration + daysDelta));
-            if (newDuration !== task.duration) {
-              // Fix parameter mismatch - need to calculate new end date
-              const currentStart = new Date(task.start);
-              const newEndDate = new Date(currentStart.getTime() + (newDuration * 24 * 60 * 60 * 1000));
-              onTaskDurationChange(draggedTaskId, newDuration, newEndDate.toISOString().split('T')[0]);
-            }
-          }
-        }
-      }
-    }
-  }, [isDragging, draggedTaskId, dragStartX, originalDuration, dragMode, tasks, onTaskDurationChange, onTaskMove]);
-
-  const handleMouseUp = useCallback(() => {
-    // Restore cursor
-    document.body.style.cursor = 'default';
-    
-    setIsDragging(false);
-    setDraggedTaskId(null);
-    setDragStartX(0);
-    setOriginalDuration(0);
-    setDragMode(null);
-    setOriginalStartDate(null);
-  }, []); // No dependencies needed for simple state setters
+  // Drag handlers moved into useGanttDrag
 
   // Memoized modal handlers to prevent child re-renders
   const handleOpenAddTaskModal = useCallback(() => setShowAddTaskModal(true), []);
@@ -159,10 +110,16 @@ const GanttChart = ({
     });
   }, [onAddCustomTask]);
 
-  // Memoized Excel export handler
+  // Memoized Excel export handler (prefers container-provided handler)
   const handleExportToExcel = useCallback(async () => {
-    await exportToExcel(tasks, dateColumns, bankHolidays, minDate, maxDate);
-  }, [tasks, dateColumns, bankHolidays, minDate, maxDate]);
+    if (onExportExcel) {
+      await onExportExcel();
+      return;
+    }
+    // Fallback for legacy usage
+    const applicationState = { selectedAssets };
+    await exportToExcel(tasks, dateColumns, bankHolidays, minDate, maxDate, applicationState);
+  }, [onExportExcel, tasks, dateColumns, bankHolidays, minDate, maxDate, selectedAssets]);
 
   // Drag-drop dependency functionality
   const availableTasksForDependency = useMemo(() => 
@@ -200,11 +157,12 @@ const GanttChart = ({
       
       const daysDiff = Math.ceil((taskStart - minDate) / (1000 * 60 * 60 * 24));
       const duration = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
+      const moveOffset = (isDragging && dragMode === 'move' && draggedTaskId === task.id) ? (moveDaysDelta * GANTT_CONFIG.DAY_COLUMN_WIDTH) : 0;
       
       return {
         id: task.id,
         name: task.name,
-        left: LEFT_COLUMN_WIDTH + (daysDiff * GANTT_CONFIG.DAY_COLUMN_WIDTH),
+        left: LEFT_COLUMN_WIDTH + (daysDiff * GANTT_CONFIG.DAY_COLUMN_WIDTH) + moveOffset,
         width: duration * GANTT_CONFIG.DAY_COLUMN_WIDTH,
         top: HEADER_HEIGHT + (index * TASK_HEIGHT),
         height: TASK_HEIGHT - 10, // Subtract margin
@@ -212,20 +170,9 @@ const GanttChart = ({
         dependencies: task.dependencies || []
       };
     }).filter(Boolean); // Remove null entries
-  }, [tasks, minDate]);
+  }, [tasks, minDate, isDragging, dragMode, draggedTaskId, moveDaysDelta]);
 
-  // Setup drag event listeners (for duration dragging)
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, draggedTaskId, dragStartX, originalDuration]);
+  // Drag event listeners handled by useGanttDrag
 
   // Setup dependency drag event listeners
   useEffect(() => {
@@ -309,10 +256,10 @@ const GanttChart = ({
 
           {/* Task Rows */}
           <div ref={containerRef}>
-            {tasks.map(task => (
-              <GanttTaskRow
-                key={task.id}
-                task={task}
+            {assetGroups.map((group, index) => (
+              <AssetGroupSection
+                key={`${group.key}-${index}`}
+                group={group}
                 dateColumns={dateColumns}
                 minDate={minDate}
                 bankHolidays={bankHolidays}
@@ -321,12 +268,13 @@ const GanttChart = ({
                 onMouseDown={handleMouseDown}
                 isDragging={isDragging}
                 draggedTaskId={draggedTaskId}
-                // Dependency drag-drop props
                 onDependencyDragStart={handleTaskDragStart}
                 onDependencyDragEnd={handleTaskDragEnd}
-                isDependencyDragEnabled={isDragDropEnabled}
+                isDragDropEnabled={isDragDropEnabled}
                 dragState={dragState}
                 getDropValidation={getDropValidation}
+                dragMode={dragMode}
+                moveDaysDelta={moveDaysDelta}
               />
             ))}
           </div>

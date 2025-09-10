@@ -57,9 +57,12 @@ export interface TasksState {
   all: Task[];                   // All tasks from CSV
   bank: Record<string, Task[]>;  // assetId -> Task[] (for backward compat)
   byAsset: Record<string, Task[]>; // Grouped by asset type
+  instanceDurations: Record<string, number>; // taskId -> duration (per-instance overrides)
   timeline: TimelineTask[];      // Calculated timeline with dates
   custom: Task[];                // User-added custom tasks
   names: Record<string, string>; // taskId -> custom name
+  // NEW: Explicit dependencies keyed by successor task ID
+  deps?: Record<string, Array<{ predecessorId: string; type: 'FS'; lag: number }>>;
 }
 
 export interface DatesState {
@@ -75,6 +78,9 @@ export interface UIState {
   showGettingStarted: boolean;
   showAllInstructions: boolean;
   dateErrors: string[];          // Array of asset IDs with conflicts
+  // When true, Orchestrator will not rebuild timeline after an Excel import
+  // and will only compute derived warnings (earliest starts, conflicts)
+  freezeImportedTimeline?: boolean;
 }
 
 export interface TimelineState {
@@ -101,6 +107,7 @@ export enum ActionType {
   ADD_CUSTOM_TASK = 'ADD_CUSTOM_TASK',
   UPDATE_TASK_DURATION = 'UPDATE_TASK_DURATION',
   RENAME_TASK = 'RENAME_TASK',
+  MOVE_TASK = 'MOVE_TASK', // Correctly handle drag-and-drop repositioning
   UPDATE_TASK_BANK = 'UPDATE_TASK_BANK',
   BULK_UPDATE_DURATIONS = 'BULK_UPDATE_DURATIONS',
   
@@ -209,6 +216,14 @@ export interface UpdateTaskDurationAction {
     assetType: string;
     taskName: string;
     duration: number;
+  };
+}
+
+export interface MoveTaskAction {
+  type: ActionType.MOVE_TASK;
+  payload: {
+    taskId: string;
+    newStartDate: string;
   };
 }
 
@@ -423,6 +438,7 @@ export type TimelineAction =
   | SetAssetStartDateAction
   | AddCustomTaskAction
   | UpdateTaskDurationAction
+  | MoveTaskAction
   | BulkUpdateDurationsAction
   | UpdateTaskBankAction
   | SetDateErrorsAction
@@ -482,6 +498,8 @@ export interface TimelineContextValue {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  // Hydration status for recovery/catalog readiness
+  isHydrating?: boolean;
 }
 
 // ============================================

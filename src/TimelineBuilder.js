@@ -15,8 +15,7 @@ import { isSundayOnlyAsset } from './components/ganttUtils';
 import { buildAssetTimeline as buildAssetTimelineCalculator } from './services/TimelineCalculator';
 import { TimelineActions } from './actions/timelineActions';
 // import DependencyManagementButton from './components/DependencyManagementButton';
-import TimelineCompressionMetrics from './components/TimelineCompressionMetrics.tsx';
-import SimpleAnalytics from './components/SimpleAnalytics';
+// Removed analytics components to simplify UI
 
 const TimelineBuilder = () => {
     // CSV and asset data
@@ -72,7 +71,7 @@ const TimelineBuilder = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [importError, setImportError] = useState(null);
     const [showImportConfirm, setShowImportConfirm] = useState(false);
-    const [showAnalytics, setShowAnalytics] = useState(false);
+    // Removed showAnalytics state to simplify UI
     const [importPreview, setImportPreview] = useState(null);
     const fileInputRef = useRef(null);
 
@@ -115,6 +114,12 @@ const TimelineBuilder = () => {
         showRecoveryPrompt,
         recoveryPreview
     } = useAutoSave(currentNestedState, true); // Enable auto-save
+
+    // Persist dependency changes (debounced by useAutoSave)
+    useEffect(() => {
+        // Centralized, robust save trigger on dependency updates
+        triggerSave('Updated dependencies');
+    }, [taskDependencies, triggerSave]);
 
     // Handle session recovery
     const handleRecover = useCallback(() => {
@@ -1949,15 +1954,7 @@ useEffect(() => {
                                 {isExporting ? '⏳ Exporting...' : '📊 Export'}
                             </button>
                             
-                            {/* Analytics Button */}
-                            <button
-                                onClick={() => setShowAnalytics(true)}
-                                disabled={timelineTasks.length === 0}
-                                className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                                title="View Analytics"
-                            >
-                                📊 Analytics
-                            </button>
+                            {/* Analytics Button - Removed to simplify UI */}
                             
                             {/* Hidden file input */}
                             <input
@@ -2037,6 +2034,7 @@ useEffect(() => {
                             }}
                             projectStartDate={projectStartDate}
                             dateErrors={dateErrors}
+                            bankHolidays={bankHolidays}
                             workingDaysNeeded={calculateWorkingDaysNeeded()}
                         />
 <AssetSelector
@@ -2132,11 +2130,7 @@ useEffect(() => {
                                     {/* <DependencyManagementButton variant="primary" size="medium" /> */}
                                 </div>
 
-                                {/* Timeline Compression Metrics */}
-                                <TimelineCompressionMetrics 
-                                    tasks={timelineTasks}
-                                    originalDuration={calculateWorkingDaysNeeded()}
-                                />
+                                {/* Timeline Compression Metrics - Removed to simplify UI */}
 
                                 <GanttChart 
                             tasks={timelineTasks}
@@ -2361,12 +2355,7 @@ useEffect(() => {
                 </div>
             )}
             
-            {/* Simple Analytics Modal */}
-            <SimpleAnalytics
-                tasks={timelineTasks}
-                isOpen={showAnalytics}
-                onClose={() => setShowAnalytics(false)}
-            />
+            {/* Simple Analytics Modal - Removed to simplify UI */}
         </div>
     );
 };

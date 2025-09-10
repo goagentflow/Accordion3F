@@ -15,6 +15,7 @@ export function flatToNested(flatState) {
     availableAssetTypes = [],
     assetLiveDates = {},
     assetTaskDurations = {},
+    taskDependencies = {},
     taskBank = {},  // Add taskBank handling
     customTasks = [],
     customTaskNames = {},
@@ -40,7 +41,10 @@ export function flatToNested(flatState) {
       custom: customTasks,
       timeline: timeline,
       names: customTaskNames,
+      instanceDurations: {},
       parallelConfig: parallelConfig,
+      // Persist dependency map for DAG calculator
+      dependencies: taskDependencies,
       bank: taskBank  // Add taskBank to nested structure
     },
     dates: {
@@ -74,6 +78,8 @@ export function nestedToFlat(nestedState) {
     availableAssetTypes: assets.available || [],
     assetLiveDates: assets.liveDates || {},
     assetTaskDurations: assets.taskDurations || {},
+    // Extract dependency map from nested structure
+    taskDependencies: tasks.dependencies || {},
     taskBank: tasks.bank || {},  // Extract taskBank from nested structure
     customTasks: tasks.custom || [],
     customTaskNames: tasks.names || {},
@@ -101,6 +107,7 @@ export function createStateSnapshot(flatState) {
     useGlobalDate: flatState.useGlobalDate,
     assetLiveDates: flatState.assetLiveDates,
     assetTaskDurations: flatState.assetTaskDurations,
+    taskDependencies: flatState.taskDependencies || {},
     taskBank: flatState.taskBank || {},  // Include taskBank for custom tasks
     customTasks: flatState.customTasks,
     customTaskNames: flatState.customTaskNames,

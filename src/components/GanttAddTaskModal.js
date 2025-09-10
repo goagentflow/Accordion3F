@@ -10,16 +10,18 @@ const GanttAddTaskModal = ({
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskDuration, setNewTaskDuration] = useState(1);
   const [newTaskOwner, setNewTaskOwner] = useState('m');
-  const [newTaskAssetType, setNewTaskAssetType] = useState('');
+  const [newTaskAssetId, setNewTaskAssetId] = useState('');
   const [insertAfterTask, setInsertAfterTask] = useState('');
 
   const handleSubmit = () => {
-    if (newTaskName.trim() && newTaskAssetType) {
+    if (newTaskName.trim() && newTaskAssetId) {
+      const asset = selectedAssets.find(a => a.id === newTaskAssetId);
+      if (!asset) return;
       onSubmit({
         name: newTaskName.trim(),
         duration: newTaskDuration,
         owner: newTaskOwner,
-        assetType: newTaskAssetType,
+        assetType: asset.type,
         insertAfter: insertAfterTask
       });
       
@@ -27,7 +29,7 @@ const GanttAddTaskModal = ({
       setNewTaskName('');
       setNewTaskDuration(1);
       setNewTaskOwner('m');
-      setNewTaskAssetType('');
+      setNewTaskAssetId('');
       setInsertAfterTask('');
       onClose();
     }
@@ -43,18 +45,18 @@ const GanttAddTaskModal = ({
         {/* Asset Type Selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Asset Type
+            Asset
           </label>
           <select
-            value={newTaskAssetType}
-            onChange={(e) => setNewTaskAssetType(e.target.value)}
+            value={newTaskAssetId}
+            onChange={(e) => setNewTaskAssetId(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           >
-            <option value="">Select Asset Type</option>
+            <option value="">Select Asset</option>
             {selectedAssets.map((asset) => (
-              <option key={asset.id} value={asset.name}>
-                {asset.name}
+              <option key={asset.id} value={asset.id}>
+                {asset.name} ({asset.type})
               </option>
             ))}
           </select>
@@ -107,7 +109,7 @@ const GanttAddTaskModal = ({
         </div>
 
         {/* Insert Position */}
-        {newTaskAssetType && (
+        {newTaskAssetId && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Insert After (optional)
@@ -119,7 +121,7 @@ const GanttAddTaskModal = ({
             >
               <option value="">At the beginning</option>
               {tasks
-                .filter(task => task.assetType === newTaskAssetType && !task.isLiveTask)
+                .filter(task => task.assetId === newTaskAssetId && !task.isLiveTask)
                 .map(task => (
                   <option key={task.id} value={task.id}>
                     After: {task.name}
@@ -139,7 +141,7 @@ const GanttAddTaskModal = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!newTaskName.trim() || !newTaskAssetType}
+            disabled={!newTaskName.trim() || !newTaskAssetId}
             className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             Add Task

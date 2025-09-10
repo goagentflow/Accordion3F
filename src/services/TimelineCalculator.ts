@@ -1,6 +1,9 @@
 /**
- * Timeline calculation service
- * Handles all business logic for building timelines from assets and tasks
+ * Timeline calculation service with factory pattern
+ * Routes between sequential and DAG calculators based on feature flags
+ * 
+ * Following Golden Rule #1: Safety First - Feature flags allow safe rollback
+ * Following Golden Rule #4: Clear Roles - Factory handles calculator selection
  */
 
 import { 
@@ -19,9 +22,16 @@ import {
   calculateWorkingDaysBetween
 } from '../utils/dateHelpers';
 
+import { useDAGCalculator, isDebugMode } from '../config/features';
+import { buildAssetTimelineDAG } from './TimelineCalculatorDAG';
+
+// ============================================
+// Calculator Factory Pattern
+// ============================================
+
 /**
- * Build a dated timeline for a single asset
- * Calculates task dates working backwards from the live date
+ * Main timeline calculation entry point
+ * Routes to appropriate calculator based on feature flags and task dependencies
  * 
  * @param rawTasks - Array of tasks without dates
  * @param liveDateStr - The go-live date as ISO string
@@ -30,6 +40,55 @@ import {
  * @returns Array of tasks with calculated start and end dates
  */
 export const buildAssetTimeline = (
+  rawTasks: Task[],
+  liveDateStr: string,
+  customDurations: Record<string, number> = {},
+  bankHolidays: string[] = []
+): TimelineTask[] => {
+  // Early validation
+  if (!liveDateStr || rawTasks.length === 0) {
+    return [];
+  }
+  
+  const liveDate = new Date(liveDateStr);
+  if (isNaN(liveDate.getTime())) {
+    console.error('Invalid live date:', liveDateStr);
+    return [];
+  }
+  
+  // Determine calculator strategy
+  const shouldUseDAG = useDAGCalculator();
+  const hasDependencies = rawTasks.some(task => task.dependencies && task.dependencies.length > 0);
+  
+  if (isDebugMode()) {
+    console.log('Timeline calculation strategy:', {
+      useDAGFeatureFlag: shouldUseDAG,
+      hasDependencies,
+      taskCount: rawTasks.length,
+      selectedCalculator: shouldUseDAG ? 'DAG' : 'Sequential'
+    });
+  }
+  
+  // Route to appropriate calculator
+  if (shouldUseDAG) {
+    // Use DAG calculator (handles both sequential and overlapped tasks)
+    return buildAssetTimelineDAG(rawTasks, liveDateStr, customDurations, bankHolidays);
+  } else {
+    // Use original sequential calculator (preserved for backwards compatibility)
+    return buildAssetTimelineSequential(rawTasks, liveDateStr, customDurations, bankHolidays);
+  }
+};
+
+// ============================================
+// Sequential Calculator (Original Implementation)
+// ============================================
+
+/**
+ * Sequential timeline calculator (original implementation)
+ * Calculates task dates working backwards from the live date
+ * PRESERVED EXACTLY for backwards compatibility
+ */
+export const buildAssetTimelineSequential = (
   rawTasks: Task[],
   liveDateStr: string,
   customDurations: Record<string, number> = {},
@@ -77,9 +136,10 @@ export const buildAssetTimeline = (
       }
     }
     
-    // Create timeline task with dates
+    // Create timeline task with dates and correct duration
     const timelineTask: TimelineTask = {
       ...task,
+      duration, // Use the calculated duration (including custom overrides)
       start: safeToISOString(startDate),
       end: safeToISOString(endDate),
       progress: 0

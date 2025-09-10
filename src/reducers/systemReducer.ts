@@ -30,21 +30,25 @@ export const initialTimelineState: TimelineState = {
     all: [],
     bank: {},
     byAsset: {},
+    instanceDurations: {},
     timeline: [],
     custom: [],
-    names: {}
+    names: {},
+    deps: {}
   },
   dates: {
     globalLiveDate: '',
     useGlobalDate: true,
     projectStartDate: '',
-    bankHolidays: []
+    bankHolidays: [],
+    calculatedStartDates: {}
   },
   ui: {
     showInfoBox: true,
     showGettingStarted: false,
     showAllInstructions: false,
-    dateErrors: []
+    dateErrors: [],
+    freezeImportedTimeline: false
   },
   status: 'ready'
 };
@@ -153,6 +157,10 @@ export function handleSetAssetLiveDate(
         ...state.assets.liveDates,
         [assetName]: validatedDate
       }
+    },
+    ui: {
+      ...state.ui,
+      freezeImportedTimeline: false
     }
   };
 }
@@ -181,6 +189,10 @@ export function handleSetAssetStartDate(
     assets: {
       ...state.assets,
       selected: updatedAssets
+    },
+    ui: {
+      ...state.ui,
+      freezeImportedTimeline: false
     }
   };
 }

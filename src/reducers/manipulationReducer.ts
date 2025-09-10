@@ -99,9 +99,11 @@ export function handleHydrateFromStorage(state: TimelineState, action: HydrateFr
       all: hydratedData.tasks?.all || state.tasks.all,
       bank: hydratedData.tasks?.bank || state.tasks.bank,
       byAsset: hydratedData.tasks?.byAsset || state.tasks.byAsset,
+      instanceDurations: hydratedData.tasks?.instanceDurations || state.tasks.instanceDurations,
       timeline: hydratedData.tasks?.timeline || state.tasks.timeline,
       custom: hydratedData.tasks?.custom || state.tasks.custom,
-      names: hydratedData.tasks?.names || state.tasks.names
+      names: hydratedData.tasks?.names || state.tasks.names,
+      deps: hydratedData.tasks?.deps || state.tasks.deps
     },
     dates: {
       globalLiveDate: hydratedData.dates?.globalLiveDate || state.dates.globalLiveDate,
@@ -136,6 +138,34 @@ export function handleHydrateFromStorage(state: TimelineState, action: HydrateFr
   return hydratedState;
 }
 
+/**
+ * Handle MOVE_TASK action - Handles direct task repositioning from drag-and-drop
+ */
+export function handleMoveTask(state: TimelineState, action: any): TimelineState {
+  const { taskId, newStartDate } = action.payload;
+
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      timeline: state.tasks.timeline.map(task => {
+        if (task.id === taskId) {
+          const newStart = new Date(newStartDate);
+          const newEnd = new Date(newStart);
+          newEnd.setDate(newEnd.getDate() + task.duration - 1);
+
+          return {
+            ...task,
+            start: newStart.toISOString().split('T')[0],
+            end: newEnd.toISOString().split('T')[0],
+          };
+        }
+        return task;
+      })
+    }
+  };
+}
+
 // History management for undo/redo (prevents memory leaks)
 const MAX_HISTORY_SIZE = 50;
 let undoHistory: TimelineState[] = [];
@@ -159,7 +189,7 @@ function pushToUndoHistory(state: TimelineState): void {
 /**
  * Handle UNDO action - Bounded undo with memory leak prevention
  */
-export function handleUndo(state: TimelineState, action: UndoAction): TimelineState {
+export function handleUndo(state: TimelineState, _action: UndoAction): TimelineState {
   if (undoHistory.length === 0) {
     console.warn(`[ManipulationReducer] No undo history available`);
     return state;
@@ -179,7 +209,7 @@ export function handleUndo(state: TimelineState, action: UndoAction): TimelineSt
 /**
  * Handle REDO action - Bounded redo with memory leak prevention
  */
-export function handleRedo(state: TimelineState, action: RedoAction): TimelineState {
+export function handleRedo(state: TimelineState, _action: RedoAction): TimelineState {
   if (redoHistory.length === 0) {
     console.warn(`[ManipulationReducer] No redo history available`);
     return state;

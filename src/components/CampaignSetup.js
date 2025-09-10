@@ -7,7 +7,8 @@ const CampaignSetup = React.memo(({
     onUseGlobalDateChange, 
     projectStartDate, 
     dateErrors,
-    workingDaysNeeded
+    workingDaysNeeded,
+    bankHolidays = []
 }) => {
     // Remove the clientDeadline state and handleDeadlineChange
 
@@ -34,6 +35,16 @@ const CampaignSetup = React.memo(({
         });
     };
 
+    // Detect if a date is a non-working day (weekend or bank holiday)
+    const isNonWorkingDay = (dateString) => {
+        if (!dateString) return false;
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return false;
+        const day = d.getDay();
+        const iso = d.toISOString().split('T')[0];
+        return day === 0 || day === 6 || (Array.isArray(bankHolidays) && bankHolidays.includes(iso));
+    };
+
     // Check if calculated start date is in the past
     const isStartDateInPast = dateErrors.length > 0;
 
@@ -45,7 +56,7 @@ const CampaignSetup = React.memo(({
             </h3>
 
             {/* Campaign Live Date */}
-            <div className="mb-4">
+            <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     Campaign Live Date *
                 </label>
@@ -68,8 +79,18 @@ const CampaignSetup = React.memo(({
                 )}
             </div>
 
+            {/* Non-working day info for go-live (amber) */}
+            {globalLiveDate && isNonWorkingDay(globalLiveDate) && (
+                <div className="mb-4 bg-yellow-50 border border-yellow-300 text-yellow-900 rounded-md p-3 text-sm">
+                    <div className="font-medium">Heads up: Go-live is on a non‑working day</div>
+                    <div className="mt-1">
+                        The live task will be anchored to this date. All other tasks adjust to working days only.
+                    </div>
+                </div>
+            )}
+
             {/* Use Global Date Toggle */}
-            <div className="mb-4">
+            <div className="mb-3">
                 <label className="flex items-center">
                     <input
                         type="checkbox"
@@ -86,7 +107,7 @@ const CampaignSetup = React.memo(({
 
             {/* Calculated Project Start Date - Made less prominent */}
             {projectStartDate && (
-                <div className="mb-4">
+                <div className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Earliest Work Start Date
                     </label>
@@ -128,7 +149,14 @@ const CampaignSetup = React.memo(({
                         <div className="text-sm font-medium">
                             {workingDaysNeeded.needed > 0 ? (
                                 <span className="text-red-700">
-                                    ⚠️ {workingDaysNeeded.needed} day{workingDaysNeeded.needed !== 1 ? 's' : ''} need to be saved to start on time
+                                    {(() => {
+                                        const count = Array.isArray(dateErrors) ? dateErrors.length : 0;
+                                        const x = workingDaysNeeded.needed;
+                                        const y = count;
+                                        const dayLabel = x !== 1 ? 'days' : 'day';
+                                        const assetLabel = y !== 1 ? 'assets' : 'asset';
+                                        return `⚠️ ${x} ${dayLabel} need to be saved to start on time across ${y} ${assetLabel}`;
+                                    })()}
                                 </span>
                             ) : workingDaysNeeded.needed < 0 ? (
                                 <span className="text-green-700">
@@ -140,9 +168,7 @@ const CampaignSetup = React.memo(({
                                 </span>
                             )}
                         </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                            Available: {workingDaysNeeded.available} days | Allocated: {workingDaysNeeded.allocated} days
-                        </div>
+                        {/* Removed Available/Allocated row per UX request */}
                     </div>
                 </div>
             )}

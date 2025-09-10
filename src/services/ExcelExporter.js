@@ -1,5 +1,5 @@
 import * as ExcelJS from 'exceljs';
-import { safeToISOString, isBankHoliday, isWeekend, getOwnerFromTask, getOwnerDescription, countWorkingDays } from '../components/ganttUtils';
+import { safeToISOString, isBankHoliday, isWeekend, getOwnerFromTask, getOwnerDescription, countWorkingDays, isFinalLiveTask } from '../components/ganttUtils';
 
 /**
  * Export timeline tasks to Excel with professional formatting matching pre-refactored design
@@ -131,24 +131,25 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     });
   });
 
-  // 4. Group tasks by asset type and add them with headers
+  // 4. Group tasks by asset (prefer assetId/name; fallback to assetType)
   const groupedTasks = {};
+  const selectedAssets = (applicationState.selectedAssets || []).reduce((acc, a) => {
+    acc[a.id] = a;
+    return acc;
+  }, {});
 
-  // Group tasks by asset type
   tasks.forEach(task => {
-    const assetType = task.assetType || 'Other';
-    if (!groupedTasks[assetType]) {
-      groupedTasks[assetType] = [];
-    }
-    groupedTasks[assetType].push(task);
+    const groupKey = task.assetId || task.assetType || 'Other';
+    if (!groupedTasks[groupKey]) groupedTasks[groupKey] = [];
+    groupedTasks[groupKey].push(task);
   });
 
-  // Add tasks grouped by asset type
-  Object.keys(groupedTasks).forEach(assetType => {
-    const assetTasks = groupedTasks[assetType];
+  Object.keys(groupedTasks).forEach(groupKey => {
+    const assetTasks = groupedTasks[groupKey];
+    const asset = selectedAssets[groupKey];
+    const headerLabel = asset?.name || assetTasks[0]?.assetType || 'Asset';
 
-    // Add asset type header row
-    const assetHeaderRow = worksheet.addRow([assetType]);
+    const assetHeaderRow = worksheet.addRow([headerLabel]);
     assetHeaderRow.height = 25;
     const assetHeaderCell = assetHeaderRow.getCell(1);
     assetHeaderCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
@@ -165,7 +166,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     worksheet.mergeCells(assetHeaderRow.number, 1, assetHeaderRow.number, dateColumns.length + 1);
     currentRow++;
 
-    // Add tasks for this asset type
+    // Add tasks for this asset
     assetTasks.forEach(task => {
       const taskRow = worksheet.addRow([]);
       taskRow.height = 20; // Compact row height
@@ -186,18 +187,21 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
 
       // Get colors for this task
       const owner = getOwnerFromTask(task);
-      const colors = task.isLiveTask ? getOwnerColor('l') : getOwnerColor(owner);
+      const colors = isFinalLiveTask(task) ? getOwnerColor('l') : getOwnerColor(owner);
 
       // Fill timeline cells for this task
-      const taskStart = new Date(task.start);
-      const taskEnd = new Date(task.end);
+      // Normalize comparisons to date-only to avoid timezone drift
+      const taskStartISO = safeToISOString(new Date(task.start));
+      const taskEndISO = safeToISOString(new Date(task.end));
 
       dateColumns.forEach((date, index) => {
         const cell = taskRow.getCell(index + 2);
 
-        if (date >= taskStart && date <= taskEnd) {
+        // Compare by ISO YYYY-MM-DD strings to avoid TZ issues
+        const colISO = safeToISOString(date);
+        if (colISO >= taskStartISO && colISO <= taskEndISO) {
           // Check if this is a final task (live tasks)
-          const isFinalTask = task.isLiveTask || task.name.toLowerCase().includes('live');
+          const isFinalTask = isFinalLiveTask(task);
 
           // Final tasks always show in color, regular tasks only on working days
           if (isFinalTask || (!isWeekend(date) && !isBankHoliday(date, bankHolidays))) {

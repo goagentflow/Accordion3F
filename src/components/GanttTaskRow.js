@@ -1,4 +1,5 @@
 import React, { useState, memo } from 'react';
+import TaskDependencyIndicator from './TaskDependencyIndicator';
 import { 
   GANTT_CONFIG, 
   getColumnBackground, 
@@ -17,7 +18,16 @@ const GanttTaskRow = memo(({
   onTaskNameChange,
   onMouseDown,
   isDragging,
-  draggedTaskId 
+  draggedTaskId,
+  // Dependency drag-drop props
+  onDependencyDragStart,
+  onDependencyDragEnd,
+  isDependencyDragEnabled = false,
+  dragState = { isDragging: false, sourceTaskId: null },
+  getDropValidation = () => ({ isValid: false }),
+  // Visual drag props
+  dragMode = null,
+  moveDaysDelta = 0
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(task.name);
@@ -58,14 +68,56 @@ const GanttTaskRow = memo(({
   const ownerDescription = getOwnerDescription(owner);
   const ownerColorClasses = getOwnerColorClasses(owner);
   const taskPosition = calculateTaskPosition(task, minDate);
+  const visualOffsetPx = (isDragging && draggedTaskId === task.id && dragMode === 'move')
+    ? moveDaysDelta * GANTT_CONFIG.DAY_COLUMN_WIDTH
+    : 0;
 
   const isTaskBeingDragged = isDragging && draggedTaskId === task.id;
+
+  // Drag-drop dependency handlers
+  const handleDependencyDragStart = (e) => {
+    if (!isDependencyDragEnabled || !onDependencyDragStart) return;
+    
+    const taskInfo = {
+      id: task.id,
+      name: task.name,
+      assetId: task.assetId || task.id,
+      duration: task.duration
+    };
+    
+    onDependencyDragStart(taskInfo, e);
+  };
+
+  const handleDependencyDragEnd = () => {
+    if (!isDependencyDragEnabled || !onDependencyDragEnd || !dragState.isDragging) return;
+    
+    const taskInfo = {
+      id: task.id,
+      name: task.name,
+      assetId: task.assetId || task.id,
+      duration: task.duration
+    };
+    
+    onDependencyDragEnd(taskInfo);
+  };
+
+  // Check if this task is a valid drop target
+  const dropValidation = getDropValidation(task.id);
+  const isValidDropTarget = dragState.isDragging && 
+    dragState.sourceTaskId !== task.id && 
+    dropValidation.isValid;
+  const isInvalidDropTarget = dragState.isDragging && 
+    dragState.sourceTaskId !== task.id && 
+    !dropValidation.isValid;
 
   return (
     <div className="flex" style={{ height: `${GANTT_CONFIG.ROW_HEIGHT}px` }}>
       {/* Task name cell */}
       <div
-        className="border-b border-r border-gray-200 flex flex-col justify-center px-3 bg-white"
+        className={`border-b border-r border-gray-200 flex flex-col justify-center px-3 bg-white ${
+          isValidDropTarget ? 'ring-2 ring-green-400 bg-green-50' :
+          isInvalidDropTarget ? 'ring-2 ring-red-400 bg-red-50' : ''
+        }`}
         style={{
           width: `${GANTT_CONFIG.TASK_NAME_WIDTH}px`,
           minWidth: `${GANTT_CONFIG.TASK_NAME_WIDTH}px`,
@@ -73,6 +125,7 @@ const GanttTaskRow = memo(({
           left: 0,
           zIndex: 20
         }}
+        onMouseUp={handleDependencyDragEnd}
       >
         {isEditing ? (
           <input
@@ -89,16 +142,40 @@ const GanttTaskRow = memo(({
             onClick={handleNameClick}
             className="cursor-pointer hover:text-blue-600 transition-colors"
           >
-            <span className="font-medium text-sm">{task.name}</span>
-            {task.assetPrefix && (
-              <span className="ml-2 text-xs text-gray-500">({task.assetPrefix})</span>
-            )}
-            {task.isCustom && (
-              <span className="ml-2 text-xs text-gray-600">(Cu)</span>
-            )}
-            {task.isLiveTask && (
-              <span className="ml-2 text-xs text-green-600">📍 Live</span>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">{task.name}</span>
+              {task.assetPrefix && (
+                <span className="text-xs text-gray-500">({task.assetPrefix})</span>
+              )}
+              {task.isCustom && (
+                <span className="text-xs text-gray-600">(Cu)</span>
+              )}
+              {task.isLiveTask && (
+                <span className="text-xs text-green-600">📍 Live</span>
+              )}
+              
+              {/* Dependency Indicator */}
+              <TaskDependencyIndicator
+                taskId={task.id}
+                taskName={task.name}
+                dependencies={task.dependencies}
+                isCritical={task.isCritical}
+                totalFloat={task.totalFloat}
+                size="small"
+                showLabels={false}
+              />
+              
+              {/* Dependency drag handle */}
+              {isDependencyDragEnabled && (
+                <button
+                  className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
+                  title="Drag to create dependency"
+                  onMouseDown={handleDependencyDragStart}
+                >
+                  🔗
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -135,72 +212,40 @@ const GanttTaskRow = memo(({
           />
         ))}
 
-        {/* Task bar */}
+        {/* Task bar with separate drag zones */}
         <div
           className={`absolute ${ownerColorClasses} ${isTaskBeingDragged ? 'opacity-50' : ''} 
             text-white text-xs flex items-center justify-center rounded shadow-sm border 
-            hover:shadow-md transition-shadow cursor-ew-resize`}
+            hover:shadow-md transition-shadow relative overflow-hidden`}
           style={{
-            left: `${taskPosition.left}px`,
+            left: `${taskPosition.left + visualOffsetPx}px`,
             width: `${taskPosition.width}px`,
             top: '20px',
             height: '40px',
             zIndex: 10
           }}
-          onMouseDown={(e) => onMouseDown(e, task.id, task.start, task.end)}
         >
-          <span className="truncate px-2 font-medium">
-            {task.duration} {task.duration === 1 ? 'day' : 'days'}
-          </span>
+          {/* Center move handle - drag to reposition task */}
+          <div
+            className="absolute left-0 right-2 top-0 bottom-0 cursor-move hover:bg-black hover:bg-opacity-10 transition-colors flex items-center justify-center"
+            title="Drag to reposition task (change start date)"
+            onMouseDown={(e) => onMouseDown(e, task.id, task.start, task.end, 'move')}
+          >
+            <span className="truncate px-2 font-medium">
+              {task.duration} {task.duration === 1 ? 'day' : 'days'}
+            </span>
+          </div>
+          
+          {/* Right resize handle - drag to adjust duration */}
+          <div
+            className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize hover:bg-black hover:bg-opacity-20 transition-colors"
+            title="Drag to adjust duration"
+            onMouseDown={(e) => onMouseDown(e, task.id, task.start, task.end, 'resize-right')}
+          />
         </div>
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Enhanced memo comparison function - only re-render when THIS task's data changes
-  // or when drag state specifically relates to this task
-  
-  // First, check if this is the task being dragged - always re-render in this case
-  const wasBeingDragged = prevProps.isDragging && prevProps.draggedTaskId === prevProps.task.id;
-  const isBeingDragged = nextProps.isDragging && nextProps.draggedTaskId === nextProps.task.id;
-  
-  if (wasBeingDragged !== isBeingDragged) {
-    return false; // Re-render when drag state changes for this task
-  }
-  
-  // For other tasks, only check if they're affected by the drag operation visually
-  if (prevProps.isDragging !== nextProps.isDragging && 
-      prevProps.draggedTaskId !== prevProps.task.id && 
-      nextProps.draggedTaskId !== nextProps.task.id) {
-    return true; // Don't re-render unrelated tasks during drag operations
-  }
-  
-  // Task-specific data comparison - return true if props are equal (skip re-render)
-  const taskEqual = (
-    prevProps.task.id === nextProps.task.id &&
-    prevProps.task.duration === nextProps.task.duration &&
-    prevProps.task.name === nextProps.task.name &&
-    prevProps.task.assetPrefix === nextProps.task.assetPrefix &&
-    prevProps.task.isLiveTask === nextProps.task.isLiveTask &&
-    prevProps.task.start === nextProps.task.start &&
-    prevProps.task.end === nextProps.task.end
-  );
-  
-  // DateColumns comparison - only check length and first/last dates for performance
-  const dateColumnsEqual = (
-    prevProps.dateColumns.length === nextProps.dateColumns.length &&
-    prevProps.dateColumns[0]?.getTime() === nextProps.dateColumns[0]?.getTime() &&
-    prevProps.dateColumns[prevProps.dateColumns.length - 1]?.getTime() === 
-      nextProps.dateColumns[nextProps.dateColumns.length - 1]?.getTime()
-  );
-  
-  // MinDate comparison
-  const minDateEqual = prevProps.minDate.getTime() === nextProps.minDate.getTime();
-  
-  // BankHolidays comparison - check length only for performance
-  const bankHolidaysEqual = prevProps.bankHolidays.length === nextProps.bankHolidays.length;
-  
-  return taskEqual && dateColumnsEqual && minDateEqual && bankHolidaysEqual;
 });
 
 GanttTaskRow.displayName = 'GanttTaskRow';

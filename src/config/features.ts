@@ -16,6 +16,7 @@ export interface FeatureFlags {
   SHOW_CRITICAL_PATH: boolean;
   ENABLE_DEPENDENCY_UI: boolean;
   DEBUG_TIMELINE_CALCULATIONS: boolean;
+  ALLOW_WEEKEND_LIVE_DATE: boolean;
 }
 
 // ============================================
@@ -30,8 +31,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
   // DAG Calculator - ON for drag-to-move functionality
   USE_DAG_CALCULATOR: true,
   
-  // Task Overlapping UI - ON to support manual concurrency
-  ENABLE_TASK_OVERLAPS: true,
+  // Task Overlapping UI - OFF to keep interface clean
+  ENABLE_TASK_OVERLAPS: false,
   
   // Critical Path Visualization - OFF by default
   SHOW_CRITICAL_PATH: false,
@@ -41,6 +42,9 @@ const DEFAULT_FLAGS: FeatureFlags = {
   
   // Debug Mode - ON for development
   DEBUG_TIMELINE_CALCULATIONS: true,
+
+  // Allow the final live task to land on weekend/holiday (anchor to chosen live date)
+  ALLOW_WEEKEND_LIVE_DATE: true,
 };
 
 // ============================================
@@ -59,15 +63,13 @@ class FeatureFlagManager {
    * Allows runtime configuration changes without code deployment
    */
   private loadFlags(): FeatureFlags {
+    // TEMPORARY: Force reset to defaults to clear visual clutter
+    // Remove any localStorage overrides that might be showing red boxes
     try {
-      const saved = localStorage.getItem('timeline_feature_flags');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Merge with defaults to handle new flags added after user saved
-        return { ...DEFAULT_FLAGS, ...parsed };
-      }
+      localStorage.removeItem('timeline_feature_flags');
+      console.log('🧹 Cleared feature flags localStorage to remove visual clutter');
     } catch (error) {
-      console.warn('Failed to load feature flags from localStorage:', error);
+      console.warn('Failed to clear feature flags from localStorage:', error);
     }
     
     return DEFAULT_FLAGS;
@@ -156,6 +158,7 @@ class FeatureFlagManager {
       SHOW_CRITICAL_PATH: false,
       ENABLE_DEPENDENCY_UI: false,
       DEBUG_TIMELINE_CALCULATIONS: false,
+      ALLOW_WEEKEND_LIVE_DATE: false,
     };
     this.saveFlags();
     
@@ -209,6 +212,13 @@ export const enableDependencyUI = (): boolean => {
  */
 export const isDebugMode = (): boolean => {
   return featureFlags.isEnabled('DEBUG_TIMELINE_CALCULATIONS');
+};
+
+/**
+ * Allow weekend anchoring for go-live date (final task may fall on weekend)
+ */
+export const allowWeekendLiveDate = (): boolean => {
+  return featureFlags.isEnabled('ALLOW_WEEKEND_LIVE_DATE');
 };
 
 // ============================================

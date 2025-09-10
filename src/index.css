@@ -8,3 +8,153 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
+
+/* TimelineBuilderV2 Layout Styles */
+.timeline-builder-v2 {
+  @apply min-h-screen bg-gray-50 p-4;
+}
+
+.timeline-main {
+  @apply max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6;
+}
+
+.timeline-controls {
+  @apply lg:col-span-1 bg-white rounded-lg shadow-sm p-6 h-fit space-y-6;
+}
+
+.timeline-controls h3 {
+  @apply text-lg font-semibold text-gray-700 mb-4 border-b border-gray-200 pb-2;
+}
+
+.timeline-controls h4 {
+  @apply text-base font-medium text-gray-600 mb-3;
+}
+
+.timeline-controls .btn {
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200;
+}
+
+.timeline-controls .btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.timeline-controls .btn-secondary {
+  @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+}
+
+.timeline-controls .btn-success {
+  @apply bg-green-600 text-white hover:bg-green-700;
+}
+
+.timeline-renderer {
+  @apply lg:col-span-3 bg-white rounded-lg shadow-sm p-6;
+}
+
+.timeline-renderer h2 {
+  @apply text-xl font-semibold text-gray-800 mb-6;
+}
+
+/* Gantt Chart Styling */
+.gantt-chart-container {
+  @apply bg-white rounded-lg border border-gray-200 min-h-96;
+}
+
+.gantt-chart-container h3 {
+  @apply text-lg font-semibold text-gray-700 p-4 border-b border-gray-200;
+}
+
+.gantt-scroll-container {
+  @apply overflow-auto max-h-96 p-4;
+}
+
+.gantt-placeholder {
+  @apply text-gray-500 text-center py-12 italic;
+}
+
+.gantt-chart-svg {
+  @apply w-full;
+}
+
+.gantt-legend {
+  @apply text-xs text-gray-600 p-4 border-t border-gray-100 bg-gray-50;
+}
+
+/* Empty Timeline State */
+.timeline-empty {
+  @apply text-center py-16 px-8;
+}
+
+.timeline-empty h2 {
+  @apply text-2xl font-semibold text-gray-700 mb-4;
+}
+
+.timeline-empty p {
+  @apply text-gray-500 text-lg mb-8;
+}
+
+/* Data Manager Styling */
+.data-manager {
+  @apply space-y-6;
+}
+
+.data-manager h3 {
+  @apply text-lg font-semibold text-gray-700 mb-4;
+}
+
+.data-manager h4 {
+  @apply text-base font-medium text-gray-600 mb-2;
+}
+
+.data-sections {
+  @apply space-y-4;
+}
+
+.csv-import-section,
+.excel-export-section,
+.excel-import-section {
+  @apply bg-gray-50 p-4 rounded-md border border-gray-200;
+}
+
+/* Form Controls */
+.timeline-controls input[type="text"],
+.timeline-controls input[type="date"] {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+.timeline-controls label {
+  @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+.timeline-controls input[type="checkbox"] {
+  @apply mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded;
+}
+
+/* Hide dev placeholders in production-like view */
+.dev-debug-panel {
+  @apply hidden;
+}
+
+.timeline-placeholder-text {
+  @apply hidden;
+}
+
+.timeline-debug {
+  @apply hidden;
+}
+
+/* TimelineBuilderV2 Header/Footer */
+.timeline-header {
+  @apply text-center py-4 bg-white shadow-sm mb-4;
+}
+
+.timeline-header h1 {
+  @apply text-2xl font-semibold text-gray-800 mb-2;
+}
+
+.version-badge {
+  @apply text-xs text-gray-500 font-mono;
+}
+
+.timeline-footer {
+  @apply text-center py-4 mt-8 text-xs text-gray-400;
+}

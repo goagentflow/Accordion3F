@@ -11,16 +11,11 @@ import Papa from 'papaparse';
 import AssetSelector from './components/AssetSelector';
 import CampaignSetup from './components/CampaignSetup';
 import GanttChart from './components/GanttChart';
+// Removed analytics/optimization components to simplify UI
 
 // Hooks
-import { 
-  useTimeline,
-  useAssets,
-  useTasks,
-  useDates,
-  useUI,
-  TimelineActions
-} from './hooks/useTimeline';
+import { useTimeline, TimelineActions } from './hooks/useTimeline';
+import { useAssets, useTasks, useDates, useUI } from './hooks/useTimelineSelectors';
 
 // Services
 import {
@@ -43,7 +38,7 @@ const TimelineBuilder: React.FC = () => {
   // State Management via Hooks
   // ============================================
   
-  const { dispatch, undo, redo, canUndo, canRedo } = useTimeline();
+  const { dispatch, undo, redo, canUndo, canRedo, isHydrating } = useTimeline();
   const { assets, addAsset, removeAsset, renameAsset, setAssetStartDate } = useAssets();
   const { tasks, addCustomTask, updateTaskDuration, renameTask } = useTasks();
   const { dates, setGlobalLiveDate, toggleUseGlobalDate } = useDates();
@@ -52,6 +47,7 @@ const TimelineBuilder: React.FC = () => {
   // Local UI state (not part of global state)
   const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [csvData, setCsvData] = useState<CsvRow[]>([]);
+  const [catalogReady, setCatalogReady] = useState(false);
   
   // Excel import/export state
   const [isImporting, setIsImporting] = useState(false);
@@ -60,6 +56,8 @@ const TimelineBuilder: React.FC = () => {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [importPreview, setImportPreview] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Analytics/optimization state variables removed to simplify UI
 
   // ============================================
   // Load CSV Data on Mount
@@ -85,9 +83,14 @@ const TimelineBuilder: React.FC = () => {
           const assetTasks = createTasksFromCsv(parsedData, asset);
           dispatch(TimelineActions.updateTaskBank(assetTasks));
         });
+
+        // CSV parsed and initial bank seeded
+        setCatalogReady(true);
       },
       error: (error) => {
         console.error("Error parsing CSV file:", error);
+        // Avoid blocking UI; downstream handles empty bank safely
+        setCatalogReady(true);
       }
     });
   }, [dispatch, assets.selected]);
@@ -123,8 +126,11 @@ const TimelineBuilder: React.FC = () => {
   // ============================================
   
   useEffect(() => {
+    if (!catalogReady) return; // wait for catalog
+    // Avoid clearing the timeline during transitions (e.g., recovery/hydration)
+    // Only recompute when we actually have selected assets; otherwise, preserve
+    // existing timeline until an explicit clear/reset occurs.
     if (assets.selected.length === 0) {
-      dispatch(TimelineActions.updateTimeline([]));
       return;
     }
 
@@ -132,12 +138,23 @@ const TimelineBuilder: React.FC = () => {
     
     // Build timeline for each selected asset
     assets.selected.forEach(asset => {
-      const rawTasks = tasks.bank[asset.id] || [];
+      let rawTasks = tasks.bank[asset.id] || [];
       const liveDate = dates.useGlobalDate 
         ? dates.globalLiveDate 
         : asset.startDate;
       
       if (!liveDate) return;
+      
+      // Apply per-instance duration overrides before scheduling (Bug fix: task name collision)
+      // Per-instance overrides have priority over name-based overrides
+      if (tasks.instanceDurations) {
+        rawTasks = rawTasks.map(task => {
+          if (task.id && tasks.instanceDurations[task.id] !== undefined) {
+            return { ...task, duration: tasks.instanceDurations[task.id] };
+          }
+          return task;
+        });
+      }
       
       const assetTimeline = buildAssetTimeline(
         rawTasks,
@@ -167,7 +184,7 @@ const TimelineBuilder: React.FC = () => {
     // TODO: Find conflicts and update UI state when date error actions are implemented
     // const conflicts = findDateConflicts(assets.selected, calculatedStartDates);
     
-  }, [assets.selected, tasks.bank, dates, assets.taskDurations, dispatch]);
+  }, [assets.selected, tasks.bank, dates, assets.taskDurations, tasks.instanceDurations, dispatch]);
 
   // ============================================
   // Event Handlers
@@ -386,6 +403,7 @@ const TimelineBuilder: React.FC = () => {
               >
                 {isExporting ? '⏳ Exporting...' : '📊 Export'}
               </button>
+
               
               {/* Hidden file input */}
               <input
@@ -447,11 +465,22 @@ const TimelineBuilder: React.FC = () => {
 
       {/* Main Content */}
       <main className="container mx-auto p-6">
+        {isHydrating && (
+          <div className="text-center text-gray-600 py-6">
+            <div className="inline-block animate-pulse px-4 py-2 bg-gray-200 rounded">Restoring your session…</div>
+          </div>
+        )}
+        {!catalogReady && (
+          <div className="text-center text-gray-600 py-10">
+            <div className="inline-block animate-pulse px-4 py-2 bg-gray-200 rounded">Loading timeline catalog…</div>
+          </div>
+        )}
+        {catalogReady && !isHydrating && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column: Controls */}
-          <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg overflow-x-auto" style={{ minWidth: 380 }}>
-            <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Timeline Setup</h2>
+          <div className="lg:col-span-1 bg-white p-4 rounded-xl shadow-lg" style={{ minWidth: 380 }}>
+            <h2 className="text-xl font-semibold mb-3 border-b pb-2 text-gray-700">Timeline Setup</h2>
             
             <CampaignSetup 
               {...{
@@ -461,6 +490,7 @@ const TimelineBuilder: React.FC = () => {
                 onUseGlobalDateChange: handleToggleUseGlobalDate,
                 projectStartDate: dates.projectStartDate,
                 dateErrors: ui.dateErrors,
+                bankHolidays: dates.bankHolidays,
                 workingDaysNeeded: workingDaysNeeded
               } as any}
             />
@@ -562,6 +592,7 @@ const TimelineBuilder: React.FC = () => {
             )}
           </div>
         </div>
+        )}
       </main>
 
       {/* Import Confirmation Modal */}
@@ -642,6 +673,8 @@ const TimelineBuilder: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Analytics/Optimization modals removed to simplify UI */}
     </div>
   );
 };

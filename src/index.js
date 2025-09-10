@@ -2,13 +2,8 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import 'react-datepicker/dist/react-datepicker.css';
-import TimelineBuilder from './TimelineBuilder';
-import TimelineBuilderTSX from './TimelineBuilder.tsx';
-import { TimelineProvider } from './hooks/useTimeline';
+import TimelineBuilderV2 from './v2/TimelineBuilderV2';
 import ErrorBoundary from './components/ErrorBoundary';
-
-// Feature flag - set to true to use new TypeScript version
-const USE_NEW_VERSION = false;
 
 // Simple, clean initialization
 function initApp() {
@@ -22,29 +17,12 @@ function initApp() {
   
   const root = createRoot(container);
   
-  // Switch between JS and TSX versions based on flag
-  if (USE_NEW_VERSION) {
-    // New TypeScript version with Context Providers
-    const { ValidationProvider } = require('./contexts/ValidationContext');
-    const TimelineBuilderValidated = require('./TimelineBuilderValidated').default;
-    
-    root.render(
-      <ErrorBoundary>
-        <TimelineProvider>
-          <ValidationProvider>
-            <TimelineBuilderValidated />
-          </ValidationProvider>
-        </TimelineProvider>
-      </ErrorBoundary>
-    );
-  } else {
-    // Current working JS version
-    root.render(
-      <ErrorBoundary>
-        <TimelineBuilder />
-      </ErrorBoundary>
-    );
-  }
+  // Render V2 (includes its own provider internally)
+  root.render(
+    <ErrorBoundary>
+      <TimelineBuilderV2 />
+    </ErrorBoundary>
+  );
 }
 
 // Wait for DOM and initialize

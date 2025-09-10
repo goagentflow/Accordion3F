@@ -11,6 +11,8 @@ import {
   useReducer, 
   useCallback, 
   useMemo,
+  useState,
+  useEffect,
   ReactNode
 } from 'react';
 
@@ -21,9 +23,11 @@ import {
 
 import {
   timelineReducer,
-  initialTimelineState,
-  TimelineActions
+  initialTimelineState
 } from '../reducers/timelineReducer';
+
+import { TimelineActions } from '../actions/timelineActions';
+// import { migrateLocalStorageState } from '../utils/stateMigration';
 
 import {
   createTimelineReducerWithHistory,
@@ -73,11 +77,14 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
     []
   );
 
-  // Initialize state with history
+  // Initialize state with history and migration support
   const initialStateWithHistory = useMemo(
-    () => createInitialStateWithHistory(
-      initialState ? { ...initialTimelineState, ...initialState } : initialTimelineState
-    ),
+    () => {
+      // Use provided initial state or default state (migration disabled)
+      const baseState = initialState ? { ...initialTimelineState, ...initialState } : initialTimelineState;
+      
+      return createInitialStateWithHistory(baseState);
+    },
     [initialState]
   );
 
@@ -94,6 +101,9 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
     () => getPresent(stateWithHistory),
     [stateWithHistory]
   );
+
+  // Hydration flag to gate UI during recovery/import + catalog readiness
+  const [isHydrating, setIsHydrating] = useState(false);
 
   // ============================================
   // Undo/Redo Implementation
@@ -123,10 +133,21 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
     discardRecovery,
     showRecoveryPrompt,
     recoveryPreview
-  } = useAutoSave(state, true); // Enable auto-save
+  } = useAutoSave(state, !isHydrating); // Pause auto-save during hydration
+
+  // Exit hydration when timeline is available or recovery is dismissed with no selected assets
+  useEffect(() => {
+    if (!isHydrating) return;
+    const hasTimeline = Array.isArray(state.tasks?.timeline) && state.tasks.timeline.length > 0;
+    const noAssets = Array.isArray(state.assets?.selected) && state.assets.selected.length === 0;
+    if (hasTimeline || (noAssets && !showRecoveryPrompt)) {
+      setIsHydrating(false);
+    }
+  }, [isHydrating, state.tasks?.timeline?.length, state.assets?.selected?.length, showRecoveryPrompt]);
 
   // Handle session recovery
   const handleRecover = useCallback(() => {
+    setIsHydrating(true);
     const recoveredState = recoverSession();
     if (recoveredState) {
       dispatch(TimelineActions.importState(recoveredState));
@@ -147,9 +168,10 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
       undo,
       redo,
       canUndo,
-      canRedo
+      canRedo,
+      isHydrating
     }),
-    [state, undo, redo, canUndo, canRedo]
+    [state, undo, redo, canUndo, canRedo, isHydrating]
   );
 
   return (
@@ -194,223 +216,10 @@ export const useTimeline = (): TimelineContextValue => {
 };
 
 // ============================================
-// Convenience Hooks for Specific State Slices
-// ============================================
-
-/**
- * useAssets Hook
- * Provides access to assets state slice and related actions
- */
-export const useAssets = () => {
-  const { state, dispatch } = useTimeline();
-  
-  const addAsset = useCallback(
-    (assetType: string, name?: string) => {
-      dispatch(TimelineActions.addAsset(assetType, name, state.dates.globalLiveDate));
-    },
-    [dispatch, state.dates.globalLiveDate]
-  );
-
-  const removeAsset = useCallback(
-    (assetId: string) => {
-      dispatch(TimelineActions.removeAsset(assetId));
-    },
-    [dispatch]
-  );
-
-  const renameAsset = useCallback(
-    (assetId: string, newName: string) => {
-      dispatch(TimelineActions.renameAsset(assetId, newName));
-    },
-    [dispatch]
-  );
-
-  const setAssetStartDate = useCallback(
-    (assetId: string, date: string) => {
-      dispatch(TimelineActions.setAssetStartDate(assetId, date));
-    },
-    [dispatch]
-  );
-
-  return {
-    assets: state.assets,
-    addAsset,
-    removeAsset,
-    renameAsset,
-    setAssetStartDate
-  };
-};
-
-/**
- * useTasks Hook
- * Provides access to tasks state slice and related actions
- */
-export const useTasks = () => {
-  const { state, dispatch } = useTimeline();
-  
-  const addCustomTask = useCallback(
-    (name: string, duration: number, owner: 'c' | 'm' | 'a' | 'l', assetType: string, insertAfterTaskId?: string) => {
-      dispatch(TimelineActions.addCustomTask(name, duration, owner, assetType, insertAfterTaskId));
-    },
-    [dispatch]
-  );
-
-  const updateTaskDuration = useCallback(
-    (taskId: string, assetType: string, taskName: string, duration: number) => {
-      dispatch(TimelineActions.updateTaskDuration(taskId, assetType, taskName, duration));
-    },
-    [dispatch]
-  );
-
-  const renameTask = useCallback(
-    (taskId: string, newName: string) => {
-      dispatch(TimelineActions.renameTask(taskId, newName));
-    },
-    [dispatch]
-  );
-
-  return {
-    tasks: state.tasks,
-    addCustomTask,
-    updateTaskDuration,
-    renameTask
-  };
-};
-
-/**
- * useDates Hook
- * Provides access to dates state slice and related actions
- */
-export const useDates = () => {
-  const { state, dispatch } = useTimeline();
-  
-  const setGlobalLiveDate = useCallback(
-    (date: string) => {
-      dispatch(TimelineActions.setGlobalLiveDate(date));
-    },
-    [dispatch]
-  );
-
-  const toggleUseGlobalDate = useCallback(() => {
-    dispatch(TimelineActions.toggleUseGlobalDate());
-  }, [dispatch]);
-
-  const setBankHolidays = useCallback(
-    (holidays: string[]) => {
-      dispatch(TimelineActions.setBankHolidays(holidays));
-    },
-    [dispatch]
-  );
-
-  return {
-    dates: state.dates,
-    setGlobalLiveDate,
-    toggleUseGlobalDate,
-    setBankHolidays
-  };
-};
-
-/**
- * useUI Hook
- * Provides access to UI state slice
- */
-export const useUI = () => {
-  const { state } = useTimeline();
-  
-  return {
-    ui: state.ui,
-    dateErrors: state.ui.dateErrors,
-    calculatedStartDates: state.dates.calculatedStartDates || {},
-    showInfoBox: state.ui.showInfoBox
-  };
-};
-
-// ============================================
-// Selector Hooks for Computed Values
-// ============================================
-
-/**
- * useSelectedAssets Hook
- * Returns just the selected assets array
- */
-export const useSelectedAssets = () => {
-  const { state } = useTimeline();
-  return state.assets.selected;
-};
-
-/**
- * useTimelineTasks Hook
- * Returns the calculated timeline tasks
- */
-export const useTimelineTasks = () => {
-  const { state } = useTimeline();
-  return state.tasks.timeline;
-};
-
-/**
- * useHasDateErrors Hook
- * Returns whether there are any date conflicts
- */
-export const useHasDateErrors = () => {
-  const { state } = useTimeline();
-  return state.ui.dateErrors.length > 0;
-};
-
-/**
- * useProjectDates Hook
- * Returns key project dates
- */
-export const useProjectDates = () => {
-  const { state } = useTimeline();
-  return {
-    globalLiveDate: state.dates.globalLiveDate,
-    projectStartDate: state.dates.projectStartDate,
-    useGlobalDate: state.dates.useGlobalDate
-  };
-};
-
-// ============================================
-// Export Action Creators for Direct Use
+// Export Action Creators for Direct Use  
 // ============================================
 
 export { TimelineActions };
 
-// ============================================
-// Development Helper (Remove in production)
-// ============================================
-
-/**
- * useTimelineDebug Hook
- * Provides debugging capabilities in development
- * Includes history information
- * TODO: Remove this before production
- */
-export const useTimelineDebug = () => {
-  const { state, canUndo, canRedo } = useTimeline();
-  
-  if (process.env.NODE_ENV === 'development') {
-    // Safe logging in development only
-    const logState = () => {
-      console.group('📊 Timeline State');
-      console.log('Assets:', state.assets);
-      console.log('Tasks:', state.tasks);
-      console.log('Dates:', state.dates);
-      console.log('UI:', state.ui);
-      console.groupEnd();
-    };
-
-    const logHistory = () => {
-      console.group('🕒 History Status');
-      console.log('Can Undo:', canUndo);
-      console.log('Can Redo:', canRedo);
-      console.groupEnd();
-    };
-
-    return { logState, logHistory };
-  }
-  
-  return { 
-    logState: () => {}, 
-    logHistory: () => {} 
-  };
-};
+// Note: Convenience hooks moved to src/hooks/useTimelineSelectors.tsx
+// to comply with Golden Rule #2: 400 Line Max

@@ -55,6 +55,59 @@ export const getPreviousWorkingDay = (
 };
 
 /**
+ * Map CPM day offset (0-indexed) to calendar date
+ * @param projectStartDate - The project start date (working day)
+ * @param dayOffset - 0-indexed offset (0 = project start date)
+ * @param bankHolidays - Array of bank holiday dates
+ * @returns The calendar date for the given CPM day
+ */
+export const getCPMDateOffset = (
+  projectStartDate: Date | null | undefined,
+  dayOffset: number,
+  bankHolidays: string[] = []
+): Date => {
+  if (!projectStartDate || isNaN(projectStartDate.getTime())) {
+    return new Date();
+  }
+  
+  // Start with project start date (ensure it's a working day)
+  let currentDate = new Date(projectStartDate);
+  if (isNonWorkingDay(currentDate, bankHolidays)) {
+    currentDate = getNextWorkingDay(currentDate, bankHolidays);
+  }
+  
+  // If offset is 0, return the start date
+  if (dayOffset === 0) {
+    return currentDate;
+  }
+  
+  // Add working days for positive offset
+  let remainingDays = dayOffset;
+  let iterations = 0;
+  const maxIterations = 10000;
+  
+  while (remainingDays > 0 && iterations < maxIterations) {
+    currentDate.setDate(currentDate.getDate() + 1);
+    iterations++;
+    
+    if (!isNonWorkingDay(currentDate, bankHolidays)) {
+      remainingDays--;
+    }
+    
+    if (currentDate.getFullYear() > 2100) {
+      console.warn('CPM date calculation went too far forward');
+      break;
+    }
+  }
+  
+  if (iterations >= maxIterations) {
+    console.warn('CPM date calculation exceeded maximum iterations');
+  }
+  
+  return currentDate;
+};
+
+/**
  * Get the next working day from a given date
  * @param date - The starting date
  * @param bankHolidays - Array of bank holiday dates

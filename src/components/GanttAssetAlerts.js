@@ -36,19 +36,15 @@ const GanttAssetAlerts = ({ assetAlerts, workingDaysNeeded }) => {
                   <p className="text-sm text-gray-600">
                     Go-live date: {alert.liveDate?.toLocaleDateString()}
                   </p>
-                  <p className="text-sm font-medium text-red-600 mt-1">
-                    {alert.daysOver} working {alert.daysOver === 1 ? 'day' : 'days'} after go-live
-                  </p>
+                  {/* Removed 'working days after go-live' line per UX request */}
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-gray-500">
                     Total duration: {alert.totalDuration} days
                   </p>
-                  {workingDaysNeeded && (
-                    <p className="text-gray-500">
-                      Working days: {workingDaysNeeded.needed}
-                    </p>
-                  )}
+                  <p className="text-gray-500">
+                    Working days needed: {alert.daysNeeded}
+                  </p>
                 </div>
               </div>
             </div>
