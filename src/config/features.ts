@@ -40,8 +40,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
   // Dependency Management UI - OFF by default (drag-to-move provides UI)
   ENABLE_DEPENDENCY_UI: false,
   
-  // Debug Mode - ON for development
-  DEBUG_TIMELINE_CALCULATIONS: true,
+  // Debug Mode - ON in development only
+  DEBUG_TIMELINE_CALCULATIONS: process.env.NODE_ENV === 'development',
 
   // Allow the final live task to land on weekend/holiday (anchor to chosen live date)
   ALLOW_WEEKEND_LIVE_DATE: true,
@@ -63,15 +63,19 @@ class FeatureFlagManager {
    * Allows runtime configuration changes without code deployment
    */
   private loadFlags(): FeatureFlags {
-    // TEMPORARY: Force reset to defaults to clear visual clutter
-    // Remove any localStorage overrides that might be showing red boxes
-    try {
-      localStorage.removeItem('timeline_feature_flags');
-      console.log('🧹 Cleared feature flags localStorage to remove visual clutter');
-    } catch (error) {
-      console.warn('Failed to clear feature flags from localStorage:', error);
+    // Production: never load or mutate from localStorage
+    if (process.env.NODE_ENV === 'production') {
+      return DEFAULT_FLAGS;
     }
-    
+    // Development: allow local overrides
+    try {
+      const stored = localStorage.getItem('timeline_feature_flags');
+      if (stored) {
+        return { ...DEFAULT_FLAGS, ...JSON.parse(stored) } as FeatureFlags;
+      }
+    } catch (_err) {
+      // Silent fallback
+    }
     return DEFAULT_FLAGS;
   }
 
@@ -145,7 +149,10 @@ class FeatureFlagManager {
     this.flags = { ...DEFAULT_FLAGS };
     this.saveFlags();
     
-    console.log('Feature flags reset to defaults');
+    if (this.isEnabled('DEBUG_TIMELINE_CALCULATIONS')) {
+      // eslint-disable-next-line no-console
+      console.log('Feature flags reset to defaults');
+    }
   }
 
   /**
@@ -282,6 +289,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   // Only attach to window in development
   (window as any).timelineFeatureFlags = createDebugInterface();
   
+  // eslint-disable-next-line no-console
   console.log('🔧 Development feature flags available at window.timelineFeatureFlags');
   console.warn('⚠️  This debug interface will be automatically removed in production builds');
 } else {

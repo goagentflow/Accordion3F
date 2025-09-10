@@ -57,6 +57,8 @@ export interface TasksState {
   all: Task[];                   // All tasks from CSV
   bank: Record<string, Task[]>;  // assetId -> Task[] (for backward compat)
   byAsset: Record<string, Task[]>; // Grouped by asset type
+  // NEW: Per-asset instance base tasks (used when importing an editable plan)
+  instanceBase?: Record<string, Task[]>; // assetId -> Task[]
   instanceDurations: Record<string, number>; // taskId -> duration (per-instance overrides)
   timeline: TimelineTask[];      // Calculated timeline with dates
   custom: Task[];                // User-added custom tasks

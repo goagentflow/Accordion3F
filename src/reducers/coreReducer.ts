@@ -133,8 +133,8 @@ export function handleRenameAsset(
       selected: updatedAssets
     },
     ui: {
-      ...state.ui,
-      freezeImportedTimeline: false
+      ...state.ui
+      // Do not alter freezeImportedTimeline on rename; preserves imported timeline
     }
   };
 }
@@ -223,6 +223,28 @@ export function handleAddCustomTask(
     newDeps[newTask.id] = [{ predecessorId: insertAfterTaskId, type: 'FS', lag: 0 }];
   }
 
+  // Also update instanceBase when present (editable imported plan)
+  let updatedInstanceBase = state.tasks.instanceBase ? { ...state.tasks.instanceBase } : state.tasks.instanceBase;
+  if (updatedInstanceBase && Array.isArray(updatedInstanceBase[newTask.assetId])) {
+    const baseArr = [...updatedInstanceBase[newTask.assetId]!];
+    let baseInsertIndex = baseArr.length;
+    if (insertAfterTaskId) {
+      const idx = baseArr.findIndex((t: any) => t && t.id === insertAfterTaskId);
+      baseInsertIndex = idx !== -1 ? idx + 1 : baseArr.length;
+    }
+    // Insert minimal Task into instanceBase; dependencies resolved via deps map during orchestration
+    baseArr.splice(baseInsertIndex, 0, {
+      id: newTask.id,
+      name: newTask.name,
+      duration: newTask.duration,
+      owner: newTask.owner,
+      assetId: newTask.assetId,
+      assetType: newTask.assetType,
+      isCustom: true
+    } as any);
+    updatedInstanceBase[newTask.assetId] = baseArr as any;
+  }
+
   return {
     ...state,
     tasks: {
@@ -232,7 +254,8 @@ export function handleAddCustomTask(
         [asset.id]: updatedAssetTasks
       },
       custom: [...state.tasks.custom, newTask],
-      deps: newDeps
+      deps: newDeps,
+      instanceBase: updatedInstanceBase || state.tasks.instanceBase
     },
     ui: {
       ...state.ui,

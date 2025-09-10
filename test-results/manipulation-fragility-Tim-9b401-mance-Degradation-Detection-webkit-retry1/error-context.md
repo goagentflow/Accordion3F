@@ -1,0 +1,273 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Accordion Timeline Builder" [level=1] [ref=e6]
+      - generic [ref=e7]:
+        - button "📥 Import" [ref=e8] [cursor=pointer]
+        - button "📊 Export" [ref=e9] [cursor=pointer]
+        - button "↩️ Undo" [ref=e10] [cursor=pointer]
+        - button "↪️ Redo" [disabled] [ref=e11]
+  - main [ref=e12]:
+    - button "🚀 Getting Started" [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - heading "📅 Campaign Setup" [level=3] [ref=e19]:
+            - generic [ref=e20]: 📅
+            - text: Campaign Setup
+          - generic [ref=e21]:
+            - generic [ref=e22]: Campaign Live Date *
+            - paragraph [ref=e23]: If campaign elements start on different days, uncheck the box and set each asset's start date when selected.
+            - textbox [active] [ref=e24]: 2025-12-25
+            - paragraph [ref=e25]: Thu, 25 Dec 2025
+          - generic [ref=e27]:
+            - checkbox "Use same live date for all assets" [checked] [ref=e28]
+            - generic [ref=e29]: Use same live date for all assets
+          - generic [ref=e30]:
+            - generic [ref=e31]: Timeline Status
+            - generic [ref=e32]:
+              - generic [ref=e34]: 🎯 You're on target
+              - generic [ref=e35]: "Available: 0 days | Allocated: 0 days"
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - heading "Select Assets" [level=3] [ref=e38]
+            - generic [ref=e39]: 1 asset selected
+          - textbox "Search assets..." [ref=e41]
+          - generic [ref=e42]:
+            - generic [ref=e43]:
+              - generic [ref=e44]: Digital Display - Creative (MMM creating)
+              - button "Add" [ref=e45] [cursor=pointer]
+            - generic [ref=e46]:
+              - generic [ref=e47]: Digital Display - Creative (Agency mockups, MMM building)
+              - button "Add" [ref=e48] [cursor=pointer]
+            - generic [ref=e49]:
+              - generic [ref=e50]: Digital Display - Agency Tags
+              - button "Add" [ref=e51] [cursor=pointer]
+            - generic [ref=e52]:
+              - generic [ref=e53]: Digital - HUB
+              - button "Add" [ref=e54] [cursor=pointer]
+            - generic [ref=e55]:
+              - generic [ref=e56]: Digital - Competition Page
+              - button "Add" [ref=e57] [cursor=pointer]
+            - generic [ref=e58]:
+              - generic [ref=e59]: Native Article - MailOnline/Metro
+              - button "Add" [ref=e60] [cursor=pointer]
+            - generic [ref=e61]:
+              - generic [ref=e62]: Native Article - This is Money
+              - button "Add" [ref=e63] [cursor=pointer]
+            - generic [ref=e64]:
+              - generic [ref=e65]: Email Campaigns
+              - button "Add" [ref=e66] [cursor=pointer]
+            - generic [ref=e67]:
+              - generic [ref=e68]: MOL App Splash
+              - button "Add" [ref=e69] [cursor=pointer]
+            - generic [ref=e70]:
+              - generic [ref=e71]: Print - Metro/DM Advertorial
+              - button "Add" [ref=e72] [cursor=pointer]
+            - generic [ref=e73]:
+              - generic [ref=e74]: Print - iNews Advertorial
+              - button "Add" [ref=e75] [cursor=pointer]
+            - generic [ref=e76]:
+              - generic [ref=e77]: Print - DM Check-in Advertorial
+              - button "Add" [ref=e78] [cursor=pointer]
+            - generic [ref=e79]:
+              - generic [ref=e80]: Print - Supplements Full Page
+              - button "Add" [ref=e81] [cursor=pointer]
+            - generic [ref=e82]:
+              - generic [ref=e83]: Print - Metro Cover Wrap
+              - button "Add" [ref=e84] [cursor=pointer]
+            - generic [ref=e85]:
+              - generic [ref=e86]: Video/Edits
+              - button "Add" [ref=e87] [cursor=pointer]
+            - generic [ref=e88]:
+              - generic [ref=e89]: Creative & Posters (MMM)
+              - button "Add" [ref=e90] [cursor=pointer]
+            - generic [ref=e91]:
+              - generic [ref=e92]: Uniforms
+              - button "Add" [ref=e93] [cursor=pointer]
+            - generic [ref=e94]:
+              - generic [ref=e95]: Product Delivery
+              - button "Add" [ref=e96] [cursor=pointer]
+          - generic [ref=e97]:
+            - heading "Selected Assets" [level=4] [ref=e98]
+            - generic [ref=e99]:
+              - generic [ref=e100]:
+                - generic [ref=e101]:
+                  - generic [ref=e103]: Asset Name
+                  - textbox "Click to edit asset name" [ref=e104]: Digital Display - Creative (MMM creating)
+                  - generic [ref=e105]: 💡 Click to edit - this name will appear in your timeline
+                - generic [ref=e106]:
+                  - generic [ref=e107]: Go-Live Date
+                  - textbox "Select date" [disabled] [ref=e110]: 2025-12-25
+              - generic [ref=e111]: ⚠️ The selected go-live date is a weekend or bank holiday. Consider choosing a working day.
+              - button "Remove" [ref=e112] [cursor=pointer]
+          - generic [ref=e115]: "Selected Assets: Digital Display - Creative (MMM creating)"
+      - generic [ref=e118]:
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - heading "Project Gantt Chart" [level=3] [ref=e122]
+            - paragraph [ref=e123]: 10 tasks • 31 days total • 11/29/2025 to 12/30/2025
+            - paragraph [ref=e124]: 💡 Click on any task name to edit it
+          - generic [ref=e125]:
+            - button "➕ Add Task" [ref=e126] [cursor=pointer]:
+              - generic [ref=e127] [cursor=pointer]: ➕
+              - text: Add Task
+            - button "📊 Export to Excel" [ref=e128] [cursor=pointer]:
+              - generic [ref=e129] [cursor=pointer]: 📊
+              - text: Export to Excel
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: Task Name
+            - generic [ref=e135]: Sa 29 Nov
+            - generic [ref=e137]: Su 30 Nov
+            - generic [ref=e139]: M 1 Dec
+            - generic [ref=e141]: Tu 2 Dec
+            - generic [ref=e143]: W 3 Dec
+            - generic [ref=e145]: Th 4 Dec
+            - generic [ref=e147]: F 5 Dec
+            - generic [ref=e149]: Sa 6 Dec
+            - generic [ref=e151]: Su 7 Dec
+            - generic [ref=e153]: M 8 Dec
+            - generic [ref=e155]: Tu 9 Dec
+            - generic [ref=e157]: W 10 Dec
+            - generic [ref=e159]: Th 11 Dec
+            - generic [ref=e161]: F 12 Dec
+            - generic [ref=e163]: Sa 13 Dec
+            - generic [ref=e165]: Su 14 Dec
+            - generic [ref=e167]: M 15 Dec
+            - generic [ref=e169]: Tu 16 Dec
+            - generic [ref=e171]: W 17 Dec
+            - generic [ref=e173]: Th 18 Dec
+            - generic [ref=e175]: F 19 Dec
+            - generic [ref=e177]: Sa 20 Dec
+            - generic [ref=e179]: Su 21 Dec
+            - generic [ref=e181]: M 22 Dec
+            - generic [ref=e183]: Tu 23 Dec
+            - generic [ref=e185]: W 24 Dec
+            - generic [ref=e187]:
+              - text: Th 25 Dec
+              - generic "Bank Holiday" [ref=e188]: 🏦
+            - generic [ref=e190]:
+              - text: F 26 Dec
+              - generic "Bank Holiday" [ref=e191]: 🏦
+            - generic [ref=e193]: Sa 27 Dec
+            - generic [ref=e195]: Su 28 Dec
+            - generic [ref=e197]: M 29 Dec
+            - generic [ref=e199]: Tu 30 Dec
+          - generic [ref=e201] [cursor=pointer]:
+            - generic [ref=e202] [cursor=pointer]: ">"
+            - generic [ref=e203] [cursor=pointer]: Legend
+          - generic [ref=e204]:
+            - generic [ref=e205]:
+              - generic [ref=e206]: Legend
+              - button "×" [ref=e207] [cursor=pointer]
+            - generic [ref=e208]:
+              - generic [ref=e211]: Client Action
+              - generic [ref=e214]: MMM Action
+              - generic [ref=e217]: Agency Action
+              - generic [ref=e220]: Live Date
+              - generic [ref=e221]:
+                - generic [ref=e222]: (Cu)
+                - generic [ref=e223]: Custom Task
+              - generic [ref=e224]:
+                - text: Press
+                - generic [ref=e225]: L
+                - text: to toggle
+          - generic [ref=e227]:
+            - generic [ref=e230]:
+              - generic [ref=e231]: Digital Display - Creative (MMM creating)
+              - generic [ref=e232]: • 10 tasks
+            - generic [ref=e234]:
+              - generic [ref=e235]:
+                - generic [ref=e238] [cursor=pointer]: Digital Assets sent to MMM
+                - generic [ref=e239]:
+                  - generic [ref=e240]: "Owner: Client"
+                  - generic [ref=e241]: "Duration:"
+                  - spinbutton [ref=e242]: "1"
+                  - generic [ref=e243]: days
+              - generic [ref=e279]: 1 day
+            - generic [ref=e281]:
+              - generic [ref=e282]:
+                - generic [ref=e285] [cursor=pointer]: Amendment Approval Phase - 1st Mockup to Client
+                - generic [ref=e286]:
+                  - generic [ref=e287]: "Owner: MMM"
+                  - generic [ref=e288]: "Duration:"
+                  - spinbutton [ref=e289]: "3"
+                  - generic [ref=e290]: days
+              - generic [ref=e326]: 3 days
+            - generic [ref=e328]:
+              - generic [ref=e329]:
+                - generic [ref=e332] [cursor=pointer]: Amendment Approval Phase - Client Feedback
+                - generic [ref=e333]:
+                  - generic [ref=e334]: "Owner: Client"
+                  - generic [ref=e335]: "Duration:"
+                  - spinbutton [ref=e336]: "2"
+                  - generic [ref=e337]: days
+              - generic [ref=e373]: 2 days
+            - generic [ref=e375]:
+              - generic [ref=e376]:
+                - generic [ref=e379] [cursor=pointer]: Amendment Approval Phase - 2nd Mockup to Client
+                - generic [ref=e380]:
+                  - generic [ref=e381]: "Owner: MMM"
+                  - generic [ref=e382]: "Duration:"
+                  - spinbutton [ref=e383]: "2"
+                  - generic [ref=e384]: days
+              - generic [ref=e420]: 2 days
+            - generic [ref=e422]:
+              - generic [ref=e423]:
+                - generic [ref=e426] [cursor=pointer]: Amendment Approval Phase - Client Feedback
+                - generic [ref=e427]:
+                  - generic [ref=e428]: "Owner: Client"
+                  - generic [ref=e429]: "Duration:"
+                  - spinbutton [ref=e430]: "2"
+                  - generic [ref=e431]: days
+              - generic [ref=e467]: 2 days
+            - generic [ref=e469]:
+              - generic [ref=e470]:
+                - generic [ref=e473] [cursor=pointer]: Amendment Approval Phase - Final Mockup to Client
+                - generic [ref=e474]:
+                  - generic [ref=e475]: "Owner: MMM"
+                  - generic [ref=e476]: "Duration:"
+                  - spinbutton [ref=e477]: "2"
+                  - generic [ref=e478]: days
+              - generic [ref=e514]: 2 days
+            - generic [ref=e516]:
+              - generic [ref=e517]:
+                - generic [ref=e520] [cursor=pointer]: Amendment Approval Phase - Client Sign off All creative
+                - generic [ref=e521]:
+                  - generic [ref=e522]: "Owner: Client"
+                  - generic [ref=e523]: "Duration:"
+                  - spinbutton [ref=e524]: "2"
+                  - generic [ref=e525]: days
+              - generic [ref=e561]: 2 days
+            - generic [ref=e563]:
+              - generic [ref=e564]:
+                - generic [ref=e567] [cursor=pointer]: All 3rd Party Tracking sent to MMM
+                - generic [ref=e568]:
+                  - generic [ref=e569]: "Owner: Client/Agency"
+                  - generic [ref=e570]: "Duration:"
+                  - spinbutton [ref=e571]: "1"
+                  - generic [ref=e572]: days
+              - generic [ref=e608]: 1 day
+            - generic [ref=e610]:
+              - generic [ref=e611]:
+                - generic [ref=e614] [cursor=pointer]: Set Up, Browser Testing, Tagging Implementation, Link Testing
+                - generic [ref=e615]:
+                  - generic [ref=e616]: "Owner: MMM"
+                  - generic [ref=e617]: "Duration:"
+                  - spinbutton [ref=e618]: "3"
+                  - generic [ref=e619]: days
+              - generic [ref=e655]: 3 days
+            - generic [ref=e657]:
+              - generic [ref=e658]:
+                - generic [ref=e661] [cursor=pointer]: Live Date
+                - generic [ref=e662]:
+                  - generic [ref=e663]: "Owner: Live Date"
+                  - generic [ref=e664]: "Duration:"
+                  - spinbutton [ref=e665]: "1"
+                  - generic [ref=e666]: days
+              - generic [ref=e702]: 1 day
+```

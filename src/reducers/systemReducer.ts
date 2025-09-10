@@ -30,6 +30,7 @@ export const initialTimelineState: TimelineState = {
     all: [],
     bank: {},
     byAsset: {},
+    instanceBase: {},
     instanceDurations: {},
     timeline: [],
     custom: [],
@@ -326,44 +327,46 @@ export function handleLoadCsvData(
 }
 
 export function handleImportState(
-  _state: TimelineState,
+  state: TimelineState,
   action: Extract<TimelineAction, { type: ActionType.IMPORT_STATE }>
 ): TimelineState {
-  const importedState = action.payload;
-  
-  // Start with clean initial state to get all default properties
-  const mergedState: TimelineState = {
-    ...initialTimelineState,
-    
-    // Merge assets state
+  const importedState = action.payload || {};
+
+  // Preserve existing catalog (assets.available, task bank/byAsset) while importing
+  // recovered user data. Also ensure we do NOT freeze timeline rebuilds after import.
+  const importedTasks = importedState.tasks || {} as any;
+  const keepByAsset = state.tasks?.byAsset && Object.keys(state.tasks.byAsset).length > 0
+    ? state.tasks.byAsset
+    : (importedTasks.byAsset || {});
+
+  return {
+    ...state,
     assets: {
-      ...initialTimelineState.assets,
+      ...state.assets,
       ...(importedState.assets || {}),
+      // Always keep the catalog list loaded from CSV
+      available: state.assets.available,
     },
-    
-    // Merge tasks state
     tasks: {
-      ...initialTimelineState.tasks,
+      ...state.tasks,
       ...(importedState.tasks || {}),
+      // Prefer the live catalog mapping when present
+      byAsset: keepByAsset,
     },
-    
-    // Merge dates state
     dates: {
-      ...initialTimelineState.dates,
+      ...state.dates,
       ...(importedState.dates || {}),
     },
-    
-    // Merge UI state, but reset certain flags
     ui: {
-      ...initialTimelineState.ui,
+      ...state.ui,
       ...(importedState.ui || {}),
       // Always reset these on import
       showGettingStarted: false,
       showAllInstructions: false,
+      // Respect caller's intent: if import path sets freezeImportedTimeline, keep it
+      freezeImportedTimeline: (importedState.ui as any)?.freezeImportedTimeline ?? state.ui.freezeImportedTimeline,
     }
   };
-  
-  return mergedState;
 }
 
 export function handleImportTimeline(
@@ -397,6 +400,8 @@ export function handleRenameTask(
     return state;
   }
   
+  // Update both the names map (for future rebuilds) and the current timeline (so it reflects immediately
+  // even when the imported timeline is frozen and Orchestrator is not rebuilding).
   return {
     ...state,
     tasks: {
@@ -404,7 +409,10 @@ export function handleRenameTask(
       names: {
         ...state.tasks.names,
         [taskId]: nameValidation.sanitized
-      }
+      },
+      timeline: Array.isArray(state.tasks.timeline)
+        ? state.tasks.timeline.map(t => t.id === taskId ? { ...t, name: nameValidation.sanitized } : t)
+        : state.tasks.timeline
     }
   };
 }

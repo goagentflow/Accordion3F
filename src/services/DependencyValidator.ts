@@ -107,7 +107,7 @@ export class DependencyValidator {
       return { valid: false, error: 'Overlap days cannot be negative' };
     }
     
-    if (overlapDays >= predecessorDuration) {
+    if (overlapDays > predecessorDuration) {
       return { 
         valid: false, 
         error: `Overlap (${overlapDays} days) cannot exceed predecessor duration (${predecessorDuration} days)` 
@@ -277,7 +277,7 @@ export class DependencyValidator {
           const predecessor = this.nodes.get(dep.predecessorId);
           if (predecessor) {
             const overlapDays = Math.abs(dep.lag);
-            if (overlapDays >= predecessor.duration) {
+            if (overlapDays > predecessor.duration) {
               const predecessorTask = predecessor.task;
               const successorTask = node.task;
               errors.push(

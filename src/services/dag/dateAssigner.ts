@@ -21,7 +21,7 @@ import {
   getNextWorkingDay,
   addWorkingDays
 } from '../../utils/dateHelpers';
-import { allowWeekendLiveDate } from '../../config/features';
+import { allowWeekendLiveDate, isDebugMode } from '../../config/features';
 
 // ============================================
 // Date Assignment Results
@@ -136,7 +136,10 @@ export class DateAssigner {
     projectStartDate: Date,
     options: DateAssignmentOptions
   ): TimelineTask[] {
-    console.log(`[DEBUG] createTimelineTasks called with ${graph.nodes.size} nodes`);
+    if (isDebugMode()) {
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG] createTimelineTasks called with ${graph.nodes.size} nodes`);
+    }
     let tasks: TimelineTask[] = [];
     
     // Identify the final (live) task as the node with the maximum earliestFinish
@@ -153,7 +156,10 @@ export class DateAssigner {
 
     graph.nodes.forEach(node => {
       // DEBUG: Log CPM timing results
-      console.log(`[DEBUG] Task ${node.id}-${node.task.name}: earliestStart=${node.earliestStart}, earliestFinish=${node.earliestFinish}, duration=${node.duration}`);
+      if (isDebugMode()) {
+        // eslint-disable-next-line no-console
+        console.log(`[DEBUG] Task ${node.id}-${node.task.name}: earliestStart=${node.earliestStart}, earliestFinish=${node.earliestFinish}, duration=${node.duration}`);
+      }
       
       // Calculate default start/end using working-day offsets
       let taskStartDate = getCPMDateOffset(

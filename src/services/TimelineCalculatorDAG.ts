@@ -147,12 +147,14 @@ export class TimelineCalculatorDAG {
    */
   private buildGraph(rawTasks: Task[], customDurations: Record<string, number>): TaskGraph {
     if (isDebugMode()) {
+      // eslint-disable-next-line no-console
       console.log('Building task graph...');
     }
     
     const graph = buildTaskGraph(rawTasks, customDurations);
     
     if (isDebugMode()) {
+      // eslint-disable-next-line no-console
       console.log('Graph built:', {
         nodes: graph.nodes.size,
         startNodes: graph.startNodes.length,
@@ -169,12 +171,14 @@ export class TimelineCalculatorDAG {
    */
   private performCPMCalculation(graph: TaskGraph): CPMResults {
     if (isDebugMode()) {
+      // eslint-disable-next-line no-console
       console.log('Calculating critical path...');
     }
     
     const cmpResults = calculateCriticalPath(graph);
     
     if (isDebugMode()) {
+      // eslint-disable-next-line no-console
       console.log('CPM calculation completed:', {
         projectDuration: cmpResults.projectDuration,
         criticalPathLength: cmpResults.criticalPath.length,
@@ -195,6 +199,7 @@ export class TimelineCalculatorDAG {
     bankHolidays: string[]
   ): DateAssignmentResult {
     if (isDebugMode()) {
+      // eslint-disable-next-line no-console
       console.log('Assigning calendar dates...');
     }
     
@@ -202,6 +207,7 @@ export class TimelineCalculatorDAG {
     const dateResults = assignDatesToTasks(graph, cmpResults, options);
     
     if (isDebugMode()) {
+      // eslint-disable-next-line no-console
       console.log('Date assignment completed:', {
         taskCount: dateResults.tasks.length,
         projectStart: dateResults.projectStartDate,

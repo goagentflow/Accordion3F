@@ -9,6 +9,7 @@
 
 import { Task } from '../../types/timeline.types';
 import { dependencyValidator } from '../DependencyValidator';
+import { isDebugMode } from '../../config/features';
 import { sanitizeDependencies } from './dependencySanitizer';
 
 // ============================================
@@ -134,11 +135,17 @@ export class GraphBuilder {
         const assetTasks = tasksByAsset.get(assetId) || [];
         
         // DEBUG: Log asset tasks order
-        console.log(`[DEBUG] Asset ${assetId} tasks:`, assetTasks.map(t => `${t.id}-${t.name}`));
+        if (isDebugMode()) {
+          // eslint-disable-next-line no-console
+          console.log(`[DEBUG] Asset ${assetId} tasks:`, assetTasks.map(t => `${t.id}-${t.name}`));
+        }
         
         // Find the previous task in the same asset (by order in the array)
         const taskIndex = assetTasks.findIndex(t => t.id === task.id);
-        console.log(`[DEBUG] Task ${task.id}-${task.name} at index ${taskIndex}`);
+        if (isDebugMode()) {
+          // eslint-disable-next-line no-console
+          console.log(`[DEBUG] Task ${task.id}-${task.name} at index ${taskIndex}`);
+        }
         
         if (taskIndex > 0) {
           const previousTask = assetTasks[taskIndex - 1];
@@ -147,9 +154,15 @@ export class GraphBuilder {
             type: 'FS' as const,
             lag: 0
           }];
-          console.log(`[DEBUG] Added dependency: ${task.id} depends on ${previousTask.id}`);
+          if (isDebugMode()) {
+            // eslint-disable-next-line no-console
+            console.log(`[DEBUG] Added dependency: ${task.id} depends on ${previousTask.id}`);
+          }
         } else {
-          console.log(`[DEBUG] Task ${task.id} is start node (no dependency)`);
+          if (isDebugMode()) {
+            // eslint-disable-next-line no-console
+            console.log(`[DEBUG] Task ${task.id} is start node (no dependency)`);
+          }
         }
       }
       

@@ -71,6 +71,9 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
   children, 
   initialState 
 }) => {
+  // Feature toggles – disable autosave/recovery UI (warnings only)
+  const ENABLE_AUTOSAVE = false;
+  const ENABLE_RECOVERY_UI = false;
   // Create the reducer with history support
   const reducerWithHistory = useMemo(
     () => createTimelineReducerWithHistory(timelineReducer),
@@ -127,13 +130,17 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
   // Auto-Save Integration
   // ============================================
   
-  const {
-    saveStatus,
-    recoverSession,
-    discardRecovery,
-    showRecoveryPrompt,
-    recoveryPreview
-  } = useAutoSave(state, !isHydrating); // Pause auto-save during hydration
+  const auto = ENABLE_AUTOSAVE
+    ? useAutoSave(state, !isHydrating) // Pause auto-save during hydration
+    : {
+        saveStatus: { status: 'idle', lastSaved: null, message: '', isDirty: false },
+        triggerSave: (_: string) => {},
+        recoverSession: () => undefined,
+        discardRecovery: () => undefined,
+        showRecoveryPrompt: false,
+        recoveryPreview: null
+      };
+  const { saveStatus, recoverSession, discardRecovery, showRecoveryPrompt, recoveryPreview } = auto as any;
 
   // Exit hydration when timeline is available or recovery is dismissed with no selected assets
   useEffect(() => {
@@ -147,15 +154,15 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
 
   // Handle session recovery
   const handleRecover = useCallback(() => {
+    if (!ENABLE_RECOVERY_UI) return;
     setIsHydrating(true);
     const recoveredState = recoverSession();
     if (recoveredState) {
       dispatch(TimelineActions.importState(recoveredState));
     }
-  }, [recoverSession]);
+  }, [recoverSession, ENABLE_RECOVERY_UI]);
 
-  // Note: Auto-save is now handled by useAutoSave hook
-  // which monitors state changes and triggers saves automatically
+  // Autosave disabled – no proactive triggers
 
   // ============================================
   // Memoized Context Value
@@ -176,20 +183,24 @@ export const TimelineProvider: React.FC<TimelineProviderProps> = ({
 
   return (
     <TimelineContext.Provider value={contextValue}>
-      {/* Recovery Prompt */}
-      <RecoveryPrompt
-        isOpen={showRecoveryPrompt}
-        preview={recoveryPreview}
-        onRecover={handleRecover}
-        onDiscard={discardRecovery}
-      />
+      {/* Recovery Prompt (disabled) */}
+      {ENABLE_RECOVERY_UI && (
+        <RecoveryPrompt
+          isOpen={showRecoveryPrompt}
+          preview={recoveryPreview}
+          onRecover={handleRecover}
+          onDiscard={discardRecovery}
+        />
+      )}
       
-      {/* Save Status Indicator */}
-      <SaveIndicator
-        status={saveStatus.status}
-        lastSaved={saveStatus.lastSaved}
-        message={saveStatus.message}
-      />
+      {/* Save Status Indicator (disabled) */}
+      {ENABLE_AUTOSAVE && (
+        <SaveIndicator
+          status={saveStatus.status}
+          lastSaved={saveStatus.lastSaved}
+          message={saveStatus.message}
+        />
+      )}
       
       {children}
     </TimelineContext.Provider>

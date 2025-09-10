@@ -35,6 +35,28 @@ const ImportManager: React.FC = () => {
     try {
       const data: any = await importFromExcel(selectedFile);
       dispatch(TimelineActions.clearAll());
+
+      // Build instanceBase from imported tasks (group by assetId)
+      const baseByInstance: Record<string, any[]> = {};
+      ((data.tasks as any[]) || []).forEach((t: any) => {
+        if (!t || !t.assetId) return;
+        if (!baseByInstance[t.assetId]) baseByInstance[t.assetId] = [];
+        baseByInstance[t.assetId].push({
+          id: t.id,
+          name: t.name,
+          duration: t.duration,
+          owner: t.owner || 'm',
+          assetId: t.assetId,
+          assetType: t.assetType,
+          isCustom: !!t.isCustom,
+          dependencies: Array.isArray(t.dependencies) ? t.dependencies.map((d: any) => ({
+            predecessorId: d.predecessorId,
+            type: 'FS' as const,
+            lag: d.lag
+          })) : []
+        });
+      });
+
       dispatch(TimelineActions.importState({
         assets: {
           available: [],
@@ -46,10 +68,11 @@ const ImportManager: React.FC = () => {
           all: [],
           bank: {},
           byAsset: {},
+          instanceBase: baseByInstance,
           instanceDurations: {},
-          timeline: (data.tasks as any[]) || [],
-          custom: (data.customTasks as any[]) || [],
-          names: (data.customTaskNames as Record<string,string>) || {},
+          timeline: [],
+          custom: [],
+          names: {},
           deps: {}
         },
         dates: {
@@ -59,7 +82,7 @@ const ImportManager: React.FC = () => {
           bankHolidays: [],
           calculatedStartDates: {}
         },
-        ui: { freezeImportedTimeline: true } as any
+        ui: { freezeImportedTimeline: false } as any
       }));
 
       // Re-seed catalog after import so AssetSelector lists all assets

@@ -49,8 +49,13 @@ export const Orchestrator: React.FC = () => {
 
     const allTimeline: any[] = [];
     assets.selected.forEach(asset => {
-      const base = (tasks.byAsset && tasks.byAsset[asset.type]) || [];
-      const live = dates.useGlobalDate ? dates.globalLiveDate : asset.startDate;
+      const instanceBase = (tasks as any).instanceBase && (tasks as any).instanceBase[asset.id];
+      const base = (instanceBase && instanceBase.length > 0)
+        ? instanceBase
+        : ((tasks.byAsset && tasks.byAsset[asset.type]) || []);
+      // Robust live date resolution: if global is enabled but empty, fall back to per-asset start date
+      const resolvedGlobal = dates.globalLiveDate && dates.globalLiveDate.trim() !== '' ? dates.globalLiveDate : undefined;
+      const live = dates.useGlobalDate ? (resolvedGlobal || asset.startDate) : asset.startDate;
       if (!live || base.length === 0) return;
       // Clone raw tasks for this asset instance
       const raw = base.map((t: any, idx: number) => ({
@@ -77,29 +82,31 @@ export const Orchestrator: React.FC = () => {
         r.dependencies = sanitize(r.id);
       });
 
-      // Include custom tasks for this asset (Phase 1 parity)
-      const customForAsset = (tasks.bank && tasks.bank[asset.id]) || [];
-      customForAsset
-        .filter((t: any) => t && t.isCustom)
-        .forEach((custom: any) => {
-          const ct = {
-            id: custom.id,
-            name: custom.name,
-            duration: custom.duration,
-            owner: custom.owner,
-            assetId: asset.id,
-            assetType: asset.type,
-            isCustom: true,
-            dependencies: sanitize(custom.id)
-          } as any;
-          if (custom.insertAfterTaskId) {
-            const idx = raw.findIndex(r => r.id === custom.insertAfterTaskId);
-            const insertIndex = idx !== -1 ? idx + 1 : raw.length;
-            raw.splice(insertIndex, 0, ct);
-          } else {
-            raw.push(ct);
-          }
-        });
+      // When using instanceBase (imported editable plan), custom tasks are already embedded.
+      if (!(instanceBase && instanceBase.length > 0)) {
+        const customForAsset = (tasks.bank && (tasks.bank as any)[asset.id]) || [];
+        customForAsset
+          .filter((t: any) => t && t.isCustom)
+          .forEach((custom: any) => {
+            const ct = {
+              id: custom.id,
+              name: custom.name,
+              duration: custom.duration,
+              owner: custom.owner,
+              assetId: asset.id,
+              assetType: asset.type,
+              isCustom: true,
+              dependencies: sanitize(custom.id)
+            } as any;
+            if (custom.insertAfterTaskId) {
+              const idx = raw.findIndex((r: any) => r.id === custom.insertAfterTaskId);
+              const insertIndex = idx !== -1 ? idx + 1 : raw.length;
+              raw.splice(insertIndex, 0, ct);
+            } else {
+              raw.push(ct);
+            }
+          });
+      }
 
       if (dropped > 0 && process.env.NODE_ENV !== 'production') {
         // Dev-friendly warning to help catch mapping issues without breaking timeline
