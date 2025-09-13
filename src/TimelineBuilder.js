@@ -1809,6 +1809,27 @@ useEffect(() => {
             const importedData = await importFromExcel(importPreview.file);
             console.log('Imported data:', importedData);
             
+            // Reconstruct dependency map from imported timeline so overlaps persist after rebuild
+            // This ensures that any concurrent tasks (negative lag FS deps) are reapplied
+            const reconstructedDeps = (Array.isArray(importedData.tasks) ? importedData.tasks : []).reduce((acc, t) => {
+                if (t && Array.isArray(t.dependencies) && t.dependencies.length > 0) {
+                    // Normalize to expected shape { predecessorId, type: 'FS', lag }
+                    acc[t.id] = t.dependencies.map(dep => ({
+                        predecessorId: dep.predecessorId,
+                        type: 'FS',
+                        lag: Number(dep.lag) || 0
+                    }));
+                }
+                return acc;
+            }, {});
+
+            if (Object.keys(reconstructedDeps).length > 0) {
+                setTaskDependencies(reconstructedDeps);
+            } else {
+                // Clear if none present to avoid stale state affecting new imports
+                setTaskDependencies({});
+            }
+
             // Restore application state from imported data
             console.log('=== IMPORT DEBUG ===');
             console.log('importedData.selectedAssets:', importedData.selectedAssets);

@@ -138,7 +138,10 @@ const TimelineBuilder: React.FC = () => {
     
     // Build timeline for each selected asset
     assets.selected.forEach(asset => {
-      let rawTasks = tasks.bank[asset.id] || [];
+      // Prefer instanceBase tasks (from imported editable plan) if present; they already include dependencies
+      let rawTasks = (tasks as any).instanceBase && (tasks as any).instanceBase[asset.id]
+        ? (tasks as any).instanceBase[asset.id]
+        : (tasks.bank[asset.id] || []);
       const liveDate = dates.useGlobalDate 
         ? dates.globalLiveDate 
         : asset.startDate;
@@ -148,7 +151,7 @@ const TimelineBuilder: React.FC = () => {
       // Apply per-instance duration overrides before scheduling (Bug fix: task name collision)
       // Per-instance overrides have priority over name-based overrides
       if (tasks.instanceDurations) {
-        rawTasks = rawTasks.map(task => {
+        rawTasks = (rawTasks as any[]).map((task: any) => {
           if (task.id && tasks.instanceDurations[task.id] !== undefined) {
             return { ...task, duration: tasks.instanceDurations[task.id] };
           }
@@ -157,7 +160,7 @@ const TimelineBuilder: React.FC = () => {
       }
       
       const assetTimeline = buildAssetTimeline(
-        rawTasks,
+        rawTasks as any,
         liveDate,
         assets.taskDurations[asset.type],
         dates.bankHolidays
@@ -184,7 +187,15 @@ const TimelineBuilder: React.FC = () => {
     // TODO: Find conflicts and update UI state when date error actions are implemented
     // const conflicts = findDateConflicts(assets.selected, calculatedStartDates);
     
-  }, [assets.selected, tasks.bank, dates, assets.taskDurations, tasks.instanceDurations, dispatch]);
+  }, [
+    assets.selected,
+    tasks.bank,
+    (tasks as any).instanceBase,
+    dates,
+    assets.taskDurations,
+    tasks.instanceDurations,
+    dispatch
+  ]);
 
   // ============================================
   // Event Handlers
@@ -340,11 +351,59 @@ const TimelineBuilder: React.FC = () => {
     setShowImportConfirm(false);
 
     try {
-      const importedData = await importFromExcel(importPreview.file);
-      
-      // Clear current state and import new data
+      const importedData: any = await importFromExcel(importPreview.file);
+
+      // Build instanceBase from imported tasks preserving dependencies and custom flags
+      const baseByInstance: Record<string, any[]> = {};
+      ((importedData.tasks as any[]) || []).forEach((t: any) => {
+        if (!t || !t.assetId) return;
+        if (!baseByInstance[t.assetId]) baseByInstance[t.assetId] = [];
+        baseByInstance[t.assetId].push({
+          id: t.id,
+          name: t.name,
+          duration: t.duration,
+          owner: t.owner || 'm',
+          assetId: t.assetId,
+          assetType: t.assetType,
+          isCustom: !!t.isCustom,
+          insertAfterTaskId: t.insertAfterTaskId || undefined,
+          dependencies: Array.isArray(t.dependencies) ? t.dependencies.map((d: any) => ({
+            predecessorId: d.predecessorId,
+            type: 'FS' as const,
+            lag: Number(d.lag) || 0
+          })) : []
+        });
+      });
+
+      // Import minimal state required to rebuild the timeline with overlaps preserved
       dispatch(TimelineActions.clearAll());
-      dispatch(TimelineActions.importTimeline(importedData));
+      dispatch(TimelineActions.importState({
+        assets: {
+          available: [],
+          selected: (importedData.selectedAssets as any[]) || [],
+          liveDates: (importedData.assetLiveDates as Record<string, string>) || {},
+          taskDurations: {}
+        },
+        tasks: {
+          all: [],
+          bank: {},
+          byAsset: {},
+          instanceBase: baseByInstance,
+          instanceDurations: {},
+          timeline: [],
+          custom: [],
+          names: {},
+          deps: {}
+        },
+        dates: {
+          globalLiveDate: (importedData.globalLiveDate as string) || '',
+          useGlobalDate: (importedData.useGlobalDate as boolean) !== undefined ? Boolean(importedData.useGlobalDate) : true,
+          projectStartDate: '',
+          bankHolidays: dates.bankHolidays,
+          calculatedStartDates: {}
+        },
+        ui: { freezeImportedTimeline: false } as any
+      }));
 
       setImportError(null);
     } catch (error) {

@@ -68,25 +68,7 @@ export const importFromExcel = async (file) => {
     throw new Error('No timeline data found in the Excel file.');
   }
 
-  // Transform the data back to the format expected by the timeline reducer
-  const importedData = {
-    version: jsonData.version,
-    exportDate: jsonData.exportDate,
-    taskCount: jsonData.taskCount,
-    tasks: jsonData.timeline.map(task => ({
-      ...task,
-      start: task.startDate || task.start,
-      end: task.endDate || task.end
-    })),
-    // Include all application state for restoration
-    selectedAssets: jsonData.selectedAssets || [],
-    globalLiveDate: jsonData.globalLiveDate || '',
-    assetLiveDates: jsonData.assetLiveDates || {},
-    useGlobalDate: jsonData.useGlobalDate !== undefined ? jsonData.useGlobalDate : true,
-    customTasks: jsonData.customTasks || [],
-    assetTaskDurations: jsonData.assetTaskDurations || {},
-    customTaskNames: jsonData.customTaskNames || {}
-  };
+  const importedData = transformImportedJson(jsonData);
 
   // Additional validation on the transformed data
   const validTasks = importedData.tasks.filter(task => 
@@ -107,6 +89,32 @@ export const importFromExcel = async (file) => {
     importedAt: new Date().toISOString(),
     originalFileName: file.name
   };
+};
+
+/**
+ * Pure transformation helper: turn JSON metadata from the DO_NOT_EDIT_DATA sheet
+ * back into the structure the app expects. Exported for unit testing to avoid
+ * coupling tests to binary XLSX parsing in Jest.
+ */
+export const transformImportedJson = (jsonData) => {
+  const importedData = {
+    version: jsonData.version,
+    exportDate: jsonData.exportDate,
+    taskCount: jsonData.taskCount,
+    tasks: (jsonData.timeline || []).map(task => ({
+      ...task,
+      start: task.startDate || task.start,
+      end: task.endDate || task.end
+    })),
+    selectedAssets: jsonData.selectedAssets || [],
+    globalLiveDate: jsonData.globalLiveDate || '',
+    assetLiveDates: jsonData.assetLiveDates || {},
+    useGlobalDate: jsonData.useGlobalDate !== undefined ? jsonData.useGlobalDate : true,
+    customTasks: jsonData.customTasks || [],
+    assetTaskDurations: jsonData.assetTaskDurations || {},
+    customTaskNames: jsonData.customTaskNames || {}
+  };
+  return importedData;
 };
 
 /**

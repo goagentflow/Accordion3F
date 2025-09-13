@@ -65,11 +65,11 @@ export const Orchestrator: React.FC = () => {
         assetType: asset.type
       }));
 
-      // Build allowed id set and sanitize dependencies from tasks.deps
+      // Build allowed id set and sanitize dependencies
       const allowedIds = new Set(raw.map((r: any) => r.id));
       const depsMap: Record<string, Array<{ predecessorId: string; type: 'FS'; lag: number }>> = (tasks.deps as any) || {};
       let dropped = 0;
-      const sanitize = (succId: string) => {
+      const sanitizeFromGlobal = (succId: string) => {
         const list = depsMap[succId] || [];
         if (!list || list.length === 0) return [] as any[];
         const filtered = list.filter(d => allowedIds.has(d.predecessorId) && d.predecessorId !== succId);
@@ -79,7 +79,14 @@ export const Orchestrator: React.FC = () => {
       };
 
       raw.forEach((r: any) => {
-        r.dependencies = sanitize(r.id);
+        // Preserve dependencies embedded in instanceBase when present.
+        const existing = Array.isArray(r.dependencies) ? r.dependencies : [];
+        const sanitizedExisting = existing
+          .filter((d: any) => d && allowedIds.has(d.predecessorId) && d.predecessorId !== r.id)
+          .map((d: any) => ({ predecessorId: d.predecessorId, type: 'FS' as const, lag: Number(d.lag) || 0 }));
+        const fromGlobal = sanitizeFromGlobal(r.id);
+        // Prefer explicit global mapping when available; otherwise keep imported/embedded deps
+        r.dependencies = (fromGlobal && fromGlobal.length > 0) ? fromGlobal : sanitizedExisting;
       });
 
       // When using instanceBase (imported editable plan), custom tasks are already embedded.
@@ -96,7 +103,7 @@ export const Orchestrator: React.FC = () => {
               assetId: asset.id,
               assetType: asset.type,
               isCustom: true,
-              dependencies: sanitize(custom.id)
+              dependencies: sanitizeFromGlobal(custom.id)
             } as any;
             if (custom.insertAfterTaskId) {
               const idx = raw.findIndex((r: any) => r.id === custom.insertAfterTaskId);
