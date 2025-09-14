@@ -31,32 +31,39 @@ const GettingStarted: React.FC = () => {
               {!showAll ? (
                 <div className="space-y-6 text-gray-700">
                   <div className="text-center mb-2">
-                    <p className="text-gray-600 text-lg">Quick Start (4 steps)</p>
+                    <p className="text-gray-600 text-lg">Quick Start (5 steps)</p>
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-start space-x-4">
                       <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
                       <div>
-                        <h3 className="font-semibold text-gray-800">Select your assets</h3>
-                        <p className="text-gray-600 text-sm">Use the left panel to add the marketing assets you need. You can add the same type multiple times, just rename each one so you know what's what.</p>
+                        <h3 className="font-semibold text-gray-800">Name Your Project (Required)</h3>
+                        <p className="text-gray-600 text-sm">Add a client or campaign name (e.g., Barclays Autumn Campaign). This is required and appears in your Excel header, sheet tab and filename; export is disabled until it’s set.</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
                       <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">2</div>
                       <div>
-                        <h3 className="font-semibold text-gray-800">Set your go live dates</h3>
-                        <p className="text-gray-600 text-sm">Use one global date for everything, or set individual dates per asset. Go live dates can fall on weekends or bank holidays (the “Live” task anchors there), while all other tasks use working days only. One requirement: Print Supplements Full Page must have a Sunday go live date.</p>
+                        <h3 className="font-semibold text-gray-800">Select your assets (Required)</h3>
+                        <p className="text-gray-600 text-sm">Use the left panel to add the marketing assets you need. You can add the same type multiple times, just rename each one so you know what's what.</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
                       <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
+                      <div>
+                        <h3 className="font-semibold text-gray-800">Set your go live dates (Required)</h3>
+                        <p className="text-gray-600 text-sm">Use one global date for everything, or set individual dates per asset. Go live dates can fall on weekends or bank holidays (the “Live” task anchors there), while all other tasks use working days only. One requirement: Print Supplements Full Page must have a Sunday go live date.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-4">
+                      <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">4</div>
                       <div>
                         <h3 className="font-semibold text-gray-800">Review and adjust</h3>
                         <p className="text-gray-600 text-sm">Change task durations, rename tasks to match your workflow and drag tasks to reorder or create overlaps. Warnings will appear if adjustments are required, please take action to remedy.</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
-                      <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">4</div>
+                      <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">5</div>
                       <div>
                         <h3 className="font-semibold text-gray-800">Save your work</h3>
                         <p className="text-gray-600 text-sm">Export to Excel to save a copy. Import that Excel file later to resume where you left off, but don't edit the tab called “Data” or your imported Excel will no longer regenerate a timeline.</p>

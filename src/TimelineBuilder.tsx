@@ -48,6 +48,8 @@ const TimelineBuilder: React.FC = () => {
   const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [csvData, setCsvData] = useState<CsvRow[]>([]);
   const [catalogReady, setCatalogReady] = useState(false);
+  // UI: collapsible left column
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
   
   // Excel import/export state
   const [isImporting, setIsImporting] = useState(false);
@@ -539,75 +541,117 @@ const TimelineBuilder: React.FC = () => {
         {catalogReady && !isHydrating && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Column: Controls */}
-          <div className="lg:col-span-1 bg-white p-4 rounded-xl shadow-lg" style={{ minWidth: 380 }}>
-            <h2 className="text-xl font-semibold mb-3 border-b pb-2 text-gray-700">Timeline Setup</h2>
-            
-            <CampaignSetup 
-              {...{
-                clientCampaignName: ui.clientCampaignName || '',
-                onClientCampaignNameChange: setClientCampaignName,
-                globalLiveDate: dates.globalLiveDate,
-                onGlobalLiveDateChange: handleGlobalLiveDateChange,
-                useGlobalDate: dates.useGlobalDate,
-                onUseGlobalDateChange: handleToggleUseGlobalDate,
-                projectStartDate: dates.projectStartDate,
-                dateErrors: ui.dateErrors,
-                bankHolidays: dates.bankHolidays,
-                workingDaysNeeded: workingDaysNeeded
-              } as any}
-            />
-            
-            <AssetSelector
-              {...{
-                assets: assets.available,
-                selectedAssets: assets.selected,
-                onAddAsset: handleAddAsset,
-                onRemoveAsset: handleRemoveAsset,
-                useGlobalDate: dates.useGlobalDate,
-                globalLiveDate: dates.globalLiveDate,
-                assetLiveDates: assets.liveDates,
-                onAssetLiveDateChange: (assetName: string, date: string) => {
-                  dispatch(TimelineActions.setAssetLiveDate(assetName, date));
-                },
-                calculatedStartDates: dates.calculatedStartDates || {},
-                dateErrors: ui.dateErrors,
-                onRenameAsset: handleRenameAsset,
-                onAssetStartDateChange: handleAssetStartDateChange,
-                csvData: csvData,
-                onSaveTaskDurations: handleSaveTaskDurations,
-                isNonWorkingDay: (date: Date) => {
-                  const day = date.getDay();
-                  const dateStr = date.toISOString().split('T')[0];
-                  const isWeekend = day === 0 || day === 6;
-                  const isHoliday = dates.bankHolidays.includes(dateStr);
-                  return isWeekend || isHoliday;
-                },
-                calculateWorkingDaysBetween: (start: string, end: string) => {
-                  if (!start || !end) return 0;
-                  const startDate = new Date(start);
-                  const endDate = new Date(end);
-                  if (startDate >= endDate) return 0;
-                  
-                  let workingDays = 0;
-                  let currentDate = new Date(startDate);
-                  
-                  while (currentDate < endDate) {
-                    const dayOfWeek = currentDate.getDay();
-                    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                      workingDays++;
+          {/* Left Column: Controls (collapsible) */}
+          {leftCollapsed ? (
+            <div className="lg:col-span-1 flex">
+              <button
+                data-testid="expand-left-panel"
+                onClick={() => setLeftCollapsed(false)}
+                className="w-[50px] py-3 rounded-lg border border-gray-200 bg-white shadow flex flex-col items-center justify-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                title="Expand Campaign Setup"
+                aria-expanded="false"
+                aria-controls="left-panel"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  className="text-gray-500"
+                >
+                  <path
+                    d="M22.7 19.3l-6.4-6.4a6 6 0 00-7.6-7.6l3 3a2.5 2.5 0 01-3.5 3.5l-3-3A6 6 0 0013 16.3l6.4 6.4a1 1 0 001.4-1.4z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span className="my-2 text-gray-500 leading-none">›</span>
+                <span className="text-[10px] text-gray-600 tracking-wide">Setup</span>
+              </button>
+            </div>
+          ) : (
+            <div id="left-panel" className="lg:col-span-1 bg-white p-4 rounded-xl shadow-lg" style={{ minWidth: 380 }}>
+              <div className="flex items-center justify-between mb-3 border-b pb-2">
+                <h2 className="text-xl font-semibold text-gray-700">Timeline Setup</h2>
+                <button
+                  data-testid="collapse-left-panel"
+                  onClick={() => setLeftCollapsed(true)}
+                  className="text-gray-500 hover:text-gray-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400 rounded"
+                  title="Collapse Campaign Setup"
+                  aria-expanded="true"
+                  aria-controls="left-panel"
+                >
+                  ‹
+                </button>
+              </div>
+              
+              <CampaignSetup 
+                {...{
+                  clientCampaignName: ui.clientCampaignName || '',
+                  onClientCampaignNameChange: setClientCampaignName,
+                  globalLiveDate: dates.globalLiveDate,
+                  onGlobalLiveDateChange: handleGlobalLiveDateChange,
+                  useGlobalDate: dates.useGlobalDate,
+                  onUseGlobalDateChange: handleToggleUseGlobalDate,
+                  projectStartDate: dates.projectStartDate,
+                  dateErrors: ui.dateErrors,
+                  bankHolidays: dates.bankHolidays,
+                  workingDaysNeeded: workingDaysNeeded
+                } as any}
+              />
+              
+              <AssetSelector
+                {...{
+                  assets: assets.available,
+                  selectedAssets: assets.selected,
+                  onAddAsset: handleAddAsset,
+                  onRemoveAsset: handleRemoveAsset,
+                  useGlobalDate: dates.useGlobalDate,
+                  globalLiveDate: dates.globalLiveDate,
+                  assetLiveDates: assets.liveDates,
+                  onAssetLiveDateChange: (assetName: string, date: string) => {
+                    dispatch(TimelineActions.setAssetLiveDate(assetName, date));
+                  },
+                  calculatedStartDates: dates.calculatedStartDates || {},
+                  dateErrors: ui.dateErrors,
+                  onRenameAsset: handleRenameAsset,
+                  onAssetStartDateChange: handleAssetStartDateChange,
+                  csvData: csvData,
+                  onSaveTaskDurations: handleSaveTaskDurations,
+                  isNonWorkingDay: (date: Date) => {
+                    const day = date.getDay();
+                    const dateStr = date.toISOString().split('T')[0];
+                    const isWeekend = day === 0 || day === 6;
+                    const isHoliday = dates.bankHolidays.includes(dateStr);
+                    return isWeekend || isHoliday;
+                  },
+                  calculateWorkingDaysBetween: (start: string, end: string) => {
+                    if (!start || !end) return 0;
+                    const startDate = new Date(start);
+                    const endDate = new Date(end);
+                    if (startDate >= endDate) return 0;
+                    
+                    let workingDays = 0;
+                    let currentDate = new Date(startDate);
+                    
+                    while (currentDate < endDate) {
+                      const dayOfWeek = currentDate.getDay();
+                      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                        workingDays++;
+                      }
+                      currentDate.setDate(currentDate.getDate() + 1);
                     }
-                    currentDate.setDate(currentDate.getDate() + 1);
+                    
+                    return workingDays;
                   }
-                  
-                  return workingDays;
-                }
-              } as any}
-            />
-          </div>
+                } as any}
+              />
+            </div>
+          )}
           
           {/* Right Column: Timeline */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg" style={{ minWidth: 0, maxWidth: "100%" }}>
+          <div className={`${leftCollapsed ? 'lg:col-span-3' : 'lg:col-span-2'} bg-white p-6 rounded-xl shadow-lg`} style={{ minWidth: 0, maxWidth: "100%" }}>
             <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Generated Timeline</h2>
             
             {/* Timeline Conflict Warnings */}
@@ -720,16 +764,18 @@ const TimelineBuilder: React.FC = () => {
                 </button>
               </div>
               
-              {/* Instructions content (simplified for brevity) */}
+              {/* Quick Start (5 steps) */}
               <div className="space-y-4">
-                <p className="text-gray-600">
-                  Build your campaign timeline in 4 simple steps:
-                </p>
-                <ol className="list-decimal pl-5 space-y-2">
-                  <li>Select your assets from the left panel</li>
-                  <li>Set your go-live date(s)</li>
-                  <li>Review your timeline</li>
-                  <li>Export to Excel when ready</li>
+                <p className="text-gray-600">Build your campaign timeline in 5 simple steps:</p>
+                <ol className="list-decimal pl-5 space-y-2 text-gray-700">
+                  <li>
+                    <span className="font-medium">Name your project (Required):</span>
+                    <span className="ml-1 text-gray-600">Add a client or campaign name (e.g., Barclays Autumn Campaign). This is required and appears in your Excel header, sheet tab and filename; export is disabled until it’s set.</span>
+                  </li>
+                  <li><span className="font-medium">Select your assets (Required):</span> Use the left panel to add the marketing assets you need.</li>
+                  <li><span className="font-medium">Set your go-live date(s) (Required):</span> Use a single global date or individual dates per asset.</li>
+                  <li><span className="font-medium">Review your timeline:</span> Adjust durations, overlaps and resolve warnings.</li>
+                  <li><span className="font-medium">Export to Excel:</span> Save and share your professional timeline.</li>
                 </ol>
               </div>
             </div>
