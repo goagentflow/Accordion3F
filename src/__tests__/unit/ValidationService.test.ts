@@ -19,14 +19,20 @@ describe('ValidationService', () => {
     });
 
     it('should escape HTML entities to prevent XSS', () => {
+      // Script tags are removed completely, not escaped
       expect(ValidationService.sanitizeText('<script>alert("XSS")</script>'))
-        .toBe('&lt;script&gt;alert(&quot;XSS&quot;)&lt;&#x2F;script&gt;');
+        .toBe('');
       
+      // Ampersands are now allowed for names like "Creative & Posters"
       expect(ValidationService.sanitizeText('Hello & goodbye'))
-        .toBe('Hello &amp; goodbye');
+        .toBe('Hello & goodbye');
       
       expect(ValidationService.sanitizeText('"Quotes" and \'apostrophes\''))
         .toBe('&quot;Quotes&quot; and &#39;apostrophes&#39;');
+        
+      // Test other dangerous characters are still escaped
+      expect(ValidationService.sanitizeText('<div>content</div>'))
+        .toBe('&lt;div&gt;content&lt;/div&gt;');
     });
 
     it('should remove script tags completely', () => {
@@ -85,7 +91,7 @@ describe('ValidationService', () => {
       const result = ValidationService.validateTaskName('<script>alert("xss")</script>Task');
       expect(result.valid).toBe(true);
       expect(result.sanitized).not.toContain('<script>');
-      expect(result.sanitized).toContain('&lt;script&gt;');
+      expect(result.sanitized).toBe('Task'); // Script tags are completely removed
     });
   });
 
