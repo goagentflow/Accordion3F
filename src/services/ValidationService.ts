@@ -27,7 +27,6 @@ const HTML_ENTITIES: Record<string, string> = {
   '>': '&gt;',
   '"': '&quot;',
   "'": '&#39;',
-  '/': '&#x2F;',
   '`': '&#x60;',
   '=': '&#x3D;'
 };
@@ -52,8 +51,8 @@ export class ValidationService {
     sanitized = sanitized.replace(/on\w+\s*=\s*["'][^"']*["']/gi, '');
     sanitized = sanitized.replace(/on\w+\s*=\s*[^\s>]*/gi, ''); // Also catch unquoted handlers
 
-    // Now escape HTML entities
-    sanitized = sanitized.replace(/[&<>"'`=\/]/g, (char) => HTML_ENTITIES[char] || char);
+    // Now escape HTML entities (allow forward slashes so names like Video/Edits render correctly)
+    sanitized = sanitized.replace(/[&<>"'`=]/g, (char) => HTML_ENTITIES[char] || char);
 
     // Apply length limit if specified
     if (maxLength && sanitized.length > maxLength) {

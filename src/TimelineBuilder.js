@@ -547,7 +547,21 @@ const TimelineBuilder = () => {
         
         // Build base taskBank from CSV data
         const bank = {};
-        selectedAssets.forEach(asset => {
+        // Order selected assets by catalog order (uniqueAssets)
+        const catalog = Array.isArray(uniqueAssets) ? uniqueAssets : [];
+        const norm = (s) => (s || '').toLowerCase().trim();
+        const indexOfType = (t) => {
+            const i = catalog.findIndex(x => norm(x) === norm(t));
+            return i === -1 ? Number.POSITIVE_INFINITY : i;
+        };
+        const orderedSelected = [...selectedAssets].sort((a, b) => {
+            const ai = indexOfType(a.type);
+            const bi = indexOfType(b.type);
+            if (ai !== bi) return ai - bi;
+            return norm(a.name).localeCompare(norm(b.name));
+        });
+
+        orderedSelected.forEach(asset => {
             const rows = csvData.filter(row => row['Asset Type'] === asset.type);
             bank[asset.id] = rows.map((row, idx) => ({
                 id: `${asset.id}-template-${idx}`,
@@ -616,7 +630,7 @@ const TimelineBuilder = () => {
         }
         
         const all = [];
-        selectedAssets.forEach(asset => {
+        orderedSelected.forEach(asset => {
             // Get the correct live date for this asset
             let liveDateStr;
             if (useGlobalDate && globalLiveDate) {

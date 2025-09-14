@@ -138,8 +138,21 @@ const TimelineBuilder: React.FC = () => {
 
     const allTimelineTasks: TimelineTask[] = [];
     
-    // Build timeline for each selected asset
-    assets.selected.forEach(asset => {
+    // Build timeline for each selected asset, ordered by catalog (Select Assets list)
+    const catalog = Array.isArray(assets.available) ? assets.available : [];
+    const norm = (s: string) => (s || '').toLowerCase().trim();
+    const indexOfType = (t: string) => {
+      const i = catalog.findIndex(x => norm(x) === norm(t));
+      return i === -1 ? Number.POSITIVE_INFINITY : i;
+    };
+    const ordered = [...assets.selected].sort((a, b) => {
+      const ai = indexOfType(a.type);
+      const bi = indexOfType(b.type);
+      if (ai !== bi) return ai - bi;
+      return norm(a.name).localeCompare(norm(b.name));
+    });
+
+    ordered.forEach(asset => {
       // Prefer instanceBase tasks (from imported editable plan) if present; they already include dependencies
       let rawTasks = (tasks as any).instanceBase && (tasks as any).instanceBase[asset.id]
         ? (tasks as any).instanceBase[asset.id]
@@ -176,7 +189,7 @@ const TimelineBuilder: React.FC = () => {
 
     // Calculate date conflicts
     const calculatedStartDates: Record<string, string> = {};
-    assets.selected.forEach(asset => {
+    ordered.forEach(asset => {
       const assetTasks = allTimelineTasks.filter(t => t.assetId === asset.id);
       if (assetTasks.length > 0) {
         const earliestStart = getEarliestStartDate(assetTasks);

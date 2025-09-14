@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAssets, useDates, useTasks, useUI } from '../hooks/useTimelineSelectors';
 import { useTimeline } from '../hooks/useTimeline';
 import { TimelineActions } from '../actions/timelineActions';
@@ -11,6 +11,24 @@ export const Orchestrator: React.FC = () => {
   const { tasks } = useTasks();
   const { ui } = useUI();
   const { dispatch } = useTimeline();
+
+  // Catalog-ordered selected assets (stable across renders)
+  const orderedSelected = useMemo(() => {
+    const catalog = Array.isArray(assets.available) ? (assets.available as any[]) : [];
+    const norm = (s: string) => (s || '').toLowerCase().trim();
+    const indexOfType = (t: string) => {
+      const i = catalog.findIndex((x: any) => norm(x) === norm(t));
+      return i === -1 ? Number.POSITIVE_INFINITY : i;
+    };
+    const arr = [...(assets.selected || [])];
+    arr.sort((a: any, b: any) => {
+      const ai = indexOfType(a.type);
+      const bi = indexOfType(b.type);
+      if (ai !== bi) return ai - bi;
+      return norm(a.name).localeCompare(norm(b.name));
+    });
+    return arr;
+  }, [assets.selected, assets.available]);
 
   useEffect(() => {
     // Only build when assets selected and we have either global or per-asset live dates
@@ -48,7 +66,7 @@ export const Orchestrator: React.FC = () => {
     }
 
     const allTimeline: any[] = [];
-    assets.selected.forEach(asset => {
+    orderedSelected.forEach((asset: any) => {
       const instanceBase = (tasks as any).instanceBase && (tasks as any).instanceBase[asset.id];
       const base = (instanceBase && instanceBase.length > 0)
         ? instanceBase
@@ -155,7 +173,8 @@ export const Orchestrator: React.FC = () => {
     tasks.instanceDurations,
     tasks.deps,
     tasks.custom,
-    dispatch
+    dispatch,
+    orderedSelected
   ]);
 
   // Secondary effect: always recompute derived warnings from the current timeline
@@ -166,7 +185,7 @@ export const Orchestrator: React.FC = () => {
     if (!assets.selected || assets.selected.length === 0) return;
 
     const startDates: Record<string, string> = {};
-    assets.selected.forEach(asset => {
+    orderedSelected.forEach((asset: any) => {
       const mine = (tasks.timeline as any[]).filter(t => t.assetId === asset.id);
       const earliest = getEarliestStartDate(mine as any);
       if (earliest) startDates[asset.id] = earliest;
