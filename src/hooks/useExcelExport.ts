@@ -40,13 +40,13 @@ export const useExcelExport = () => {
         useGlobalDate: dates.useGlobalDate,
         customTasks: state.tasks.custom,
         assetTaskDurations: assets.taskDurations,
-        customTaskNames: state.tasks.names
+        customTaskNames: state.tasks.names,
+        clientCampaignName: state.ui.clientCampaignName
       }
     );
-  }, [tasks.timeline, dates.bankHolidays, dates.globalLiveDate, dates.useGlobalDate, assets.selected, assets.liveDates, assets.taskDurations, state.tasks.custom, state.tasks.names]);
+  }, [tasks.timeline, dates.bankHolidays, dates.globalLiveDate, dates.useGlobalDate, assets.selected, assets.liveDates, assets.taskDurations, state.tasks.custom, state.tasks.names, state.ui.clientCampaignName]);
 
   return { exportTimeline };
 };
 
 export default useExcelExport;
-

@@ -6,7 +6,7 @@
  * Following Golden Rule #4: Clear Roles - Actions creation separated from state management
  */
 
-import {
+  import {
   TimelineAction,
   ActionType,
   TimelineState,
@@ -160,6 +160,12 @@ export const TimelineActions = {
   importTimeline: (importedData: any): TimelineAction => ({
     type: ActionType.IMPORT_TIMELINE,
     payload: { importedData }
+  }),
+
+  // UI/project metadata
+  setClientCampaignName: (name: string): TimelineAction => ({
+    type: ActionType.SET_CLIENT_CAMPAIGN_NAME,
+    payload: { name }
   }),
 
   // ============================================

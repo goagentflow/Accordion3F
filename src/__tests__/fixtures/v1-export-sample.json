@@ -1,0 +1,146 @@
+{
+  "version": "1.0",
+  "exportDate": "2024-12-15T14:30:00.000Z",
+  "taskCount": 6,
+  "timeline": [
+    {
+      "id": "v1-task-1",
+      "name": "Content Creation",
+      "duration": 5,
+      "owner": "c",
+      "assetId": "banner-campaign-1",
+      "assetType": "Banner",
+      "startDate": "2025-01-01",
+      "endDate": "2025-01-06",
+      "dependencies": []
+    },
+    {
+      "id": "v1-task-2",
+      "name": "Design Review",
+      "duration": 3,
+      "owner": "m",
+      "assetId": "banner-campaign-1", 
+      "assetType": "Banner",
+      "startDate": "2025-01-04",
+      "endDate": "2025-01-07",
+      "dependencies": [
+        {
+          "predecessorId": "v1-task-1",
+          "type": "FS",
+          "lag": -2
+        }
+      ]
+    },
+    {
+      "id": "v1-task-3",
+      "name": "Production Setup",
+      "duration": 4,
+      "owner": "c",
+      "assetId": "banner-campaign-1",
+      "assetType": "Banner", 
+      "startDate": "2025-01-06",
+      "endDate": "2025-01-10",
+      "dependencies": [
+        {
+          "predecessorId": "v1-task-2",
+          "type": "FS",
+          "lag": -1
+        }
+      ]
+    },
+    {
+      "id": "v1-task-4",
+      "name": "Video Script",
+      "duration": 3,
+      "owner": "c",
+      "assetId": "video-campaign-1",
+      "assetType": "Video",
+      "startDate": "2025-01-01",
+      "endDate": "2025-01-04",
+      "dependencies": []
+    },
+    {
+      "id": "v1-task-5", 
+      "name": "Video Production",
+      "duration": 7,
+      "owner": "m",
+      "assetId": "video-campaign-1",
+      "assetType": "Video",
+      "startDate": "2025-01-02",
+      "endDate": "2025-01-09",
+      "dependencies": [
+        {
+          "predecessorId": "v1-task-4",
+          "type": "FS",
+          "lag": -2
+        }
+      ]
+    },
+    {
+      "id": "v1-task-6",
+      "name": "Final Review",
+      "duration": 2,
+      "owner": "a",
+      "assetId": "video-campaign-1",
+      "assetType": "Video",
+      "startDate": "2025-01-08",
+      "endDate": "2025-01-10",
+      "dependencies": [
+        {
+          "predecessorId": "v1-task-5",
+          "type": "FS",
+          "lag": -1
+        },
+        {
+          "predecessorId": "v1-task-3",
+          "type": "FS",
+          "lag": -2
+        }
+      ]
+    }
+  ],
+  "selectedAssets": [
+    {
+      "id": "banner-campaign-1",
+      "type": "Banner",
+      "name": "Holiday Campaign Banner",
+      "startDate": "2025-01-01"
+    },
+    {
+      "id": "video-campaign-1", 
+      "type": "Video",
+      "name": "Holiday Campaign Video",
+      "startDate": "2025-01-01"
+    }
+  ],
+  "globalLiveDate": "2025-01-20",
+  "assetLiveDates": {
+    "banner-campaign-1": "2025-01-18",
+    "video-campaign-1": "2025-01-22"
+  },
+  "useGlobalDate": false,
+  "customTasks": [
+    {
+      "id": "custom-1",
+      "name": "Strategy Meeting",
+      "duration": 2,
+      "owner": "a"
+    }
+  ],
+  "assetTaskDurations": {
+    "Banner": {
+      "Content Creation": 5,
+      "Design Review": 3,
+      "Production Setup": 4
+    },
+    "Video": {
+      "Video Script": 3,
+      "Video Production": 7,
+      "Final Review": 2
+    }
+  },
+  "customTaskNames": {
+    "Banner": ["Custom Banner Task"],
+    "Video": ["Custom Video Task"]
+  }
+}

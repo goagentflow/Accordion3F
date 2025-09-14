@@ -11,7 +11,12 @@ import { safeToISOString, isBankHoliday, isWeekend, getOwnerFromTask, getOwnerDe
  */
 export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, maxDate, applicationState = {}) => {
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Timeline');
+  // Prepare sheet name from client/campaign name (Excel cap 31 chars, restricted chars)
+  const rawName = (applicationState.clientCampaignName || '').toString().trim();
+  const safeSheetName = rawName
+    ? rawName.replace(/[\\\/:\*\?\[\]]/g, ' ').slice(0, 31).trim() || 'Timeline'
+    : 'Timeline';
+  const worksheet = workbook.addWorksheet(safeSheetName);
 
   // Define colors for different owners (matching pre-refactored colors)
   const colorMap = {
@@ -36,12 +41,10 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   const headerRow2 = worksheet.addRow(['']);
   currentRow++;
 
-  const headerRow3 = worksheet.addRow(['Client:', 'Your Client Name']);
+  // Display the exact project name provided
+  const projectName = rawName || 'Project';
+  const headerRow3 = worksheet.addRow(['Project:', projectName]);
   headerRow3.getCell(1).font = { bold: true, size: 12 };
-  currentRow++;
-
-  const headerRow4 = worksheet.addRow(['Campaign Name:', '']);
-  headerRow4.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
   const liveDate = maxDate.toLocaleDateString();
@@ -302,7 +305,8 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     useGlobalDate: applicationState.useGlobalDate !== undefined ? applicationState.useGlobalDate : true,
     customTasks: applicationState.customTasks || [],
     assetTaskDurations: applicationState.assetTaskDurations || {},
-    customTaskNames: applicationState.customTaskNames || {}
+    customTaskNames: applicationState.customTaskNames || {},
+    clientCampaignName: rawName || ''
   };
 
   metaSheet.getCell('A3').value = JSON.stringify(metadata);
@@ -313,7 +317,9 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `professional_timeline_${new Date().toISOString().split('T')[0]}.xlsx`;
+  // Build filename: "<name> project timeline.xlsx"
+  const safeFileBase = (rawName || 'project').replace(/[^a-z0-9\-\_\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+  a.download = `${safeFileBase || 'project'} project timeline.xlsx`;
   a.click();
   window.URL.revokeObjectURL(url);
 };

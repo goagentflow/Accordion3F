@@ -112,7 +112,8 @@ export const transformImportedJson = (jsonData) => {
     useGlobalDate: jsonData.useGlobalDate !== undefined ? jsonData.useGlobalDate : true,
     customTasks: jsonData.customTasks || [],
     assetTaskDurations: jsonData.assetTaskDurations || {},
-    customTaskNames: jsonData.customTaskNames || {}
+    customTaskNames: jsonData.customTaskNames || {},
+    clientCampaignName: jsonData.clientCampaignName || ''
   };
   return importedData;
 };

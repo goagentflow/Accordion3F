@@ -133,13 +133,14 @@ export const useDates = () => {
  * Provides access to UI state slice
  */
 export const useUI = () => {
-  const { state } = useTimeline();
+  const { state, dispatch } = useTimeline();
   
   return {
     ui: state.ui,
     dateErrors: state.ui.dateErrors,
     calculatedStartDates: state.dates.calculatedStartDates || {},
-    showInfoBox: state.ui.showInfoBox
+    showInfoBox: state.ui.showInfoBox,
+    setClientCampaignName: (name: string) => dispatch(TimelineActions.setClientCampaignName(name))
   };
 };
 

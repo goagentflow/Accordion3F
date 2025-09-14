@@ -82,7 +82,7 @@ const ImportManager: React.FC = () => {
           bankHolidays: [],
           calculatedStartDates: {}
         },
-        ui: { freezeImportedTimeline: false } as any
+        ui: { freezeImportedTimeline: false, clientCampaignName: (data as any).clientCampaignName || '' } as any
       }));
 
       // Re-seed catalog after import so AssetSelector lists all assets

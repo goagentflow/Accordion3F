@@ -6,7 +6,7 @@ Remember them. Follow them. Invoke them when something feels wrong.
 
 ---
 
-## 📜 THE 6 GOLDEN RULES
+## 📜 THE 7 GOLDEN RULES
 
 ### 🔒 Rule #1: Safety First - Protect Data & Users
 **"No data leaks, no crashes, no lost work"**
@@ -262,6 +262,70 @@ try {
 
 ---
 
+### 🧪 Rule #7: Regression Testing
+**"Add regression tests for critical bugs and user-reported issues"**
+
+#### What This Means:
+- **Every critical bug fix** needs a test that prevents it from happening again
+- **User-reported issues** require regression tests even if "fixed" by other changes
+- **Complex feature interactions** need tests to prevent silent breakage
+- **Focus on high-impact areas** rather than testing everything
+
+#### Examples:
+
+```javascript
+// ❌ BAD: Fix bug but don't test it
+function calculateOverlap(task1, task2) {
+  // Fixed: Was returning wrong overlap calculation
+  return Math.max(0, task1.end - task2.start);
+}
+
+// ✅ GOOD: Fix bug AND add regression test
+// Bug fix in code PLUS:
+// __tests__/regression/overlap-calculation.test.js
+test('overlap calculation handles negative scenarios correctly', () => {
+  const task1 = { start: '2025-01-01', end: '2025-01-05' };
+  const task2 = { start: '2025-01-10', end: '2025-01-15' };
+  
+  // This was the bug: returned negative overlap
+  expect(calculateOverlap(task1, task2)).toBe(0);
+});
+```
+
+#### When to Add Regression Tests:
+- **Critical bugs** that caused data loss or crashes
+- **User-reported issues** that made it to production
+- **Excel import/export problems** that break workflows
+- **Timeline calculation errors** that affect project dates
+- **Performance issues** that made the app unusable
+
+#### Test Categories:
+```javascript
+// 1. Data Integrity Tests
+test('Excel roundtrip preserves all task dependencies', () => {
+  // Ensures export → import doesn't lose data
+});
+
+// 2. User Workflow Tests  
+test('undo/redo works for bulk operations', () => {
+  // Ensures users don't lose work
+});
+
+// 3. Edge Case Tests
+test('handles invalid date inputs gracefully', () => {
+  // Ensures app doesn't crash on bad data
+});
+
+// 4. Performance Tests
+test('timeline calculation completes within 5 seconds for 100 tasks', () => {
+  // Ensures app stays responsive
+});
+```
+
+#### Check: *"If this breaks again, would users notice immediately?"*
+
+---
+
 ## 🚨 VIOLATION ALERTS
 
 When you see these patterns, STOP and fix:
@@ -274,6 +338,7 @@ When you see these patterns, STOP and fix:
 | Component doing everything | Rule #4 | Separate concerns |
 | Direct state mutation | Rule #5 | Use reducer |
 | Technical error message | Rule #6 | Make it friendly |
+| Bug fix without test | Rule #7 | Add regression test |
 
 ---
 
@@ -288,6 +353,7 @@ Say these to invoke rules during coding:
 - **"Role check"** → Apply Rule #4
 - **"State check"** → Apply Rule #5
 - **"PM check"** → Apply Rule #6
+- **"Test check"** → Apply Rule #7
 
 ---
 
@@ -296,7 +362,7 @@ Say these to invoke rules during coding:
 ```javascript
 // COPY THIS TO YOUR DESK/MONITOR
 
-🏆 6 GOLDEN RULES - QUICK CHECK
+🏆 7 GOLDEN RULES - QUICK CHECK
 --------------------------------
 1. 🔒 SAFE?     Validated, error-handled, no data loss?
 2. 📏 SMALL?    Under 400 lines?
@@ -304,6 +370,7 @@ Say these to invoke rules during coding:
 4. 🎭 FOCUSED?  One component, one job?
 5. 🔄 FLOWING?  State flows one way?
 6. 💼 FRIENDLY? PM can't lose work or get confused?
+7. 🧪 TESTED?   Critical bugs have regression tests?
 
 IF NO TO ANY → STOP AND FIX
 ```
@@ -320,6 +387,7 @@ At the end of refactoring, we should have:
 - **Single state update pattern** (currently: multiple)
 - **Zero technical error messages** (currently: several)
 - **Auto-save + recovery working** (currently: none)
+- **Regression tests for all critical bugs** (currently: some)
 
 ---
 
@@ -332,6 +400,7 @@ Current `TimelineBuilder.js` violations:
 - ❌ Rule #5: 30+ useState calls
 - ❌ Rule #1: Minimal validation
 - ❌ Rule #6: No auto-save
+- ✅ Rule #7: Some regression tests added
 
 **This refactoring will fix ALL of these!**
 
@@ -345,7 +414,8 @@ Current `TimelineBuilder.js` violations:
 4. **State update added**: Check Rule #5
 5. **User input added**: Apply Rule #1
 6. **Error message written**: Check Rule #6
-7. **End of session**: Full rule check
+7. **Bug fix completed**: Apply Rule #7
+8. **End of session**: Full rule check
 
 ---
 
@@ -362,5 +432,5 @@ These rules exist to:
 
 ---
 
-*Last Updated: [Update when rules change]*
-*Version: 1.0*
+*Last Updated: September 13, 2025*
+*Version: 1.1 - Added Rule #7: Regression Testing*

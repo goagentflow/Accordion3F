@@ -49,7 +49,8 @@ export const initialTimelineState: TimelineState = {
     showGettingStarted: false,
     showAllInstructions: false,
     dateErrors: [],
-    freezeImportedTimeline: false
+    freezeImportedTimeline: false,
+    clientCampaignName: ''
   },
   status: 'ready'
 };
@@ -382,8 +383,32 @@ export function handleImportTimeline(
       ...initialTimelineState.tasks,
       timeline: importedData.tasks || [],
     },
+    ui: {
+      ...state.ui,
+      clientCampaignName: (importedData as any).clientCampaignName || state.ui.clientCampaignName
+    }
     // Additional state restoration logic will be added here
     // For now, keeping it simple to avoid breaking changes
+  };
+}
+
+// ============================================
+// UI: Client/Campaign Name
+// ============================================
+export function handleSetClientCampaignName(
+  state: TimelineState,
+  action: Extract<TimelineAction, { type: ActionType.SET_CLIENT_CAMPAIGN_NAME }>
+): TimelineState {
+  // Preserve user input exactly as typed (including spaces) to avoid
+  // fighting the cursor during editing. We sanitize on export.
+  const raw = (action as any).payload?.name ?? '';
+  const name = typeof raw === 'string' ? raw : '';
+  return {
+    ...state,
+    ui: {
+      ...state.ui,
+      clientCampaignName: name
+    }
   };
 }
 

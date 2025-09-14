@@ -42,7 +42,7 @@ const TimelineBuilder: React.FC = () => {
   const { assets, addAsset, removeAsset, renameAsset, setAssetStartDate } = useAssets();
   const { tasks, addCustomTask, updateTaskDuration, renameTask } = useTasks();
   const { dates, setGlobalLiveDate, toggleUseGlobalDate } = useDates();
-  const { ui } = useUI();
+  const { ui, setClientCampaignName } = useUI();
 
   // Local UI state (not part of global state)
   const [showGettingStarted, setShowGettingStarted] = useState(false);
@@ -304,7 +304,9 @@ const TimelineBuilder: React.FC = () => {
         current.setDate(current.getDate() + 1);
       }
 
-      await exportToExcel(tasks.timeline, dateColumns, dates.bankHolidays, minDate, maxDate);
+      await exportToExcel(tasks.timeline, dateColumns, dates.bankHolidays, minDate, maxDate, {
+        clientCampaignName: ui.clientCampaignName || ''
+      });
     } catch (error) {
       console.error('Export error:', error);
       setImportError('Failed to export timeline. Please try again.');
@@ -402,7 +404,7 @@ const TimelineBuilder: React.FC = () => {
           bankHolidays: dates.bankHolidays,
           calculatedStartDates: {}
         },
-        ui: { freezeImportedTimeline: false } as any
+        ui: { freezeImportedTimeline: false, clientCampaignName: importedData.clientCampaignName || '' } as any
       }));
 
       setImportError(null);
@@ -456,7 +458,7 @@ const TimelineBuilder: React.FC = () => {
               <button
                 data-testid="export-excel"
                 onClick={handleExportExcel}
-                disabled={isExporting || tasks.timeline.length === 0}
+                disabled={isExporting || tasks.timeline.length === 0 || !(ui.clientCampaignName && ui.clientCampaignName.trim())}
                 className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 title="Export Timeline to Excel"
               >
@@ -543,6 +545,8 @@ const TimelineBuilder: React.FC = () => {
             
             <CampaignSetup 
               {...{
+                clientCampaignName: ui.clientCampaignName || '',
+                onClientCampaignNameChange: setClientCampaignName,
                 globalLiveDate: dates.globalLiveDate,
                 onGlobalLiveDateChange: handleGlobalLiveDateChange,
                 useGlobalDate: dates.useGlobalDate,

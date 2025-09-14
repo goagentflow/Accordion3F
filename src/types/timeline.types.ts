@@ -83,6 +83,8 @@ export interface UIState {
   // When true, Orchestrator will not rebuild timeline after an Excel import
   // and will only compute derived warnings (earliest starts, conflicts)
   freezeImportedTimeline?: boolean;
+  // Project identity field shown in UI and exported to Excel
+  clientCampaignName?: string;
 }
 
 export interface TimelineState {
@@ -146,6 +148,8 @@ export enum ActionType {
   RESET_STATE = 'RESET_STATE',
   CLEAR_ALL = 'CLEAR_ALL',
   IMPORT_TIMELINE = 'IMPORT_TIMELINE',
+  // UI/project metadata
+  SET_CLIENT_CAMPAIGN_NAME = 'SET_CLIENT_CAMPAIGN_NAME',
   
   // NEW: Manipulation bug fix actions
   DRAG_TASK = 'DRAG_TASK',
@@ -431,6 +435,11 @@ export interface RedoAction {
   payload?: never;
 }
 
+export interface SetClientCampaignNameAction {
+  type: ActionType.SET_CLIENT_CAMPAIGN_NAME;
+  payload: { name: string };
+}
+
 // Union type of all actions
 export type TimelineAction =
   | AddAssetAction
@@ -469,7 +478,8 @@ export type TimelineAction =
   | DragTaskAction
   | HydrateFromStorageAction
   | UndoAction
-  | RedoAction;
+  | RedoAction
+  | SetClientCampaignNameAction;
 
 // ============================================
 // Dependency Validation Types

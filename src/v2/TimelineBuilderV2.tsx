@@ -26,7 +26,7 @@ const LeftColumn: React.FC = () => {
   const { dispatch } = useTimeline();
   const { assets, addAsset, removeAsset, renameAsset, setAssetStartDate } = useAssets();
   const { dates, setGlobalLiveDate, toggleUseGlobalDate } = useDates();
-  const { ui } = useUI();
+  const { ui, setClientCampaignName } = useUI() as any;
   const { csvRows } = useCatalog();
 
   const workingDaysNeeded = calculateWorkingDaysNeeded(
@@ -43,6 +43,8 @@ const LeftColumn: React.FC = () => {
       {/* Campaign Setup */}
       <CampaignSetup
         {...{
+          clientCampaignName: ui.clientCampaignName || '',
+          onClientCampaignNameChange: setClientCampaignName,
           globalLiveDate: dates.globalLiveDate,
           onGlobalLiveDateChange: setGlobalLiveDate,
           useGlobalDate: dates.useGlobalDate,
@@ -319,7 +321,7 @@ const HeaderActions: React.FC = () => {
       <ImportManager />
       <button
         onClick={handleExport}
-        disabled={!state.tasks?.timeline || state.tasks.timeline.length === 0}
+        disabled={!state.tasks?.timeline || state.tasks.timeline.length === 0 || !(state.ui?.clientCampaignName && state.ui.clientCampaignName.trim())}
         className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50"
         title="Export Timeline to Excel"
       >

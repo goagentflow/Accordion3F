@@ -54,6 +54,9 @@ const TimelineBuilder = () => {
     // Add state to store bank holidays
     const [bankHolidays, setBankHolidays] = useState([]); // Array of YYYY-MM-DD strings
 
+    // Project name (Client/Campaign Name)
+    const [projectName, setProjectName] = useState('');
+
     // State for parallel task configuration (empty for now, ready for future use)
     const [parallelConfig, setParallelConfig] = useState({}); // { taskName: { parallelWith: string, startOffset: number } }
 
@@ -1671,6 +1674,10 @@ useEffect(() => {
             setImportError('No timeline to export. Please add some assets first.');
             return;
         }
+        if (!projectName || projectName.trim() === '') {
+            setImportError('Please enter a Client/Campaign Name before exporting.');
+            return;
+        }
 
         setIsExporting(true);
         setImportError(null);
@@ -1712,7 +1719,8 @@ useEffect(() => {
                 useGlobalDate,
                 customTasks,
                 assetTaskDurations,
-                customTaskNames
+                customTaskNames,
+                clientCampaignName: projectName.trim()
             };
 
             // If selectedAssets is empty but we have tasks, reconstruct assets from tasks
@@ -1905,6 +1913,10 @@ useEffect(() => {
                 console.log('Restoring customTaskNames:', importedData.customTaskNames);
                 setCustomTaskNames(importedData.customTaskNames);
             }
+
+            if (importedData.clientCampaignName) {
+                setProjectName(importedData.clientCampaignName);
+            }
             
             // Timeline tasks will be rebuilt automatically by useEffect hooks once assets are restored
             setImportError(null);
@@ -1957,23 +1969,23 @@ useEffect(() => {
                         <h1 className="text-3xl font-bold text-gray-800">Accordion Timeline Builder</h1>
                         <div className="flex items-center space-x-2">
                             {/* Excel Import/Export */}
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isImporting}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
                                 className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                                 title="Import Timeline from Excel"
                             >
                                 {isImporting ? '⏳ Importing...' : '📥 Import'}
                             </button>
-                            <button
-                                data-testid="export-excel"
-                                onClick={handleExportExcel}
-                                disabled={isExporting || timelineTasks.length === 0}
-                                className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                                title="Export Timeline to Excel"
-                            >
-                                {isExporting ? '⏳ Exporting...' : '📊 Export'}
-                            </button>
+              <button
+                data-testid="export-excel"
+                onClick={handleExportExcel}
+                disabled={isExporting || timelineTasks.length === 0 || !projectName || projectName.trim() === ''}
+                className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                title="Export Timeline to Excel"
+              >
+                {isExporting ? '⏳ Exporting...' : '📊 Export'}
+              </button>
                             
                             {/* Analytics Button - Removed to simplify UI */}
                             
@@ -2045,6 +2057,11 @@ useEffect(() => {
 >
                         <h2 className="text-xl font-semibold mb-4 border-b pb-3 text-gray-700">Timeline Setup</h2>
                         <CampaignSetup 
+                            clientCampaignName={projectName || ''}
+                            onClientCampaignNameChange={(name) => {
+                                // legacy builder local state for project name
+                                setProjectName && setProjectName(name);
+                            }}
                             globalLiveDate={globalLiveDate}
                             onGlobalLiveDateChange={(date) => {
                                 executeAction(() => setGlobalLiveDate(date), `Change global go-live date to ${date}`);

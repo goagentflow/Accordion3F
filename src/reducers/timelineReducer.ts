@@ -50,7 +50,8 @@ import {
   handleImportState,
   handleImportTimeline,
   handleRenameTask,
-  handleUpdateTaskBank
+  handleUpdateTaskBank,
+  handleSetClientCampaignName
 } from './systemReducer';
 
 import {
@@ -131,6 +132,8 @@ export function timelineReducer(
       return handleSetGettingStarted(state, action);
     case ActionType.SET_ALL_INSTRUCTIONS:
       return handleSetAllInstructions(state, action);
+    case ActionType.SET_CLIENT_CAMPAIGN_NAME:
+      return handleSetClientCampaignName(state, action);
 
     // ============================================
     // System Actions
