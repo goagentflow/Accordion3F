@@ -38,14 +38,41 @@ export const importFromExcel = async (file) => {
   let jsonData = null;
   
   // Check cell A3 first (new format with warning), then A1 (old format)
-  const cell = dataWorksheet.getCell('A3').value || dataWorksheet.getCell('A1').value;
+  const cellA2 = dataWorksheet.getCell('A2').value;
+  const cellA3 = dataWorksheet.getCell('A3').value;
+  const cell = cellA3 || dataWorksheet.getCell('A1').value;
   
   if (!cell) {
     throw new Error('Timeline data is missing or empty. The data may have been accidentally deleted.');
   }
 
   try {
-    jsonData = typeof cell === 'string' ? JSON.parse(cell) : cell;
+    if (typeof cell === 'string' && cell.startsWith('GZIP:')) {
+      const b64 = cell.slice(5);
+      const binary = atob(b64);
+      const u8 = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+      if (typeof DecompressionStream === 'undefined') {
+        throw new Error('This browser cannot read compressed metadata. Please export again on this device.');
+      }
+      const ds = new DecompressionStream('gzip');
+      const w = ds.writable.getWriter();
+      await w.write(u8);
+      await w.close();
+      const jsonText = await new Response(ds.readable).text();
+      jsonData = JSON.parse(jsonText);
+    } else if (typeof cellA2 === 'string' && cellA2.startsWith('_META_CHUNKS:')) {
+      // Fallback for exporters without CompressionStream: reassemble chunked metadata
+      const count = parseInt(cellA2.split(':')[1], 10) || 0;
+      let combined = '';
+      for (let i = 0; i < count; i++) {
+        const part = dataWorksheet.getCell(3 + i, 1).value || '';
+        combined += String(part);
+      }
+      jsonData = JSON.parse(combined);
+    } else {
+      jsonData = typeof cell === 'string' ? JSON.parse(cell) : cell;
+    }
   } catch (error) {
     throw new Error('Timeline data is corrupted and cannot be read. Please use the original exported file.');
   }

@@ -11,6 +11,14 @@ import { safeToISOString, isBankHoliday, isWeekend, getOwnerFromTask, getOwnerDe
  */
 export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, maxDate, applicationState = {}) => {
   const workbook = new ExcelJS.Workbook();
+  // Excel-safe string helper: strip control chars Excel can't store in sharedStrings
+  const excelSafe = (val) => {
+    if (val == null) return '';
+    const s = String(val);
+    // Remove ASCII control characters except tab (\x09), LF (\x0A), CR (\x0D)
+    return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  };
+  const safeRow = (arr) => arr.map(v => (typeof v === 'string' ? excelSafe(v) : v));
   // Prepare sheet name from client/campaign name (Excel cap 31 chars, restricted chars)
   const rawName = (applicationState.clientCampaignName || '').toString().trim();
   const safeSheetName = rawName
@@ -33,7 +41,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   let currentRow = 1;
 
   // 1. Add professional header with company branding
-  const headerRow1 = worksheet.addRow(['Mail METRO MEDIA']);
+  const headerRow1 = worksheet.addRow(safeRow(['Mail METRO MEDIA']));
   headerRow1.getCell(1).font = { bold: true, size: 18, color: { argb: 'FF2E75B6' } };
   headerRow1.getCell(1).alignment = { horizontal: 'left' };
   currentRow++;
@@ -43,25 +51,25 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
 
   // Display the exact project name provided
   const projectName = rawName || 'Project';
-  const headerRow3 = worksheet.addRow(['Project:', projectName]);
+  const headerRow3 = worksheet.addRow(safeRow(['Project:', projectName]));
   headerRow3.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
   const liveDate = maxDate.toLocaleDateString();
-  const headerRow5 = worksheet.addRow(['Live Date:', liveDate]);
+  const headerRow5 = worksheet.addRow(safeRow(['Live Date:', liveDate]));
   headerRow5.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
-  const headerRow6 = worksheet.addRow(['Generated:', new Date().toLocaleDateString()]);
+  const headerRow6 = worksheet.addRow(safeRow(['Generated:', new Date().toLocaleDateString()]));
   headerRow6.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
-  const headerRow7 = worksheet.addRow(['Total Tasks:', tasks.length]);
+  const headerRow7 = worksheet.addRow(safeRow(['Total Tasks:', tasks.length]));
   headerRow7.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
   const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
-  const headerRow8 = worksheet.addRow(['Project Duration:', `${totalDays} days`]);
+  const headerRow8 = worksheet.addRow(safeRow(['Project Duration:', `${totalDays} days`]));
   headerRow8.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
@@ -69,7 +77,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   currentRow++;
 
   // 2. Add dynamic legend based on actual tasks
-  const legendRow1 = worksheet.addRow(['Legend:']);
+  const legendRow1 = worksheet.addRow(safeRow(['Legend:']));
   legendRow1.getCell(1).font = { bold: true, size: 14 };
   currentRow++;
 
@@ -78,7 +86,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
 
   // Add legend rows only for owners that are actually used
   usedOwners.forEach((owner, index) => {
-    const legendRow = worksheet.addRow([getOwnerDescription(owner)]);
+    const legendRow = worksheet.addRow(safeRow([getOwnerDescription(owner)]));
     const colorCell = legendRow.getCell(1);
     const colors = getOwnerColor(owner);
     colorCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + colors.fill } };
@@ -152,7 +160,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     const asset = selectedAssets[groupKey];
     const headerLabel = asset?.name || assetTasks[0]?.assetType || 'Asset';
 
-    const assetHeaderRow = worksheet.addRow([headerLabel]);
+    const assetHeaderRow = worksheet.addRow(safeRow([headerLabel]));
     assetHeaderRow.height = 25;
     const assetHeaderCell = assetHeaderRow.getCell(1);
     assetHeaderCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
@@ -178,7 +186,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
       const taskNameCell = taskRow.getCell(1);
       const taskNameParts = task.name.split(': ');
       const cleanTaskName = taskNameParts.length > 1 ? taskNameParts[1] : task.name;
-      taskNameCell.value = cleanTaskName;
+      taskNameCell.value = excelSafe(cleanTaskName);
       taskNameCell.font = { size: 10 };
       taskNameCell.border = {
         top: { style: 'thin' },
@@ -309,17 +317,48 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     clientCampaignName: rawName || ''
   };
 
-  metaSheet.getCell('A3').value = JSON.stringify(metadata);
+  // Write metadata JSON; if very large, compress to avoid sharedStrings repairs
+  const jsonPlain = JSON.stringify(metadata);
+  const writeMeta = async () => {
+    try {
+      // Deterministic: always chunk when exceeding 30,000 characters
+      if (jsonPlain.length > 30000) {
+        const CHUNK_SIZE = 30000;
+        const parts = [];
+        for (let i = 0; i < jsonPlain.length; i += CHUNK_SIZE) parts.push(jsonPlain.slice(i, i + CHUNK_SIZE));
+        metaSheet.getCell('A2').value = `_META_CHUNKS:${parts.length}`;
+        parts.forEach((s, idx) => metaSheet.getCell(3 + idx, 1).value = s);
+      } else {
+        metaSheet.getCell('A3').value = jsonPlain;
+      }
+    } catch {
+      // Last resort: write plain JSON (Excel may repair on open for extremely large files)
+      metaSheet.getCell('A3').value = jsonPlain;
+    }
+  };
+  await writeMeta();
 
   // Generate and download the file
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  // Build filename: "<name> project timeline.xlsx"
-  const safeFileBase = (rawName || 'project').replace(/[^a-z0-9\-\_\s]/gi, ' ').replace(/\s+/g, ' ').trim();
-  a.download = `${safeFileBase || 'project'} project timeline.xlsx`;
-  a.click();
-  window.URL.revokeObjectURL(url);
+  try {
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // Build filename: "<name> project timeline.xlsx"
+    const safeFileBase = (rawName || 'project').replace(/[^a-z0-9\-\_\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+    a.download = `${safeFileBase || 'project'} project timeline.xlsx`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    // Cleanup
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 0);
+  } catch (err) {
+    // Surface any unexpected export failure to the user
+    console.error('Excel export failed:', err);
+    alert('Failed to export Excel file. Please try again.');
+  }
 };

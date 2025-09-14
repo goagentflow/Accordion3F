@@ -75,13 +75,18 @@ export const Orchestrator: React.FC = () => {
       const resolvedGlobal = dates.globalLiveDate && dates.globalLiveDate.trim() !== '' ? dates.globalLiveDate : undefined;
       const live = dates.useGlobalDate ? (resolvedGlobal || asset.startDate) : asset.startDate;
       if (!live || base.length === 0) return;
-      // Clone raw tasks for this asset instance
-      const raw = base.map((t: any, idx: number) => ({
-        ...t,
-        id: `${asset.id}-template-${idx}`,
-        assetId: asset.id,
-        assetType: asset.type
-      }));
+      // Clone raw tasks for this asset instance and build baseId -> remappedId map
+      const idMap = new Map<string, string>();
+      const raw = base.map((t: any, idx: number) => {
+        const remappedId = `${asset.id}-template-${idx}`;
+        if (t && t.id) idMap.set(t.id, remappedId);
+        return {
+          ...t,
+          id: remappedId,
+          assetId: asset.id,
+          assetType: asset.type
+        };
+      });
 
       // Build allowed id set and sanitize dependencies
       const allowedIds = new Set(raw.map((r: any) => r.id));
@@ -96,16 +101,32 @@ export const Orchestrator: React.FC = () => {
         return filtered.map(d => ({ predecessorId: d.predecessorId, type: 'FS' as const, lag: d.lag }));
       };
 
-      raw.forEach((r: any) => {
-        // Preserve dependencies embedded in instanceBase when present.
-        const existing = Array.isArray(r.dependencies) ? r.dependencies : [];
-        const sanitizedExisting = existing
-          .filter((d: any) => d && allowedIds.has(d.predecessorId) && d.predecessorId !== r.id)
-          .map((d: any) => ({ predecessorId: d.predecessorId, type: 'FS' as const, lag: Number(d.lag) || 0 }));
+      raw.forEach((r: any, idx: number) => {
+        // Prefer instanceBase dependencies when present; remap base ids to current raw ids
+        const baseDeps = Array.isArray(base[idx]?.dependencies) ? base[idx].dependencies : [];
+        const remappedBaseDeps = baseDeps.map((d: any) => ({
+          predecessorId: idMap.get(d.predecessorId) || d.predecessorId,
+          type: 'FS' as const,
+          lag: Number(d.lag) || 0
+        }));
         const fromGlobal = sanitizeFromGlobal(r.id);
-        // Prefer explicit global mapping when available; otherwise keep imported/embedded deps
-        r.dependencies = (fromGlobal && fromGlobal.length > 0) ? fromGlobal : sanitizedExisting;
+        const candidate = (remappedBaseDeps && remappedBaseDeps.length > 0) ? remappedBaseDeps : fromGlobal;
+        r.dependencies = (candidate || []).filter((d: any) => allowedIds.has(d.predecessorId) && d.predecessorId !== r.id);
       });
+
+      // Enforce within-asset sequential guard when using instanceBase
+      if (instanceBase && instanceBase.length > 0) {
+        for (let i = 1; i < raw.length; i++) {
+          const prev = raw[i - 1];
+          const curr = raw[i];
+          const deps: Array<{ predecessorId: string; type: 'FS'; lag: number }> = Array.isArray(curr.dependencies)
+            ? (curr.dependencies as Array<{ predecessorId: string; type: 'FS'; lag: number }>)
+            : [];
+          const hasPrev = deps.some((d: { predecessorId: string; type: 'FS'; lag: number }) => d && d.type === 'FS' && d.predecessorId === prev.id);
+          if (!hasPrev) deps.push({ predecessorId: prev.id, type: 'FS' as const, lag: 0 });
+          curr.dependencies = deps;
+        }
+      }
 
       // When using instanceBase (imported editable plan), custom tasks are already embedded.
       if (!(instanceBase && instanceBase.length > 0)) {
