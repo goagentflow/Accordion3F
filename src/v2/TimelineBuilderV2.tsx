@@ -129,6 +129,7 @@ const RightColumn: React.FC = () => {
   const { dispatch } = useTimeline();
   const { exportTimeline } = useExcelExport();
   const assetConflicts = useAssetConflicts();
+  const [conflictsCollapsed, setConflictsCollapsed] = useState(false);
 
   const workingDaysNeeded = calculateWorkingDaysNeeded(
     assets.selected,
@@ -243,12 +244,28 @@ const RightColumn: React.FC = () => {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg" data-testid="v2-right-column">
-      {/* Conflicts banner parity with V1 */}
+      {/* Timeline Conflicts */}
       {(ui.dateErrors && ui.dateErrors.length > 0) || sundayViolations.length > 0 ? (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-          <h3 className="text-red-800 font-medium mb-2">⚠️ Timeline Conflicts</h3>
-          <p className="text-red-700 text-sm mb-2">The following assets need attention:</p>
-          <ul className="text-red-700 text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-red-800 font-semibold">⚠️ Timeline Conflicts</h3>
+            <button
+              onClick={() => setConflictsCollapsed(v => !v)}
+              className="text-red-700 hover:text-red-900 text-sm"
+              aria-expanded={!conflictsCollapsed}
+              aria-controls="timeline-conflicts-body"
+            >
+              {conflictsCollapsed ? 'Show details ▾' : 'Hide details ▴'}
+            </button>
+          </div>
+          {conflictsCollapsed ? (
+            <div id="timeline-conflicts-body" className="text-sm text-red-700">
+              <span className="font-medium">{ui.dateErrors.length}</span> asset{ui.dateErrors.length === 1 ? '' : 's'} need shortening • <span className="font-medium">{workingDaysNeeded.needed}</span> working day{workingDaysNeeded.needed === 1 ? '' : 's'} to save
+            </div>
+          ) : (
+            <>
+              <p className="text-red-700 text-sm mb-2">The following assets need attention:</p>
+              <ul id="timeline-conflicts-body" className="text-red-700 text-sm">
             {(() => {
               const conflictIds = new Set<string>(ui.dateErrors || []);
               const sundayIds = new Set<string>(sundayViolations.map((a: any) => a.id));
@@ -257,7 +274,9 @@ const RightColumn: React.FC = () => {
                 const asset = (assets.selected || []).find(a => a.id === id);
                 const hasDateConflict = conflictIds.has(id);
                 const requiresSunday = sundayIds.has(id);
-                const calcStart = dates.calculatedStartDates?.[id];
+                const conflict = (assetConflicts || []).find(c => c.assetId === id);
+                const totalDuration = conflict?.totalDuration;
+                const daysNeeded = conflict?.daysNeeded;
 
                 if (!asset) return null;
 
@@ -290,23 +309,32 @@ const RightColumn: React.FC = () => {
                   }
                 };
                 return (
-                  <li key={`conflict-${id}`} className="ml-4">
-                    • <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900">
-                      {asset.name || 'Unknown Asset'}
-                    </button>
-                    {requiresSunday && hasDateConflict ? (
-                      <span>{` — This asset requires a Sunday live date and cannot be completed by its current live date${calcStart ? ` (would need to start on ${calcStart})` : ''}.`}</span>
-                    ) : requiresSunday ? (
-                      <span>{` — This asset requires a Sunday live date—change the live date so it falls on a Sunday.`}</span>
-                    ) : hasDateConflict ? (
-                      <span>{` (would need to start on ${calcStart || 'TBD'})`}</span>
+                  <li key={`conflict-${id}`} className="ml-1 p-2 bg-white border border-red-100 rounded">
+                    <div className="text-sm">
+                      • <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900 font-medium">
+                        {asset.name || 'Unknown Asset'}
+                      </button>
+                    </div>
+                    {requiresSunday && !hasDateConflict ? (
+                      <div className="text-xs text-red-700 mt-1">
+                        This asset requires a Sunday live date—change the live date so it falls on a Sunday.
+                      </div>
+                    ) : null}
+                    {hasDateConflict ? (
+                      <div className="text-xs text-red-700 mt-1">
+                        <span className="mr-4"><span className="font-semibold">Total duration:</span> {typeof totalDuration === 'number' ? `${totalDuration} day${totalDuration === 1 ? '' : 's'}` : '—'}</span>
+                        <span><span className="font-semibold">Working days needed:</span> {typeof daysNeeded === 'number' ? daysNeeded : '—'}</span>
+                      </div>
                     ) : null}
                   </li>
                 );
               }).filter(Boolean);
               return items as any;
             })()}
-          </ul>
+              </ul>
+              <p className="text-red-700 text-sm mt-2 font-medium">Adjust task durations in the Gantt chart or change the go‑live date.</p>
+            </>
+          )}
         </div>
       ) : null}
 
