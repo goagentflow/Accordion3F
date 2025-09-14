@@ -19,6 +19,26 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
   };
   const safeRow = (arr) => arr.map(v => (typeof v === 'string' ? excelSafe(v) : v));
+
+  // Load image from public path and convert to base64 (content only)
+  const loadLogoBase64 = async (url) => {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const s = String(reader.result || '');
+          resolve(s.includes(',') ? s.split(',')[1] : s);
+        };
+        reader.readAsDataURL(blob);
+      });
+      return base64;
+    } catch {
+      return null;
+    }
+  };
   // Prepare sheet name from client/campaign name (Excel cap 31 chars, restricted chars)
   const rawName = (applicationState.clientCampaignName || '').toString().trim();
   const safeSheetName = rawName
@@ -40,14 +60,49 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
 
   let currentRow = 1;
 
-  // 1. Add professional header with company branding
-  const headerRow1 = worksheet.addRow(safeRow(['Mail METRO MEDIA']));
-  headerRow1.getCell(1).font = { bold: true, size: 18, color: { argb: 'FF2E75B6' } };
-  headerRow1.getCell(1).alignment = { horizontal: 'left' };
-  currentRow++;
+  // 1. Add branding header (logo if available across A1:C3)
+  let logoPlaced = false;
+  const logoUrl = applicationState.logoUrl || '/brand/MMM%20Logo.png';
+  const base64Logo = await loadLogoBase64(logoUrl);
+  if (base64Logo) {
+    try {
+      const imageId = workbook.addImage({ base64: base64Logo, extension: 'png' });
+      // Stretch across A1..C3; adjust row heights for a clean band
+      worksheet.getRow(1).height = 26;
+      worksheet.getRow(2).height = 24;
+      worksheet.getRow(3).height = 24;
+      worksheet.addImage(imageId, 'A1:C3');
+      currentRow = 4;
+      logoPlaced = true;
+    } catch {
+      logoPlaced = false;
+    }
+  }
+  if (!logoPlaced) {
+    const headerRow1 = worksheet.addRow(safeRow(['Mail METRO MEDIA']));
+    headerRow1.getCell(1).font = { bold: true, size: 18, color: { argb: 'FF2E75B6' } };
+    headerRow1.getCell(1).alignment = { horizontal: 'left' };
+    currentRow++;
+    const headerRow2 = worksheet.addRow(['']);
+    currentRow++;
+  }
 
-  const headerRow2 = worksheet.addRow(['']);
-  currentRow++;
+  // Compute true, unpadded range and working-day duration from tasks
+  const starts = [];
+  const ends = [];
+  (Array.isArray(tasks) ? tasks : []).forEach(t => {
+    if (t && t.start) {
+      const d = new Date(t.start);
+      if (!isNaN(d.getTime())) starts.push(d);
+    }
+    if (t && t.end) {
+      const d = new Date(t.end);
+      if (!isNaN(d.getTime())) ends.push(d);
+    }
+  });
+  const trueStartDate = starts.length ? new Date(Math.min(...starts.map(d => d.getTime()))) : (minDate instanceof Date ? minDate : new Date());
+  const trueEndDate = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : (maxDate instanceof Date ? maxDate : new Date());
+  const totalWorkingDays = countWorkingDays(trueStartDate, trueEndDate, bankHolidays || []);
 
   // Display the exact project name provided
   const projectName = rawName || 'Project';
@@ -55,7 +110,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   headerRow3.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
-  const liveDate = maxDate.toLocaleDateString();
+  const liveDate = trueEndDate.toLocaleDateString();
   const headerRow5 = worksheet.addRow(safeRow(['Live Date:', liveDate]));
   headerRow5.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
@@ -68,8 +123,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   headerRow7.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
-  const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
-  const headerRow8 = worksheet.addRow(safeRow(['Project Duration:', `${totalDays} days`]));
+  const headerRow8 = worksheet.addRow(safeRow(['Project Duration:', `${totalWorkingDays} working days`]));
   headerRow8.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
@@ -271,9 +325,9 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   // 6. Add summary section at the bottom
   const summaryRow1 = worksheet.addRow(['']);
   const summaryRow2 = worksheet.addRow(['Summary']);
-  const summaryRow3 = worksheet.addRow(['Earliest Start:', minDate.toLocaleDateString()]);
-  const summaryRow4 = worksheet.addRow(['Latest End:', maxDate.toLocaleDateString()]);
-  const summaryRow5 = worksheet.addRow(['Total Working Days:', dateColumns.filter(date => !isWeekend(date) && !isBankHoliday(date, bankHolidays)).length]);
+  const summaryRow3 = worksheet.addRow(['Earliest Start:', trueStartDate.toLocaleDateString()]);
+  const summaryRow4 = worksheet.addRow(['Latest End:', trueEndDate.toLocaleDateString()]);
+  const summaryRow5 = worksheet.addRow(['Total Working Days:', totalWorkingDays]);
 
   // Style summary
   summaryRow2.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF2E75B6' } };
@@ -308,7 +362,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     })),
     // Application state for full restoration
     selectedAssets: applicationState.selectedAssets || [],
-    globalLiveDate: applicationState.globalLiveDate || maxDate.toISOString().split('T')[0],
+    globalLiveDate: applicationState.globalLiveDate || trueEndDate.toISOString().split('T')[0],
     assetLiveDates: applicationState.assetLiveDates || {},
     useGlobalDate: applicationState.useGlobalDate !== undefined ? applicationState.useGlobalDate : true,
     customTasks: applicationState.customTasks || [],

@@ -4,7 +4,6 @@ import GanttLegend from './GanttLegend';
 import GanttTaskRow from './GanttTaskRow';
 import AssetGroupSection from './AssetGroupSection';
 import GanttAddTaskModal from './GanttAddTaskModal';
-import GanttAssetAlerts from './GanttAssetAlerts';
 import GanttDependencyVisuals from './GanttDependencyVisuals';
 import DragDropDependencyOverlay from './DragDropDependencyOverlay';
 // import { useDragDropDependency } from '../hooks/useDragDropDependency';
@@ -16,6 +15,7 @@ import {
   generateDateColumns
 } from './ganttUtils';
 import useGanttDrag from '../hooks/useGanttDrag';
+import { calculateWorkingDaysBetween } from '../utils/dateHelpers';
 
 
 const GanttChart = ({ 
@@ -48,6 +48,7 @@ const GanttChart = ({
   // This allows graceful fallback when TimelineProvider is not available
   
   const containerRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   // Memoized timeline bounds calculation - expensive operation with 150+ tasks
   const { minDate, maxDate, dateColumns, totalDays } = useMemo(() => {
@@ -69,6 +70,37 @@ const GanttChart = ({
     
     return { minDate, maxDate, dateColumns, totalDays };
   }, [tasks]); // Only recalculate when tasks change
+
+  // True, unpadded summary derived from current tasks (source of truth)
+  const { actualStart, actualEnd, totalWorkingDays } = useMemo(() => {
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      return { actualStart: null, actualEnd: null, totalWorkingDays: 0 };
+    }
+    const starts = [];
+    const ends = [];
+    for (const t of tasks) {
+      if (t && t.start) {
+        const s = new Date(t.start);
+        if (!isNaN(s.getTime())) starts.push(s);
+      }
+      if (t && t.end) {
+        const e = new Date(t.end);
+        if (!isNaN(e.getTime())) ends.push(e);
+      }
+    }
+    if (starts.length === 0 || ends.length === 0) {
+      return { actualStart: null, actualEnd: null, totalWorkingDays: 0 };
+    }
+    const actualStart = new Date(Math.min(...starts.map(d => d.getTime())));
+    const actualEnd = new Date(Math.max(...ends.map(d => d.getTime())));
+
+    // Inclusive working days between start and end
+    const endPlusOne = new Date(actualEnd);
+    endPlusOne.setDate(endPlusOne.getDate() + 1);
+    const totalWorkingDays = calculateWorkingDaysBetween(actualStart, endPlusOne, bankHolidays);
+
+    return { actualStart, actualEnd, totalWorkingDays };
+  }, [tasks, bankHolidays]);
 
   // Group tasks by asset for clearer visual separation
   const assetGroups = useMemo(() => {
@@ -187,6 +219,53 @@ const GanttChart = ({
     }
   }, [dragState.sourceTaskId, handleDependencyMouseMove, handleDependencyMouseUp]);
 
+  // Listen for requests to focus a specific asset's tasks from the left panel
+  useEffect(() => {
+    const handler = (e) => {
+      try {
+        const assetId = e?.detail?.assetId;
+        if (!assetId) return;
+        const el = document.querySelector(`[data-asset-id="${assetId}"]`);
+        if (!el) return;
+
+        // Find nearest scrollable ancestor; fall back to window
+        const getScrollable = (node) => {
+          let cur = node;
+          while (cur && cur.parentElement) {
+            cur = cur.parentElement;
+            const style = cur && window.getComputedStyle(cur);
+            if (style && (style.overflowY === 'auto' || style.overflowY === 'scroll')) {
+              return cur;
+            }
+          }
+          return window;
+        };
+
+        const scroller = getScrollable(el);
+        const OFFSET = 140; // same offset used in conflicts card
+        if (scroller === window) {
+          const rect = el.getBoundingClientRect();
+          const y = rect.top + window.pageYOffset;
+          window.scrollTo({ top: Math.max(0, y - OFFSET), behavior: 'smooth' });
+        } else {
+          const container = scroller;
+          const containerRect = container.getBoundingClientRect();
+          const targetRect = el.getBoundingClientRect();
+          const delta = (targetRect.top - containerRect.top) - OFFSET;
+          container.scrollTo({ top: container.scrollTop + delta, behavior: 'smooth' });
+        }
+
+        // Brief highlight pulse on the asset section
+        try {
+          el.classList.add('ring-2', 'ring-yellow-400');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-yellow-400'), 1200);
+        } catch {}
+      } catch {}
+    };
+    window.addEventListener('focus-asset-in-gantt', handler);
+    return () => window.removeEventListener('focus-asset-in-gantt', handler);
+  }, []);
+
   // Empty state
   if (!tasks || tasks.length === 0) {
     return (
@@ -205,7 +284,7 @@ const GanttChart = ({
           <div>
             <h3 className="text-lg font-semibold text-blue-800">Project Gantt Chart</h3>
             <p className="text-sm text-blue-600">
-              {tasks.length} tasks • {totalDays} days total • {minDate.toLocaleDateString()} to {maxDate.toLocaleDateString()}
+              {tasks.length} tasks • {totalWorkingDays} working days • {actualStart ? actualStart.toLocaleDateString() : '—'} to {actualEnd ? actualEnd.toLocaleDateString() : '—'}
             </p>
             <p className="text-xs text-blue-500 mt-1">
               💡 Click on any task name to edit it
@@ -236,14 +315,9 @@ const GanttChart = ({
         </div>
       </div>
 
-      {/* Asset Alerts */}
-      <GanttAssetAlerts 
-        assetAlerts={assetAlerts} 
-        workingDaysNeeded={workingDaysNeeded} 
-      />
 
       {/* Main Gantt Chart */}
-      <div className="overflow-auto border border-gray-300 rounded-lg" style={{ maxHeight: '75vh' }}>
+      <div ref={scrollContainerRef} className="overflow-auto border border-gray-300 rounded-lg" style={{ maxHeight: '75vh' }}>
         <div className="relative min-w-max">
           {/* Header */}
           <GanttHeader 

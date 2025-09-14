@@ -16,13 +16,15 @@ import GanttChart from './components/GanttChart';
 // Hooks
 import { useTimeline, TimelineActions } from './hooks/useTimeline';
 import { useAssets, useTasks, useDates, useUI } from './hooks/useTimelineSelectors';
+import { useAssetConflicts } from './hooks/useTimelineSelectors';
 
 // Services
 import {
   buildAssetTimeline,
   createTasksFromCsv,
   calculateWorkingDaysNeeded,
-  getEarliestStartDate
+  getEarliestStartDate,
+  findDateConflicts
 } from './services/TimelineCalculator';
 import { exportToExcel } from './services/ExcelExporter';
 import { importFromExcel, validateExcelFile, getImportPreview } from './services/ExcelImporter';
@@ -43,6 +45,7 @@ const TimelineBuilder: React.FC = () => {
   const { tasks, addCustomTask, updateTaskDuration, renameTask } = useTasks();
   const { dates, setGlobalLiveDate, toggleUseGlobalDate } = useDates();
   const { ui, setClientCampaignName } = useUI();
+  const assetConflicts = useAssetConflicts();
 
   // Local UI state (not part of global state)
   const [showGettingStarted, setShowGettingStarted] = useState(false);
@@ -187,7 +190,7 @@ const TimelineBuilder: React.FC = () => {
     // Update timeline in state
     dispatch(TimelineActions.updateTimeline(allTimelineTasks));
 
-    // Calculate date conflicts
+    // Calculate per-asset earliest start dates from the rebuilt timeline
     const calculatedStartDates: Record<string, string> = {};
     ordered.forEach(asset => {
       const assetTasks = allTimelineTasks.filter(t => t.assetId === asset.id);
@@ -199,8 +202,10 @@ const TimelineBuilder: React.FC = () => {
       }
     });
 
-    // TODO: Find conflicts and update UI state when date error actions are implemented
-    // const conflicts = findDateConflicts(assets.selected, calculatedStartDates);
+    // Persist calculated starts and recompute date errors consistently
+    dispatch(TimelineActions.setCalculatedStartDates(calculatedStartDates));
+    const conflicts = findDateConflicts(ordered as any, calculatedStartDates);
+    dispatch(TimelineActions.setDateErrors(conflicts));
     
   }, [
     assets.selected,
@@ -643,19 +648,20 @@ const TimelineBuilder: React.FC = () => {
                     if (!start || !end) return 0;
                     const startDate = new Date(start);
                     const endDate = new Date(end);
-                    if (startDate >= endDate) return 0;
-                    
+                    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate >= endDate) return 0;
+
                     let workingDays = 0;
                     let currentDate = new Date(startDate);
-                    
                     while (currentDate < endDate) {
                       const dayOfWeek = currentDate.getDay();
-                      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                      const iso = currentDate.toISOString().split('T')[0];
+                      const weekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      const holiday = (dates.bankHolidays || []).includes(iso);
+                      if (!weekend && !holiday) {
                         workingDays++;
                       }
                       currentDate.setDate(currentDate.getDate() + 1);
                     }
-                    
                     return workingDays;
                   }
                 } as any}
@@ -670,25 +676,24 @@ const TimelineBuilder: React.FC = () => {
             {/* Timeline Conflict Warnings */}
             {ui.dateErrors.length > 0 && (
               <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                <h3 className="text-red-800 font-medium mb-2">⚠️ Timeline Conflicts</h3>
-                <p className="text-red-700 text-sm mb-2">
-                  The following assets cannot be completed by their live dates:
-                </p>
-                <ul className="text-red-700 text-sm">
+                <h3 className="text-red-800 font-semibold mb-2">⚠️ Timeline Conflicts</h3>
+                <p className="text-red-700 text-sm mb-3">The following assets cannot be completed by their live dates:</p>
+                <ul className="space-y-2">
                   {ui.dateErrors.map(assetId => {
                     const asset = assets.selected.find(a => a.id === assetId);
+                    const conflict = (assetConflicts || []).find(c => c.assetId === assetId);
+                    const totalDuration = conflict?.totalDuration ?? '—';
+                    const daysNeeded = conflict?.daysNeeded ?? '—';
+
                     const handleFocus = () => {
                       const target = document.querySelector(`[data-asset-id="${assetId}"]`) as HTMLElement | null;
                       if (!target) return;
-                      // Find nearest scrollable ancestor; fall back to window
                       const getScrollable = (node: HTMLElement | null): HTMLElement | Window => {
                         let el: HTMLElement | null = node;
                         while (el && el.parentElement) {
                           el = el.parentElement as HTMLElement;
                           const style = el && window.getComputedStyle(el);
-                          if (style && (style.overflowY === 'auto' || style.overflowY === 'scroll')) {
-                            return el;
-                          }
+                          if (style && (style.overflowY === 'auto' || style.overflowY === 'scroll')) return el;
                         }
                         return window;
                       };
@@ -706,19 +711,23 @@ const TimelineBuilder: React.FC = () => {
                         container.scrollTo({ top: container.scrollTop + delta, behavior: 'smooth' });
                       }
                     };
+
                     return (
-                      <li key={assetId} className="ml-4">
-                        • <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900">
-                          {asset?.name || 'Unknown Asset'}
-                        </button>
-                        {' '}<span className="text-red-700">(would need to start on {dates.calculatedStartDates?.[assetId] || 'TBD'})</span>
+                      <li key={assetId} className="ml-1 p-2 bg-white border border-red-100 rounded">
+                        <div className="text-sm">
+                          <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900 font-medium">
+                            {asset?.name || 'Unknown Asset'}
+                          </button>
+                        </div>
+                        <div className="text-xs text-red-700 mt-1">
+                          <span className="mr-4"><span className="font-semibold">Total duration:</span> {totalDuration} day{Number(totalDuration) === 1 ? '' : 's'}</span>
+                          <span><span className="font-semibold">Working days needed:</span> {daysNeeded}</span>
+                        </div>
                       </li>
                     );
                   })}
                 </ul>
-                <p className="text-red-700 text-sm mt-2 font-medium">
-                  Manual adjustment of task durations required.
-                </p>
+                <p className="text-red-700 text-sm mt-3 font-medium">Adjust task durations in the Gantt chart or change the go‑live date.</p>
               </div>
             )}
 

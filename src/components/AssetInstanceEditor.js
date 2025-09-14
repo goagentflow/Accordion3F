@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import DatePicker from 'react-datepicker';
 import { isSundayOnlyAsset } from './ganttUtils';
 
@@ -20,47 +20,15 @@ const AssetInstanceEditor = ({
   // Check if this asset has a Sunday validation error
   const hasSundayError = sundayDateErrors.includes(asset.id);
 
-  // Local state for duration editor
-  const [showDurationEditor, setShowDurationEditor] = useState(false);
-  const [editedDurations, setEditedDurations] = useState({});
-  const [saveConfirmation, setSaveConfirmation] = useState(false);
-
   // Add a warning if go-live date is a non-working day
   // BUT don't warn about Sundays for Sunday-only assets (they SHOULD be on Sunday)
   const goLiveDateIsNonWorking = asset.startDate && isNonWorkingDay && isNonWorkingDay(new Date(asset.startDate)) &&
     !(isSundayOnlyAsset(asset.type) && new Date(asset.startDate).getDay() === 0);
 
-  // Get the list of tasks for this asset type from csvData
+  // Get the list of tasks for this asset type from csvData (no duration editing here)
   const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
 
-  // Initialize durations if opening the editor
-  const openDurationEditor = () => {
-    const initialDurations = {};
-    assetTasks.forEach(task => {
-      initialDurations[task['Task']] = parseInt(task['Duration (Days)'], 10) || 1;
-    });
-    setEditedDurations(initialDurations);
-    setShowDurationEditor(true);
-  };
-
-  // Handle duration change
-  const handleDurationChange = (taskName, value) => {
-    setEditedDurations(prev => ({ ...prev, [taskName]: Math.max(1, parseInt(value) || 1) }));
-  };
-
-  // Handle Save
-  const handleSaveDurations = () => {
-    onSaveTaskDurations(asset.id, editedDurations);
-    setShowDurationEditor(false);
-    setSaveConfirmation(true);
-    
-    // Clear confirmation after 3 seconds
-    setTimeout(() => {
-      setSaveConfirmation(false);
-    }, 3000);
-  };
-
-  // Calculate working days to save for this asset
+  // Calculate working days to save for this asset (from shared selectors)
   const workingDaysToSave = getWorkingDaysToSave(asset.id);
 
   // Helpers to compute draft remaining days without committing changes
@@ -103,31 +71,8 @@ const AssetInstanceEditor = ({
     return wd;
   };
 
-  // Live-updating remaining days while user edits durations
-  const draftDaysToSave = useMemo(() => {
-    if (!showDurationEditor) return workingDaysToSave;
-    if (!asset.startDate) return workingDaysToSave;
-    const live = new Date(asset.startDate);
-    if (isNaN(live.getTime())) return workingDaysToSave;
-
-    // Work backwards sequentially from the live date using edited durations
-    let currentEnd = new Date(live);
-    let earliestStart = new Date(live);
-    // Use CSV order which mirrors the sequential plan
-    const rows = assetTasks;
-    for (let i = rows.length - 1; i >= 0; i--) {
-      const row = rows[i];
-      const name = row['Task'];
-      const duration = editedDurations[name] || parseInt(row['Duration (Days)'], 10) || 1;
-      const start = subtractWorkingDays(currentEnd, duration);
-      earliestStart = new Date(start);
-      currentEnd = new Date(start);
-    }
-    // Compare earliestStart to today to get remaining days for this asset
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return workingDaysBetween(earliestStart, today);
-  }, [showDurationEditor, editedDurations, asset.startDate, assetTasks, isNonWorkingDay]);
+  // No local draft duration editing; all duration changes happen in the Gantt
+  const draftDaysToSave = useMemo(() => workingDaysToSave, [workingDaysToSave]);
 
   // Check if asset name has been customized (different from the default type name)
   const isCustomName = asset.name !== asset.type;
@@ -198,7 +143,7 @@ const AssetInstanceEditor = ({
         </div>
       )}
       {/* If there is a conflict, show the warning and options */}
-      {hasConflict && !showDurationEditor && (
+      {hasConflict && (
         <div className="bg-red-50 border border-red-300 text-red-800 rounded p-3 mb-2 text-xs">
           <div className="mb-2 font-semibold">
             ⚠️ This asset's timeline can't be completed by the selected start date.
@@ -217,65 +162,13 @@ const AssetInstanceEditor = ({
           <span className="mx-2 text-gray-500">or</span>
           <button
             className="px-2 py-1 bg-gray-200 text-gray-800 rounded text-xs"
-            onClick={openDurationEditor}
+            onClick={() => {
+              try {
+                window.dispatchEvent(new CustomEvent('focus-asset-in-gantt', { detail: { assetId: asset.id } }));
+              } catch {}
+            }}
           >
-            I can't change the go-live date
-          </button>
-        </div>
-      )}
-      {/* If user can't change go-live date, show manual duration editor */}
-      {hasConflict && showDurationEditor && (
-        <div className="bg-yellow-50 border border-yellow-300 text-yellow-900 rounded p-3 mb-2 text-xs">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="font-semibold">Adjust the task durations below to fit the schedule:</div>
-            <div
-              aria-live="polite"
-              className={`px-2 py-0.5 rounded text-[11px] font-semibold ${draftDaysToSave > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
-              title="Remaining working days to save for this asset"
-            >
-              {draftDaysToSave > 0 
-                ? `Remaining days to save: ${draftDaysToSave}`
-                : 'You’ve saved enough time'}
-            </div>
-          </div>
-          <table className="w-full mb-2">
-            <thead>
-              <tr>
-                <th className="text-left">Task</th>
-                <th className="text-left">Duration (days)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assetTasks.map(task => (
-                <tr key={task['Task']}>
-                  <td>{task['Task']}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min="1"
-                      value={editedDurations[task['Task']] || 1}
-                      onChange={e => handleDurationChange(task['Task'], e.target.value)}
-                      className="w-16 px-1 py-0.5 border rounded text-xs"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button
-            className="px-2 py-1 bg-green-500 text-white rounded text-xs mr-2"
-            onClick={handleSaveDurations}
-          >
-            Save
-          </button>
-          {saveConfirmation && (
-            <span className="text-green-600 text-xs ml-2">✅ Saved successfully!</span>
-          )}
-          <button
-            className="px-2 py-1 bg-gray-300 text-gray-800 rounded text-xs"
-            onClick={() => setShowDurationEditor(false)}
-          >
-            Cancel
+            Adjust task durations in the Gantt chart
           </button>
         </div>
       )}
