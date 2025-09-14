@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
 import { isSundayOnlyAsset } from './ganttUtils';
 
@@ -62,6 +62,72 @@ const AssetInstanceEditor = ({
 
   // Calculate working days to save for this asset
   const workingDaysToSave = getWorkingDaysToSave(asset.id);
+
+  // Helpers to compute draft remaining days without committing changes
+  const subtractWorkingDays = (date, days) => {
+    if (!date || isNaN(date.getTime())) return new Date();
+    let d = new Date(date);
+    let remaining = Math.max(0, days);
+    let guard = 0;
+    while (remaining > 0 && guard < 5000) {
+      d.setDate(d.getDate() - 1);
+      if (!isNonWorkingDay || !isNonWorkingDay(new Date(d))) {
+        remaining--;
+      }
+      guard++;
+    }
+    // Ensure we land on a working day
+    guard = 0;
+    while (isNonWorkingDay && isNonWorkingDay(new Date(d)) && guard < 100) {
+      d.setDate(d.getDate() - 1);
+      guard++;
+    }
+    return d;
+  };
+
+  const workingDaysBetween = (start, end) => {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    if (s >= e) return 0;
+    let wd = 0;
+    const cur = new Date(s);
+    let guard = 0;
+    while (cur < e && guard < 10000) {
+      if (!isNonWorkingDay || !isNonWorkingDay(new Date(cur))) {
+        wd++;
+      }
+      cur.setDate(cur.getDate() + 1);
+      guard++;
+    }
+    return wd;
+  };
+
+  // Live-updating remaining days while user edits durations
+  const draftDaysToSave = useMemo(() => {
+    if (!showDurationEditor) return workingDaysToSave;
+    if (!asset.startDate) return workingDaysToSave;
+    const live = new Date(asset.startDate);
+    if (isNaN(live.getTime())) return workingDaysToSave;
+
+    // Work backwards sequentially from the live date using edited durations
+    let currentEnd = new Date(live);
+    let earliestStart = new Date(live);
+    // Use CSV order which mirrors the sequential plan
+    const rows = assetTasks;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      const name = row['Task'];
+      const duration = editedDurations[name] || parseInt(row['Duration (Days)'], 10) || 1;
+      const start = subtractWorkingDays(currentEnd, duration);
+      earliestStart = new Date(start);
+      currentEnd = new Date(start);
+    }
+    // Compare earliestStart to today to get remaining days for this asset
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return workingDaysBetween(earliestStart, today);
+  }, [showDurationEditor, editedDurations, asset.startDate, assetTasks, isNonWorkingDay]);
 
   // Check if asset name has been customized (different from the default type name)
   const isCustomName = asset.name !== asset.type;
@@ -160,7 +226,18 @@ const AssetInstanceEditor = ({
       {/* If user can't change go-live date, show manual duration editor */}
       {hasConflict && showDurationEditor && (
         <div className="bg-yellow-50 border border-yellow-300 text-yellow-900 rounded p-3 mb-2 text-xs">
-          <div className="mb-2 font-semibold">Adjust the task durations below to fit the schedule:</div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="font-semibold">Adjust the task durations below to fit the schedule:</div>
+            <div
+              aria-live="polite"
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold ${draftDaysToSave > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+              title="Remaining working days to save for this asset"
+            >
+              {draftDaysToSave > 0 
+                ? `Remaining days to save: ${draftDaysToSave}`
+                : 'You’ve saved enough time'}
+            </div>
+          </div>
           <table className="w-full mb-2">
             <thead>
               <tr>

@@ -677,9 +677,41 @@ const TimelineBuilder: React.FC = () => {
                 <ul className="text-red-700 text-sm">
                   {ui.dateErrors.map(assetId => {
                     const asset = assets.selected.find(a => a.id === assetId);
+                    const handleFocus = () => {
+                      const target = document.querySelector(`[data-asset-id="${assetId}"]`) as HTMLElement | null;
+                      if (!target) return;
+                      // Find nearest scrollable ancestor; fall back to window
+                      const getScrollable = (node: HTMLElement | null): HTMLElement | Window => {
+                        let el: HTMLElement | null = node;
+                        while (el && el.parentElement) {
+                          el = el.parentElement as HTMLElement;
+                          const style = el && window.getComputedStyle(el);
+                          if (style && (style.overflowY === 'auto' || style.overflowY === 'scroll')) {
+                            return el;
+                          }
+                        }
+                        return window;
+                      };
+                      const scroller = getScrollable(target);
+                      const OFFSET = 140;
+                      if (scroller === window) {
+                        const rect = target.getBoundingClientRect();
+                        const y = rect.top + window.pageYOffset;
+                        window.scrollTo({ top: Math.max(0, y - OFFSET), behavior: 'smooth' });
+                      } else {
+                        const container = scroller as HTMLElement;
+                        const containerRect = container.getBoundingClientRect();
+                        const targetRect = target.getBoundingClientRect();
+                        const delta = (targetRect.top - containerRect.top) - OFFSET;
+                        container.scrollTo({ top: container.scrollTop + delta, behavior: 'smooth' });
+                      }
+                    };
                     return (
                       <li key={assetId} className="ml-4">
-                        • {asset?.name || 'Unknown Asset'} (would need to start on {dates.calculatedStartDates?.[assetId] || 'TBD'})
+                        • <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900">
+                          {asset?.name || 'Unknown Asset'}
+                        </button>
+                        {' '}<span className="text-red-700">(would need to start on {dates.calculatedStartDates?.[assetId] || 'TBD'})</span>
                       </li>
                     );
                   })}

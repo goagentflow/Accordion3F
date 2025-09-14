@@ -22,7 +22,7 @@ const AssetGroupSection = ({
   moveDaysDelta
 }) => {
   return (
-    <div className="relative">
+    <div className="relative" id={`asset-${group.key}`} data-asset-id={group.key}>
       {/* Left color strip spanning the asset group */}
       <div
         aria-hidden

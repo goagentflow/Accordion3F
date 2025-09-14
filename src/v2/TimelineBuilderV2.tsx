@@ -261,16 +261,47 @@ const RightColumn: React.FC = () => {
 
                 if (!asset) return null;
 
-                let message = '';
-                if (requiresSunday && hasDateConflict) {
-                  message = `${asset.name} — This asset requires a Sunday live date—change the live date so it falls on a Sunday AND it cannot be completed by its current live date${calcStart ? ` (would need to start on ${calcStart})` : ''}.`;
-                } else if (requiresSunday) {
-                  message = `${asset.name} — This asset requires a Sunday live date—change the live date so it falls on a Sunday.`;
-                } else if (hasDateConflict) {
-                  message = `${asset.name || 'Unknown Asset'} (would need to start on ${calcStart || 'TBD'})`;
-                }
+                const handleFocus = () => {
+                  const target = document.querySelector(`[data-asset-id="${id}"]`) as HTMLElement | null;
+                  if (!target) return;
+                  const getScrollable = (node: HTMLElement | null): HTMLElement | Window => {
+                    let el: HTMLElement | null = node;
+                    while (el && el.parentElement) {
+                      el = el.parentElement as HTMLElement;
+                      const style = el && window.getComputedStyle(el);
+                      if (style && (style.overflowY === 'auto' || style.overflowY === 'scroll')) {
+                        return el;
+                      }
+                    }
+                    return window;
+                  };
+                  const scroller = getScrollable(target);
+                  const OFFSET = 140;
+                  if (scroller === window) {
+                    const rect = target.getBoundingClientRect();
+                    const y = rect.top + window.pageYOffset;
+                    window.scrollTo({ top: Math.max(0, y - OFFSET), behavior: 'smooth' });
+                  } else {
+                    const container = scroller as HTMLElement;
+                    const containerRect = container.getBoundingClientRect();
+                    const targetRect = target.getBoundingClientRect();
+                    const delta = (targetRect.top - containerRect.top) - OFFSET;
+                    container.scrollTo({ top: container.scrollTop + delta, behavior: 'smooth' });
+                  }
+                };
                 return (
-                  <li key={`conflict-${id}`} className="ml-4">• {message}</li>
+                  <li key={`conflict-${id}`} className="ml-4">
+                    • <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900">
+                      {asset.name || 'Unknown Asset'}
+                    </button>
+                    {requiresSunday && hasDateConflict ? (
+                      <span>{` — This asset requires a Sunday live date and cannot be completed by its current live date${calcStart ? ` (would need to start on ${calcStart})` : ''}.`}</span>
+                    ) : requiresSunday ? (
+                      <span>{` — This asset requires a Sunday live date—change the live date so it falls on a Sunday.`}</span>
+                    ) : hasDateConflict ? (
+                      <span>{` (would need to start on ${calcStart || 'TBD'})`}</span>
+                    ) : null}
+                  </li>
                 );
               }).filter(Boolean);
               return items as any;

@@ -2127,9 +2127,40 @@ useEffect(() => {
                                 <ul className="text-red-700 text-sm">
                                     {dateErrors.map(assetId => {
                                         const asset = selectedAssets.find(a => a.id === assetId);
+                                        const handleFocus = () => {
+                                            const target = document.querySelector(`[data-asset-id="${assetId}"]`);
+                                            if (!target) return;
+                                            const getScrollable = (node) => {
+                                                let el = node;
+                                                while (el && el.parentElement) {
+                                                    el = el.parentElement;
+                                                    const style = el && window.getComputedStyle(el);
+                                                    if (style && (style.overflowY === 'auto' || style.overflowY === 'scroll')) {
+                                                        return el;
+                                                    }
+                                                }
+                                                return window;
+                                            };
+                                            const scroller = getScrollable(target);
+                                            const OFFSET = 140;
+                                            if (scroller === window) {
+                                                const rect = target.getBoundingClientRect();
+                                                const y = rect.top + window.pageYOffset;
+                                                window.scrollTo({ top: Math.max(0, y - OFFSET), behavior: 'smooth' });
+                                            } else {
+                                                const container = scroller;
+                                                const containerRect = container.getBoundingClientRect();
+                                                const targetRect = target.getBoundingClientRect();
+                                                const delta = (targetRect.top - containerRect.top) - OFFSET;
+                                                container.scrollTo({ top: container.scrollTop + delta, behavior: 'smooth' });
+                                            }
+                                        };
                                         return (
                                             <li key={assetId} className="ml-4">
-                                                • {asset?.name || 'Unknown Asset'} (would need to start on {calculatedStartDates[assetId]})
+                                                • <button onClick={handleFocus} className="underline text-red-800 hover:text-red-900">
+                                                    {asset?.name || 'Unknown Asset'}
+                                                </button>
+                                                <span className="text-red-700"> (would need to start on {calculatedStartDates[assetId]})</span>
                                             </li>
                                         );
                                     })}
