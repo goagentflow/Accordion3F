@@ -350,6 +350,9 @@ const RightColumn: React.FC = () => {
             onTaskNameChange,
             onTaskMove,
             onExportExcel: exportTimeline,
+            onDeleteTask: (taskId: string, assetId: string) => {
+              dispatch(TimelineActions.removeTask(taskId, assetId));
+            },
             onAddCustomTask: ({ name, duration, owner, assetType, insertAfterTaskId }: any) => {
               dispatch(TimelineActions.addCustomTask(name, Number(duration), owner, assetType, insertAfterTaskId));
             }

@@ -112,6 +112,7 @@ export enum ActionType {
   UPDATE_TASK_DURATION = 'UPDATE_TASK_DURATION',
   RENAME_TASK = 'RENAME_TASK',
   MOVE_TASK = 'MOVE_TASK', // Correctly handle drag-and-drop repositioning
+  REMOVE_TASK = 'REMOVE_TASK',
   UPDATE_TASK_BANK = 'UPDATE_TASK_BANK',
   BULK_UPDATE_DURATIONS = 'BULK_UPDATE_DURATIONS',
   
@@ -230,6 +231,14 @@ export interface MoveTaskAction {
   payload: {
     taskId: string;
     newStartDate: string;
+  };
+}
+
+export interface RemoveTaskAction {
+  type: ActionType.REMOVE_TASK;
+  payload: {
+    taskId: string;
+    assetId: string;
   };
 }
 
@@ -450,6 +459,7 @@ export type TimelineAction =
   | AddCustomTaskAction
   | UpdateTaskDurationAction
   | MoveTaskAction
+  | RemoveTaskAction
   | BulkUpdateDurationsAction
   | UpdateTaskBankAction
   | SetDateErrorsAction

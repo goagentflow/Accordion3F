@@ -77,6 +77,11 @@ export const TimelineActions = {
     payload: { taskId, newStartDate }
   }),
 
+  removeTask: (taskId: string, assetId: string): TimelineAction => ({
+    type: ActionType.REMOVE_TASK,
+    payload: { taskId, assetId }
+  }),
+
   updateTaskBank: (taskBank: Task[]): TimelineAction => ({
     type: ActionType.UPDATE_TASK_BANK,
     payload: { taskBank }

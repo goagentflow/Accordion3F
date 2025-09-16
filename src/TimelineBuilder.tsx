@@ -277,6 +277,10 @@ const TimelineBuilder: React.FC = () => {
     );
   };
 
+  const handleDeleteTask = (taskId: string, assetId: string) => {
+    dispatch(TimelineActions.removeTask(taskId, assetId));
+  };
+
   const handleSaveTaskDurations = (assetId: string, durations: Record<string, number>) => {
     const asset = assets.selected.find(a => a.id === assetId);
     if (!asset) return;
@@ -737,6 +741,7 @@ const TimelineBuilder: React.FC = () => {
                 {...{
                   tasks: tasks.timeline,
                   bankHolidays: dates.bankHolidays,
+                  onDeleteTask: handleDeleteTask,
                   onTaskDurationChange: handleTaskDurationChange,
                   onTaskNameChange: handleTaskNameChange,
                   workingDaysNeeded: workingDaysNeeded,

@@ -16,6 +16,7 @@ const GanttTaskRow = memo(({
   bankHolidays,
   onTaskDurationChange,
   onTaskNameChange,
+  onDeleteTask,
   onMouseDown,
   isDragging,
   draggedTaskId,
@@ -31,6 +32,7 @@ const GanttTaskRow = memo(({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(task.name);
+  const [showDeleteTip, setShowDeleteTip] = useState(false);
 
   const handleNameClick = () => {
     setIsEditing(true);
@@ -61,6 +63,13 @@ const GanttTaskRow = memo(({
     const duration = parseInt(value, 10);
     if (!isNaN(duration) && duration > 0 && duration <= 365) {
       onTaskDurationChange(task.id, duration, task.assetType, task.name);
+    }
+  };
+  
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    if (typeof onDeleteTask === 'function') {
+      onDeleteTask(task.id, task.assetId);
     }
   };
 
@@ -193,7 +202,30 @@ const GanttTaskRow = memo(({
                 min="1"
                 max="365"
               />
-              <span className="ml-1">days</span>
+              <span className="relative inline-flex items-center">
+                {/* Delete button - enlarged hit area, immediate tooltip on hover */}
+                <button
+                  type="button"
+                  onClick={handleDeleteClick}
+                  onMouseEnter={() => setShowDeleteTip(true)}
+                  onMouseLeave={() => setShowDeleteTip(false)}
+                  className="inline-flex items-center p-2 -m-1 text-gray-400 hover:text-red-600 focus:outline-none rounded"
+                  aria-label="Delete task"
+                >
+                  {/* Dustbin icon */}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M9 3h6a1 1 0 0 1 1 1v1h4v2H4V5h4V4a1 1 0 0 1 1-1zm1 0v1h4V3h-4zM7 9h2v10H7V9zm8 0h2v10h-2V9zM11 9h2v10h-2V9zM6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7z"/>
+                  </svg>
+                </button>
+                {showDeleteTip && (
+                  <div
+                    role="tooltip"
+                    className="absolute z-30 -top-7 left-0 whitespace-nowrap bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow"
+                  >
+                    Deleting this task will remove it from the Gantt chart.
+                  </div>
+                )}
+              </span>
             </>
           )}
         </div>

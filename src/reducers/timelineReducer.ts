@@ -29,6 +29,7 @@ import {
   handleRenameAsset,
   handleAddCustomTask,
   handleUpdateTaskDuration,
+  handleRemoveTask,
   handleBulkUpdateDurations
 } from './coreReducer';
 
@@ -94,6 +95,8 @@ export function timelineReducer(
       return handleAddCustomTask(state, action);
     case ActionType.UPDATE_TASK_DURATION:
       return handleUpdateTaskDuration(state, action);
+    case ActionType.REMOVE_TASK:
+      return handleRemoveTask(state, action);
     case ActionType.RENAME_TASK:
       return handleRenameTask(state, action);
     case ActionType.UPDATE_TASK_BANK:

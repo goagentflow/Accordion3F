@@ -31,7 +31,8 @@ const GanttChart = ({
   isExportDisabled = false,
   // Optional dependency function for move mode (only available with new context system)
   addDependency = null,
-  onExportExcel = null
+  onExportExcel = null,
+  onDeleteTask = () => {}
 }) => {
   // Drag state moved into hook (Golden Rule #2)
   const { isDragging, draggedTaskId, dragMode, moveDaysDelta, handleMouseDown } = useGanttDrag({
@@ -331,19 +332,20 @@ const GanttChart = ({
           {/* Task Rows */}
           <div ref={containerRef}>
             {assetGroups.map((group, index) => (
-              <AssetGroupSection
-                key={`${group.key}-${index}`}
-                group={group}
-                dateColumns={dateColumns}
-                minDate={minDate}
-                bankHolidays={bankHolidays}
-                onTaskDurationChange={onTaskDurationChange}
-                onTaskNameChange={onTaskNameChange}
-                onMouseDown={handleMouseDown}
-                isDragging={isDragging}
-                draggedTaskId={draggedTaskId}
-                onDependencyDragStart={handleTaskDragStart}
-                onDependencyDragEnd={handleTaskDragEnd}
+            <AssetGroupSection
+              key={`${group.key}-${index}`}
+              group={group}
+              dateColumns={dateColumns}
+              minDate={minDate}
+              bankHolidays={bankHolidays}
+              onTaskDurationChange={onTaskDurationChange}
+              onTaskNameChange={onTaskNameChange}
+              onDeleteTask={onDeleteTask}
+              onMouseDown={handleMouseDown}
+              isDragging={isDragging}
+              draggedTaskId={draggedTaskId}
+              onDependencyDragStart={handleTaskDragStart}
+              onDependencyDragEnd={handleTaskDragEnd}
                 isDragDropEnabled={isDragDropEnabled}
                 dragState={dragState}
                 getDropValidation={getDropValidation}

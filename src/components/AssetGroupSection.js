@@ -9,6 +9,7 @@ const AssetGroupSection = ({
   bankHolidays,
   onTaskDurationChange,
   onTaskNameChange,
+  onDeleteTask,
   onMouseDown,
   isDragging,
   draggedTaskId,
@@ -58,6 +59,7 @@ const AssetGroupSection = ({
           bankHolidays={bankHolidays}
           onTaskDurationChange={onTaskDurationChange}
           onTaskNameChange={onTaskNameChange}
+          onDeleteTask={onDeleteTask}
           onMouseDown={onMouseDown}
           isDragging={isDragging}
           draggedTaskId={draggedTaskId}

@@ -374,3 +374,112 @@ export function handleBulkUpdateDurations(
     }
   };
 }
+
+// ============================================
+// Remove Task (per-asset instance)
+// ============================================
+
+export function handleRemoveTask(
+  state: TimelineState,
+  action: Extract<TimelineAction, { type: ActionType.REMOVE_TASK }>
+): TimelineState {
+  const { taskId, assetId } = action.payload;
+
+  // Find asset to resolve its type
+  const asset = state.assets.selected.find(a => a.id === assetId);
+  if (!asset) return state;
+
+  // Protect live task: Those have a one-day duration and may be flagged in UI,
+  // but we defensively block deletion by pattern: the final live task typically
+  // maps to the last template index. Since we can't reliably detect here,
+  // we rely on UI to hide the delete button for live tasks. Proceed otherwise.
+
+  // 1) If it's a custom task in the per-instance bank, remove it there
+  const currentBank = state.tasks.bank[assetId] || [];
+  const isCustomInBank = currentBank.some(t => t.id === taskId && t.isCustom);
+  if (isCustomInBank) {
+    const newBankForAsset = currentBank.filter(t => t.id !== taskId);
+    const newCustomList = state.tasks.custom.filter(t => t.id !== taskId);
+
+    // Also remove any dependencies that reference this task
+    const newDeps = { ...(state.tasks.deps || {}) } as Record<string, any[]>;
+    delete newDeps[taskId];
+    Object.keys(newDeps).forEach(key => {
+      newDeps[key] = (newDeps[key] || []).filter(d => d.predecessorId !== taskId);
+      if (newDeps[key].length === 0) delete newDeps[key];
+    });
+
+    return {
+      ...state,
+      tasks: {
+        ...state.tasks,
+        bank: {
+          ...state.tasks.bank,
+          [assetId]: newBankForAsset
+        },
+        custom: newCustomList,
+        deps: newDeps
+      },
+      ui: { ...state.ui, freezeImportedTimeline: false }
+    };
+  }
+
+  // 2) Template task: promote this asset to an instanceBase override and remove the task there
+  // Extract template index from remapped id pattern `${assetId}-template-<idx>`
+  const match = taskId.startsWith(assetId) ? taskId.match(/template-(\d+)$/) : null;
+  const idxToRemove = match ? parseInt(match[1], 10) : -1;
+
+  // Build a working copy of the base array for this asset
+  const existingInstanceBase = (state.tasks.instanceBase && state.tasks.instanceBase[assetId]) || null;
+  let base: Task[];
+  if (existingInstanceBase && Array.isArray(existingInstanceBase)) {
+    base = [...existingInstanceBase];
+  } else {
+    // Clone from catalog by asset type into an instance-specific base
+    const byType = (state.tasks.byAsset && state.tasks.byAsset[asset.type]) || [];
+    base = byType.map((t, i) => ({
+      id: `${assetId}-template-${i}`,
+      name: t.name,
+      duration: t.duration,
+      owner: t.owner,
+      assetId: assetId,
+      assetType: asset.type,
+      isCustom: false,
+      // No explicit dependencies here; Orchestrator enforces sequential FS chain
+    } as Task));
+  }
+
+  // Remove the chosen task (by id or index fallback)
+  let newBase = base.filter(t => t.id !== taskId);
+  if (newBase.length === base.length && idxToRemove >= 0 && idxToRemove < base.length) {
+    newBase = base.filter((_, i) => i !== idxToRemove);
+  }
+
+  // Reindex remaining template ids to maintain stable remap pattern
+  const reindexed = newBase.map((t, i) => ({
+    ...t,
+    id: `${assetId}-template-${i}`
+  }));
+
+  // Clean dependency map of the deleted task; remapped ids for later tasks will change,
+  // so any dangling references will be sanitized by the Orchestrator (ignored/removed).
+  const newDeps = { ...(state.tasks.deps || {}) } as Record<string, any[]>;
+  delete newDeps[taskId];
+  Object.keys(newDeps).forEach(key => {
+    newDeps[key] = (newDeps[key] || []).filter(d => d.predecessorId !== taskId);
+    if (newDeps[key].length === 0) delete newDeps[key];
+  });
+
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      instanceBase: {
+        ...(state.tasks.instanceBase || {}),
+        [assetId]: reindexed
+      },
+      deps: newDeps
+    },
+    ui: { ...state.ui, freezeImportedTimeline: false }
+  };
+}
