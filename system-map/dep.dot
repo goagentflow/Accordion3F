@@ -1,0 +1,289 @@
+strict digraph "dependency-cruiser output"{
+    rankdir="LR" splines="true" overlap="false" nodesep="0.16" ranksep="0.18" fontname="Helvetica-bold" fontsize="9" style="rounded,bold,filled" fillcolor="#ffffff" compound="true"
+    node [shape="box" style="rounded, filled" height="0.2" color="black" fillcolor="#ffffcc" fontcolor="black" fontname="Helvetica" fontsize="9"]
+    edge [arrowhead="normal" arrowsize="0.6" penwidth="2.0" color="#00000033" fontname="Helvetica" fontsize="9"]
+
+    subgraph "cluster_src" {label="src" "src/CampaignSetup.d.ts" [label=<CampaignSetup.d.ts> tooltip="CampaignSetup.d.ts" URL="src/CampaignSetup.d.ts" fillcolor="#ccffcc"] }
+    subgraph "cluster_src" {label="src" "src/TimelineBuilder.js" [label=<TimelineBuilder.js> tooltip="TimelineBuilder.js" URL="src/TimelineBuilder.js" ] }
+    "src/TimelineBuilder.js" -> "src/actions/timelineActions.ts"
+    "src/TimelineBuilder.js" -> "src/components/AssetSelector.js"
+    "src/TimelineBuilder.js" -> "src/components/CampaignSetup.js"
+    "src/TimelineBuilder.js" -> "src/components/GanttChart.js"
+    "src/TimelineBuilder.js" -> "src/components/ganttUtils.js"
+    "src/TimelineBuilder.js" -> "src/components/RecoveryPrompt.tsx"
+    "src/TimelineBuilder.js" -> "src/components/SaveIndicator.tsx"
+    "src/TimelineBuilder.js" -> "src/hooks/useAutoSave.ts"
+    "src/TimelineBuilder.js" -> "src/hooks/useBeforeUnload.ts"
+    "src/TimelineBuilder.js" -> "src/services/ExcelExporter.js"
+    "src/TimelineBuilder.js" -> "src/services/ExcelImporter.js"
+    "src/TimelineBuilder.js" -> "src/services/TimelineCalculator.ts"
+    "src/TimelineBuilder.js" -> "src/utils/stateAdapters.js"
+    subgraph "cluster_src" {label="src" "src/TimelineBuilder.tsx" [label=<TimelineBuilder.tsx> tooltip="TimelineBuilder.tsx" URL="src/TimelineBuilder.tsx" fillcolor="#bbfeff"] }
+    "src/TimelineBuilder.tsx" -> "src/components/AssetSelector.js"
+    "src/TimelineBuilder.tsx" -> "src/components/CampaignSetup.js"
+    "src/TimelineBuilder.tsx" -> "src/components/GanttChart.js"
+    "src/TimelineBuilder.tsx" -> "src/hooks/useTimeline.tsx"
+    "src/TimelineBuilder.tsx" -> "src/hooks/useTimelineSelectors.tsx"
+    "src/TimelineBuilder.tsx" -> "src/services/ExcelExporter.js"
+    "src/TimelineBuilder.tsx" -> "src/services/ExcelImporter.js"
+    "src/TimelineBuilder.tsx" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/asset-management.spec.ts" [label=<asset-management.spec.ts> tooltip="asset-management.spec.ts" URL="src/__tests__/e2e/asset-management.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/asset-management.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/autosave-recovery.spec.ts" [label=<autosave-recovery.spec.ts> tooltip="autosave-recovery.spec.ts" URL="src/__tests__/e2e/autosave-recovery.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/autosave-recovery.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/bug-repro-timeline-disappears.spec.ts" [label=<bug-repro-timeline-disappears.spec.ts> tooltip="bug-repro-timeline-disappears.spec.ts" URL="src/__tests__/e2e/bug-repro-timeline-disappears.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/bug-repro-timeline-disappears.spec.ts" -> "src/__tests__/e2e/helpers/concurrency-v1-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/concurrency-v1-chaos.spec.ts" [label=<concurrency-v1-chaos.spec.ts> tooltip="concurrency-v1-chaos.spec.ts" URL="src/__tests__/e2e/concurrency-v1-chaos.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/concurrency-v1-chaos.spec.ts" -> "src/__tests__/e2e/helpers/concurrency-v1-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/concurrency-v1-fragility.spec.ts" [label=<concurrency-v1-fragility.spec.ts> tooltip="concurrency-v1-fragility.spec.ts" URL="src/__tests__/e2e/concurrency-v1-fragility.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/concurrency-v1-fragility.spec.ts" -> "src/__tests__/e2e/helpers/concurrency-v1-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/concurrency-v1-persistence.spec.ts" [label=<concurrency-v1-persistence.spec.ts> tooltip="concurrency-v1-persistence.spec.ts" URL="src/__tests__/e2e/concurrency-v1-persistence.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/concurrency-v1-persistence.spec.ts" -> "src/__tests__/e2e/helpers/concurrency-v1-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/critical-manipulation-test.spec.ts" [label=<critical-manipulation-test.spec.ts> tooltip="critical-manipulation-test.spec.ts" URL="src/__tests__/e2e/critical-manipulation-test.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/critical-manipulation-test.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/debug-asset-startdate.spec.ts" [label=<debug-asset-startdate.spec.ts> tooltip="debug-asset-startdate.spec.ts" URL="src/__tests__/e2e/debug-asset-startdate.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/debug-asset-startdate.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/debug-feasible-timeline.spec.ts" [label=<debug-feasible-timeline.spec.ts> tooltip="debug-feasible-timeline.spec.ts" URL="src/__tests__/e2e/debug-feasible-timeline.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/debug-feasible-timeline.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/debug-timeline-logic.spec.ts" [label=<debug-timeline-logic.spec.ts> tooltip="debug-timeline-logic.spec.ts" URL="src/__tests__/e2e/debug-timeline-logic.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/debug-timeline-logic.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/edge-cases.spec.ts" [label=<edge-cases.spec.ts> tooltip="edge-cases.spec.ts" URL="src/__tests__/e2e/edge-cases.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/edge-cases.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/excel-roundtrip-overlap.spec.ts" [label=<excel-roundtrip-overlap.spec.ts> tooltip="excel-roundtrip-overlap.spec.ts" URL="src/__tests__/e2e/excel-roundtrip-overlap.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/excel-roundtrip-overlap.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    "src/__tests__/e2e/excel-roundtrip-overlap.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/excel-roundtrip.spec.ts" [label=<excel-roundtrip.spec.ts> tooltip="excel-roundtrip.spec.ts" URL="src/__tests__/e2e/excel-roundtrip.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/excel-roundtrip.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/excel-v1-to-v2-migration.spec.ts" [label=<excel-v1-to-v2-migration.spec.ts> tooltip="excel-v1-to-v2-migration.spec.ts" URL="src/__tests__/e2e/excel-v1-to-v2-migration.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/excel-v1-to-v2-migration.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    "src/__tests__/e2e/excel-v1-to-v2-migration.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" subgraph "cluster_src/__tests__/e2e/helpers" {label="helpers" "src/__tests__/e2e/helpers/concurrency-v1-helpers.ts" [label=<concurrency-v1-helpers.ts> tooltip="concurrency-v1-helpers.ts" URL="src/__tests__/e2e/helpers/concurrency-v1-helpers.ts" fillcolor="#ddfeff"] } } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" subgraph "cluster_src/__tests__/e2e/helpers" {label="helpers" "src/__tests__/e2e/helpers/manipulation-helpers.ts" [label=<manipulation-helpers.ts> tooltip="manipulation-helpers.ts" URL="src/__tests__/e2e/helpers/manipulation-helpers.ts" fillcolor="#ddfeff"] } } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" subgraph "cluster_src/__tests__/e2e/helpers" {label="helpers" "src/__tests__/e2e/helpers/test-helpers.ts" [label=<test-helpers.ts> tooltip="test-helpers.ts" URL="src/__tests__/e2e/helpers/test-helpers.ts" fillcolor="#ddfeff"] } } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/manipulation-dependency.spec.ts" [label=<manipulation-dependency.spec.ts> tooltip="manipulation-dependency.spec.ts" URL="src/__tests__/e2e/manipulation-dependency.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/manipulation-dependency.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/manipulation-fragility.spec.ts" [label=<manipulation-fragility.spec.ts> tooltip="manipulation-fragility.spec.ts" URL="src/__tests__/e2e/manipulation-fragility.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/manipulation-fragility.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/manipulation-patterns.spec.ts" [label=<manipulation-patterns.spec.ts> tooltip="manipulation-patterns.spec.ts" URL="src/__tests__/e2e/manipulation-patterns.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/manipulation-patterns.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/manipulation-stress.spec.ts" [label=<manipulation-stress.spec.ts> tooltip="manipulation-stress.spec.ts" URL="src/__tests__/e2e/manipulation-stress.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/manipulation-stress.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/minimal-timeline-test.spec.ts" [label=<minimal-timeline-test.spec.ts> tooltip="minimal-timeline-test.spec.ts" URL="src/__tests__/e2e/minimal-timeline-test.spec.ts" fillcolor="#ccffcc"] } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/persistence-overlap-refresh.spec.ts" [label=<persistence-overlap-refresh.spec.ts> tooltip="persistence-overlap-refresh.spec.ts" URL="src/__tests__/e2e/persistence-overlap-refresh.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/persistence-overlap-refresh.spec.ts" -> "src/__tests__/e2e/helpers/manipulation-helpers.ts"
+    "src/__tests__/e2e/persistence-overlap-refresh.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/task-editing.spec.ts" [label=<task-editing.spec.ts> tooltip="task-editing.spec.ts" URL="src/__tests__/e2e/task-editing.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/task-editing.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/tier1-accordion-effect.spec.ts" [label=<tier1-accordion-effect.spec.ts> tooltip="tier1-accordion-effect.spec.ts" URL="src/__tests__/e2e/tier1-accordion-effect.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/tier1-accordion-effect.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/tier1-golive-business-rules.spec.ts" [label=<tier1-golive-business-rules.spec.ts> tooltip="tier1-golive-business-rules.spec.ts" URL="src/__tests__/e2e/tier1-golive-business-rules.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/tier1-golive-business-rules.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/tier1-timeline-accuracy.spec.ts" [label=<tier1-timeline-accuracy.spec.ts> tooltip="tier1-timeline-accuracy.spec.ts" URL="src/__tests__/e2e/tier1-timeline-accuracy.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/tier1-timeline-accuracy.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/e2e" {label="e2e" "src/__tests__/e2e/tier1-undo-redo-integrity.spec.ts" [label=<tier1-undo-redo-integrity.spec.ts> tooltip="tier1-undo-redo-integrity.spec.ts" URL="src/__tests__/e2e/tier1-undo-redo-integrity.spec.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/e2e/tier1-undo-redo-integrity.spec.ts" -> "src/__tests__/e2e/helpers/test-helpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/fixtures" {label="fixtures" "src/__tests__/fixtures/v1-export-sample.json" [label=<v1-export-sample.json> tooltip="v1-export-sample.json" URL="src/__tests__/fixtures/v1-export-sample.json" fillcolor="#ffee44"] } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/ExcelConcurrencyTransform.test.ts" [label=<ExcelConcurrencyTransform.test.ts> tooltip="ExcelConcurrencyTransform.test.ts" URL="src/__tests__/unit/ExcelConcurrencyTransform.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/ExcelConcurrencyTransform.test.ts" -> "src/services/ExcelImporter.js"
+    "src/__tests__/unit/ExcelConcurrencyTransform.test.ts" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/ExcelImportTransform.test.ts" [label=<ExcelImportTransform.test.ts> tooltip="ExcelImportTransform.test.ts" URL="src/__tests__/unit/ExcelImportTransform.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/ExcelImportTransform.test.ts" -> "src/services/ExcelImporter.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/TimelineCalculator.test.ts" [label=<TimelineCalculator.test.ts> tooltip="TimelineCalculator.test.ts" URL="src/__tests__/unit/TimelineCalculator.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/TimelineCalculator.test.ts" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/V1ToV2Migration.test.ts" [label=<V1ToV2Migration.test.ts> tooltip="V1ToV2Migration.test.ts" URL="src/__tests__/unit/V1ToV2Migration.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/V1ToV2Migration.test.ts" -> "src/services/ExcelImporter.js"
+    "src/__tests__/unit/V1ToV2Migration.test.ts" -> "src/__tests__/fixtures/v1-export-sample.json"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/ValidationService.test.ts" [label=<ValidationService.test.ts> tooltip="ValidationService.test.ts" URL="src/__tests__/unit/ValidationService.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/ValidationService.test.ts" -> "src/services/ValidationService.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/dag-custom-dependency-fallback.test.ts" [label=<dag-custom-dependency-fallback.test.ts> tooltip="dag-custom-dependency-fallback.test.ts" URL="src/__tests__/unit/dag-custom-dependency-fallback.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/dag-custom-dependency-fallback.test.ts" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/dag-fs-guard.test.ts" [label=<dag-fs-guard.test.ts> tooltip="dag-fs-guard.test.ts" URL="src/__tests__/unit/dag-fs-guard.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/dag-fs-guard.test.ts" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/endToEndUndoRedoProof.test.ts" [label=<endToEndUndoRedoProof.test.ts> tooltip="endToEndUndoRedoProof.test.ts" URL="src/__tests__/unit/endToEndUndoRedoProof.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/endToEndUndoRedoProof.test.ts" -> "src/actions/timelineActions.ts"
+    "src/__tests__/unit/endToEndUndoRedoProof.test.ts" -> "src/hooks/useUndoRedo.ts"
+    "src/__tests__/unit/endToEndUndoRedoProof.test.ts" -> "src/reducers/timelineReducer.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/stateAdapters.dependencies.test.ts" [label=<stateAdapters.dependencies.test.ts> tooltip="stateAdapters.dependencies.test.ts" URL="src/__tests__/unit/stateAdapters.dependencies.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/stateAdapters.dependencies.test.ts" -> "src/utils/stateAdapters.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/timelineReducer.test.ts" [label=<timelineReducer.test.ts> tooltip="timelineReducer.test.ts" URL="src/__tests__/unit/timelineReducer.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/timelineReducer.test.ts" -> "src/reducers/timelineReducer.ts"
+    "src/__tests__/unit/timelineReducer.test.ts" -> "src/types/timeline.types.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/timelineReducerPrerequisites.test.ts" [label=<timelineReducerPrerequisites.test.ts> tooltip="timelineReducerPrerequisites.test.ts" URL="src/__tests__/unit/timelineReducerPrerequisites.test.ts" fillcolor="#ccffcc"] } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/__tests__" {label="__tests__" subgraph "cluster_src/__tests__/unit" {label="unit" "src/__tests__/unit/undoRedoBulkOperations.test.ts" [label=<undoRedoBulkOperations.test.ts> tooltip="undoRedoBulkOperations.test.ts" URL="src/__tests__/unit/undoRedoBulkOperations.test.ts" fillcolor="#ddfeff"] } } }
+    "src/__tests__/unit/undoRedoBulkOperations.test.ts" -> "src/actions/timelineActions.ts"
+    "src/__tests__/unit/undoRedoBulkOperations.test.ts" -> "src/hooks/useUndoRedo.ts"
+    "src/__tests__/unit/undoRedoBulkOperations.test.ts" -> "src/reducers/timelineReducer.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/actions" {label="actions" "src/actions/timelineActions.ts" [label=<timelineActions.ts> tooltip="timelineActions.ts" URL="src/actions/timelineActions.ts" fillcolor="#ddfeff"] } }
+    "src/actions/timelineActions.ts" -> "src/types/timeline.types.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/AssetGroupSection.js" [label=<AssetGroupSection.js> tooltip="AssetGroupSection.js" URL="src/components/AssetGroupSection.js" ] } }
+    "src/components/AssetGroupSection.js" -> "src/components/GanttTaskRow.js"
+    "src/components/AssetGroupSection.js" -> "src/components/ganttUtils.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/AssetInstanceEditor.js" [label=<AssetInstanceEditor.js> tooltip="AssetInstanceEditor.js" URL="src/components/AssetInstanceEditor.js" ] } }
+    "src/components/AssetInstanceEditor.js" -> "src/components/ganttUtils.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/AssetSelector.js" [label=<AssetSelector.js> tooltip="AssetSelector.js" URL="src/components/AssetSelector.js" ] } }
+    "src/components/AssetSelector.js" -> "src/components/AssetInstanceEditor.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/CampaignSetup.js" [label=<CampaignSetup.js> tooltip="CampaignSetup.js" URL="src/components/CampaignSetup.js" ] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/DependencyKeyboardHandler.tsx" [label=<DependencyKeyboardHandler.tsx> tooltip="DependencyKeyboardHandler.tsx" URL="src/components/DependencyKeyboardHandler.tsx" fillcolor="#bbfeff"] } }
+    "src/components/DependencyKeyboardHandler.tsx" -> "src/config/features.ts"
+    "src/components/DependencyKeyboardHandler.tsx" -> "src/hooks/useKeyboardShortcuts.ts"
+    "src/components/DependencyKeyboardHandler.tsx" -> "src/hooks/useTimeline.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/DragDropDependencyOverlay.tsx" [label=<DragDropDependencyOverlay.tsx> tooltip="DragDropDependencyOverlay.tsx" URL="src/components/DragDropDependencyOverlay.tsx" fillcolor="#bbfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/ErrorBoundary.tsx" [label=<ErrorBoundary.tsx> tooltip="ErrorBoundary.tsx" URL="src/components/ErrorBoundary.tsx" fillcolor="#bbfeff"] } }
+    "src/components/ErrorBoundary.tsx" -> "src/services/ValidationService.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttAddTaskModal.js" [label=<GanttAddTaskModal.js> tooltip="GanttAddTaskModal.js" URL="src/components/GanttAddTaskModal.js" ] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttAssetAlerts.js" [label=<GanttAssetAlerts.js> tooltip="GanttAssetAlerts.js" URL="src/components/GanttAssetAlerts.js" fillcolor="#ccffcc"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttChart.js" [label=<GanttChart.js> tooltip="GanttChart.js" URL="src/components/GanttChart.js" ] } }
+    "src/components/GanttChart.js" -> "src/hooks/useGanttDrag.ts"
+    "src/components/GanttChart.js" -> "src/services/ExcelExporter.js"
+    "src/components/GanttChart.js" -> "src/utils/dateHelpers.ts"
+    "src/components/GanttChart.js" -> "src/components/AssetGroupSection.js"
+    "src/components/GanttChart.js" -> "src/components/DragDropDependencyOverlay.tsx"
+    "src/components/GanttChart.js" -> "src/components/GanttAddTaskModal.js"
+    "src/components/GanttChart.js" -> "src/components/GanttDependencyVisuals.tsx"
+    "src/components/GanttChart.js" -> "src/components/GanttHeader.js"
+    "src/components/GanttChart.js" -> "src/components/GanttLegend.js"
+    "src/components/GanttChart.js" -> "src/components/GanttTaskRow.js"
+    "src/components/GanttChart.js" -> "src/components/ganttUtils.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttChart.old.js" [label=<GanttChart.old.js> tooltip="GanttChart.old.js" URL="src/components/GanttChart.old.js" fillcolor="#ccffcc"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttDependencyVisuals.tsx" [label=<GanttDependencyVisuals.tsx> tooltip="GanttDependencyVisuals.tsx" URL="src/components/GanttDependencyVisuals.tsx" fillcolor="#bbfeff"] } }
+    "src/components/GanttDependencyVisuals.tsx" -> "src/config/features.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttHeader.js" [label=<GanttHeader.js> tooltip="GanttHeader.js" URL="src/components/GanttHeader.js" ] } }
+    "src/components/GanttHeader.js" -> "src/components/ganttUtils.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttLegend.js" [label=<GanttLegend.js> tooltip="GanttLegend.js" URL="src/components/GanttLegend.js" ] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/GanttTaskRow.js" [label=<GanttTaskRow.js> tooltip="GanttTaskRow.js" URL="src/components/GanttTaskRow.js" ] } }
+    "src/components/GanttTaskRow.js" -> "src/components/ganttUtils.js"
+    "src/components/GanttTaskRow.js" -> "src/components/TaskDependencyIndicator.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/RecoveryPrompt.tsx" [label=<RecoveryPrompt.tsx> tooltip="RecoveryPrompt.tsx" URL="src/components/RecoveryPrompt.tsx" fillcolor="#bbfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/SaveIndicator.tsx" [label=<SaveIndicator.tsx> tooltip="SaveIndicator.tsx" URL="src/components/SaveIndicator.tsx" fillcolor="#bbfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/TaskDependencyIndicator.tsx" [label=<TaskDependencyIndicator.tsx> tooltip="TaskDependencyIndicator.tsx" URL="src/components/TaskDependencyIndicator.tsx" fillcolor="#bbfeff"] } }
+    "src/components/TaskDependencyIndicator.tsx" -> "src/config/features.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/TimelineDisplay.js" [label=<TimelineDisplay.js> tooltip="TimelineDisplay.js" URL="src/components/TimelineDisplay.js" ] } }
+    "src/components/TimelineDisplay.js" -> "src/components/GanttChart.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/ValidationError.tsx" [label=<ValidationError.tsx> tooltip="ValidationError.tsx" URL="src/components/ValidationError.tsx" fillcolor="#ccffcc"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/components" {label="components" "src/components/ganttUtils.js" [label=<ganttUtils.js> tooltip="ganttUtils.js" URL="src/components/ganttUtils.js" ] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/config" {label="config" "src/config/features.ts" [label=<features.ts> tooltip="features.ts" URL="src/config/features.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useAutoSave.ts" [label=<useAutoSave.ts> tooltip="useAutoSave.ts" URL="src/hooks/useAutoSave.ts" fillcolor="#ddfeff"] } }
+    "src/hooks/useAutoSave.ts" -> "src/services/AutoSaveManager.ts"
+    "src/hooks/useAutoSave.ts" -> "src/hooks/useBeforeUnload.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useBeforeUnload.ts" [label=<useBeforeUnload.ts> tooltip="useBeforeUnload.ts" URL="src/hooks/useBeforeUnload.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useDebounce.js" [label=<useDebounce.js> tooltip="useDebounce.js" URL="src/hooks/useDebounce.js" fillcolor="#ccffcc"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useDependencies.ts" [label=<useDependencies.ts> tooltip="useDependencies.ts" URL="src/hooks/useDependencies.ts" fillcolor="#ddfeff"] } }
+    "src/hooks/useDependencies.ts" -> "src/actions/timelineActions.ts"
+    "src/hooks/useDependencies.ts" -> "src/config/features.ts"
+    "src/hooks/useDependencies.ts" -> "src/services/DependencyValidator.ts"
+    "src/hooks/useDependencies.ts" -> "src/hooks/useTimeline.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useExcelExport.ts" [label=<useExcelExport.ts> tooltip="useExcelExport.ts" URL="src/hooks/useExcelExport.ts" fillcolor="#ddfeff"] } }
+    "src/hooks/useExcelExport.ts" -> "src/services/ExcelExporter.js"
+    "src/hooks/useExcelExport.ts" -> "src/hooks/useTimeline.tsx"
+    "src/hooks/useExcelExport.ts" -> "src/hooks/useTimelineSelectors.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useGanttDrag.ts" [label=<useGanttDrag.ts> tooltip="useGanttDrag.ts" URL="src/hooks/useGanttDrag.ts" fillcolor="#ddfeff"] } }
+    "src/hooks/useGanttDrag.ts" -> "src/components/ganttUtils.js"
+    "src/hooks/useGanttDrag.ts" -> "src/utils/dateHelpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useKeyboardShortcuts.ts" [label=<useKeyboardShortcuts.ts> tooltip="useKeyboardShortcuts.ts" URL="src/hooks/useKeyboardShortcuts.ts" fillcolor="#ddfeff"] } }
+    "src/hooks/useKeyboardShortcuts.ts" -> "src/config/features.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useTimeline.tsx" [label=<useTimeline.tsx> tooltip="useTimeline.tsx" URL="src/hooks/useTimeline.tsx" fillcolor="#bbfeff"] } }
+    "src/hooks/useTimeline.tsx" -> "src/actions/timelineActions.ts"
+    "src/hooks/useTimeline.tsx" -> "src/components/RecoveryPrompt.tsx"
+    "src/hooks/useTimeline.tsx" -> "src/components/SaveIndicator.tsx"
+    "src/hooks/useTimeline.tsx" -> "src/reducers/timelineReducer.ts"
+    "src/hooks/useTimeline.tsx" -> "src/hooks/useAutoSave.ts"
+    "src/hooks/useTimeline.tsx" -> "src/hooks/useUndoRedo.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useTimelineSelectors.tsx" [label=<useTimelineSelectors.tsx> tooltip="useTimelineSelectors.tsx" URL="src/hooks/useTimelineSelectors.tsx" fillcolor="#bbfeff"] } }
+    "src/hooks/useTimelineSelectors.tsx" -> "src/actions/timelineActions.ts"
+    "src/hooks/useTimelineSelectors.tsx" -> "src/services/AssetConflictCalculator.ts"
+    "src/hooks/useTimelineSelectors.tsx" -> "src/hooks/useTimeline.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/hooks" {label="hooks" "src/hooks/useUndoRedo.ts" [label=<useUndoRedo.ts> tooltip="useUndoRedo.ts" URL="src/hooks/useUndoRedo.ts" fillcolor="#ddfeff"] } }
+    "src/hooks/useUndoRedo.ts" -> "src/types/timeline.types.ts"
+    subgraph "cluster_src" {label="src" "src/index.css" [label=<index.css> tooltip="index.css" URL="src/index.css" ] }
+    subgraph "cluster_src" {label="src" "src/index.js" [label=<index.js> tooltip="index.js" URL="src/index.js" ] }
+    "src/index.js" -> "src/components/ErrorBoundary.tsx"
+    "src/index.js" -> "src/index.css"
+    "src/index.js" -> "src/v2/TimelineBuilderV2.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/reducers" {label="reducers" "src/reducers/coreReducer.ts" [label=<coreReducer.ts> tooltip="coreReducer.ts" URL="src/reducers/coreReducer.ts" fillcolor="#ddfeff"] } }
+    "src/reducers/coreReducer.ts" -> "src/services/ValidationService.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/reducers" {label="reducers" "src/reducers/dependencyReducer.ts" [label=<dependencyReducer.ts> tooltip="dependencyReducer.ts" URL="src/reducers/dependencyReducer.ts" fillcolor="#ddfeff"] } }
+    "src/reducers/dependencyReducer.ts" -> "src/types/timeline.types.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/reducers" {label="reducers" "src/reducers/manipulationReducer.ts" [label=<manipulationReducer.ts> tooltip="manipulationReducer.ts" URL="src/reducers/manipulationReducer.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/reducers" {label="reducers" "src/reducers/systemReducer.ts" [label=<systemReducer.ts> tooltip="systemReducer.ts" URL="src/reducers/systemReducer.ts" fillcolor="#ddfeff"] } }
+    "src/reducers/systemReducer.ts" -> "src/services/ValidationService.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/reducers" {label="reducers" "src/reducers/timelineReducer.ts" [label=<timelineReducer.ts> tooltip="timelineReducer.ts" URL="src/reducers/timelineReducer.ts" fillcolor="#ddfeff"] } }
+    "src/reducers/timelineReducer.ts" -> "src/types/timeline.types.ts"
+    "src/reducers/timelineReducer.ts" -> "src/reducers/coreReducer.ts"
+    "src/reducers/timelineReducer.ts" -> "src/reducers/dependencyReducer.ts"
+    "src/reducers/timelineReducer.ts" -> "src/reducers/manipulationReducer.ts"
+    "src/reducers/timelineReducer.ts" -> "src/reducers/systemReducer.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/AssetConflictCalculator.ts" [label=<AssetConflictCalculator.ts> tooltip="AssetConflictCalculator.ts" URL="src/services/AssetConflictCalculator.ts" fillcolor="#ddfeff"] } }
+    "src/services/AssetConflictCalculator.ts" -> "src/utils/dateHelpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/AutoSaveManager.ts" [label=<AutoSaveManager.ts> tooltip="AutoSaveManager.ts" URL="src/services/AutoSaveManager.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/DependencyValidationEnhanced.ts" [label=<DependencyValidationEnhanced.ts> tooltip="DependencyValidationEnhanced.ts" URL="src/services/DependencyValidationEnhanced.ts" fillcolor="#ddfeff"] } }
+    "src/services/DependencyValidationEnhanced.ts" -> "src/config/features.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/DependencyValidator.ts" [label=<DependencyValidator.ts> tooltip="DependencyValidator.ts" URL="src/services/DependencyValidator.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/ExcelExporter.js" [label=<ExcelExporter.js> tooltip="ExcelExporter.js" URL="src/services/ExcelExporter.js" ] } }
+    "src/services/ExcelExporter.js" -> "src/components/ganttUtils.js"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/ExcelImporter.js" [label=<ExcelImporter.js> tooltip="ExcelImporter.js" URL="src/services/ExcelImporter.js" ] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/TimelineCalculator.ts" [label=<TimelineCalculator.ts> tooltip="TimelineCalculator.ts" URL="src/services/TimelineCalculator.ts" fillcolor="#ddfeff"] } }
+    "src/services/TimelineCalculator.ts" -> "src/config/features.ts"
+    "src/services/TimelineCalculator.ts" -> "src/utils/dateHelpers.ts"
+    "src/services/TimelineCalculator.ts" -> "src/services/TimelineCalculatorDAG.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/TimelineCalculatorDAG.ts" [label=<TimelineCalculatorDAG.ts> tooltip="TimelineCalculatorDAG.ts" URL="src/services/TimelineCalculatorDAG.ts" fillcolor="#ddfeff"] } }
+    "src/services/TimelineCalculatorDAG.ts" -> "src/config/features.ts"
+    "src/services/TimelineCalculatorDAG.ts" -> "src/utils/dateHelpers.ts"
+    "src/services/TimelineCalculatorDAG.ts" -> "src/services/dag/criticalPathCalculator.ts"
+    "src/services/TimelineCalculatorDAG.ts" -> "src/services/dag/dateAssigner.ts"
+    "src/services/TimelineCalculatorDAG.ts" -> "src/services/dag/graphBuilder.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" "src/services/ValidationService.ts" [label=<ValidationService.ts> tooltip="ValidationService.ts" URL="src/services/ValidationService.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" subgraph "cluster_src/services/dag" {label="dag" "src/services/dag/criticalPathCalculator.ts" [label=<criticalPathCalculator.ts> tooltip="criticalPathCalculator.ts" URL="src/services/dag/criticalPathCalculator.ts" fillcolor="#ddfeff"] } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" subgraph "cluster_src/services/dag" {label="dag" "src/services/dag/dateAssigner.ts" [label=<dateAssigner.ts> tooltip="dateAssigner.ts" URL="src/services/dag/dateAssigner.ts" fillcolor="#ddfeff"] } } }
+    "src/services/dag/dateAssigner.ts" -> "src/config/features.ts"
+    "src/services/dag/dateAssigner.ts" -> "src/utils/dateHelpers.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" subgraph "cluster_src/services/dag" {label="dag" "src/services/dag/dependencySanitizer.ts" [label=<dependencySanitizer.ts> tooltip="dependencySanitizer.ts" URL="src/services/dag/dependencySanitizer.ts" fillcolor="#ddfeff"] } } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/services" {label="services" subgraph "cluster_src/services/dag" {label="dag" "src/services/dag/graphBuilder.ts" [label=<graphBuilder.ts> tooltip="graphBuilder.ts" URL="src/services/dag/graphBuilder.ts" fillcolor="#ddfeff"] } } }
+    "src/services/dag/graphBuilder.ts" -> "src/config/features.ts"
+    "src/services/dag/graphBuilder.ts" -> "src/services/DependencyValidator.ts"
+    "src/services/dag/graphBuilder.ts" -> "src/services/dag/dependencySanitizer.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/types" {label="types" "src/types/timeline.types.ts" [label=<timeline.types.ts> tooltip="timeline.types.ts" URL="src/types/timeline.types.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/utils" {label="utils" "src/utils/dateHelpers.ts" [label=<dateHelpers.ts> tooltip="dateHelpers.ts" URL="src/utils/dateHelpers.ts" fillcolor="#ddfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/utils" {label="utils" "src/utils/phase2IntegrationTest.js" [label=<phase2IntegrationTest.js> tooltip="phase2IntegrationTest.js" URL="src/utils/phase2IntegrationTest.js" ] } }
+    "src/utils/phase2IntegrationTest.js" -> "src/actions/timelineActions.ts"
+    "src/utils/phase2IntegrationTest.js" -> "src/config/features.ts"
+    "src/utils/phase2IntegrationTest.js" -> "src/services/DependencyValidator.ts"
+    "src/utils/phase2IntegrationTest.js" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/utils" {label="utils" "src/utils/stateAdapters.js" [label=<stateAdapters.js> tooltip="stateAdapters.js" URL="src/utils/stateAdapters.js" ] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/BankHolidays.tsx" [label=<BankHolidays.tsx> tooltip="BankHolidays.tsx" URL="src/v2/BankHolidays.tsx" fillcolor="#bbfeff"] } }
+    "src/v2/BankHolidays.tsx" -> "src/actions/timelineActions.ts"
+    "src/v2/BankHolidays.tsx" -> "src/hooks/useTimeline.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/CatalogContext.tsx" [label=<CatalogContext.tsx> tooltip="CatalogContext.tsx" URL="src/v2/CatalogContext.tsx" fillcolor="#bbfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/CatalogInitializer.tsx" [label=<CatalogInitializer.tsx> tooltip="CatalogInitializer.tsx" URL="src/v2/CatalogInitializer.tsx" fillcolor="#bbfeff"] } }
+    "src/v2/CatalogInitializer.tsx" -> "src/actions/timelineActions.ts"
+    "src/v2/CatalogInitializer.tsx" -> "src/hooks/useTimeline.tsx"
+    "src/v2/CatalogInitializer.tsx" -> "src/v2/CatalogContext.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/GettingStarted.tsx" [label=<GettingStarted.tsx> tooltip="GettingStarted.tsx" URL="src/v2/GettingStarted.tsx" fillcolor="#bbfeff"] } }
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/ImportManager.tsx" [label=<ImportManager.tsx> tooltip="ImportManager.tsx" URL="src/v2/ImportManager.tsx" fillcolor="#bbfeff"] } }
+    "src/v2/ImportManager.tsx" -> "src/actions/timelineActions.ts"
+    "src/v2/ImportManager.tsx" -> "src/hooks/useTimeline.tsx"
+    "src/v2/ImportManager.tsx" -> "src/services/ExcelImporter.js"
+    "src/v2/ImportManager.tsx" -> "src/v2/CatalogContext.tsx"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/Orchestrator.tsx" [label=<Orchestrator.tsx> tooltip="Orchestrator.tsx" URL="src/v2/Orchestrator.tsx" fillcolor="#bbfeff"] } }
+    "src/v2/Orchestrator.tsx" -> "src/actions/timelineActions.ts"
+    "src/v2/Orchestrator.tsx" -> "src/hooks/useTimeline.tsx"
+    "src/v2/Orchestrator.tsx" -> "src/hooks/useTimelineSelectors.tsx"
+    "src/v2/Orchestrator.tsx" -> "src/services/TimelineCalculator.ts"
+    subgraph "cluster_src" {label="src" subgraph "cluster_src/v2" {label="v2" "src/v2/TimelineBuilderV2.tsx" [label=<TimelineBuilderV2.tsx> tooltip="TimelineBuilderV2.tsx" URL="src/v2/TimelineBuilderV2.tsx" fillcolor="#bbfeff"] } }
+    "src/v2/TimelineBuilderV2.tsx" -> "src/actions/timelineActions.ts"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/components/AssetSelector.js"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/components/CampaignSetup.js"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/components/GanttChart.js"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/components/ganttUtils.js"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/hooks/useBeforeUnload.ts"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/hooks/useExcelExport.ts"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/hooks/useTimeline.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/hooks/useTimelineSelectors.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/services/TimelineCalculator.ts"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/utils/dateHelpers.ts"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/v2/BankHolidays.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/v2/CatalogContext.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/v2/CatalogInitializer.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/v2/GettingStarted.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/v2/ImportManager.tsx"
+    "src/v2/TimelineBuilderV2.tsx" -> "src/v2/Orchestrator.tsx"
+}

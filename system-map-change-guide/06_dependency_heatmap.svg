@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="420" viewBox="0 0 980 420">
+  <title>Dependency Heatmap</title>
+  <desc>Date: 2025-09-20 | Legend: RED=high blast radius; AMBER=shared utils; GREEN=presentational. Commands to regenerate overlay are embedded.</desc>
+  <rect x="0" y="0" width="980" height="420" fill="#fff" stroke="#ddd"/>
+  <text x="20" y="30" font-family="monospace" font-size="16" fill="#333">Dependency Heatmap (overlay categories)</text>
+  <text x="20" y="55" font-family="monospace" font-size="12" fill="#555">Generate base graph:</text>
+  <text x="40" y="72" font-family="monospace" font-size="12" fill="#555">npx depcruise --no-config --ts-config ./tsconfig.json --include-only "src" --output-type dot src &gt; system-map/dep.dot</text>
+  <text x="40" y="89" font-family="monospace" font-size="12" fill="#555">dot -Tsvg system-map/dep.dot &gt; system-map/10_dependency_graph.svg</text>
+  <text x="20" y="112" font-family="monospace" font-size="12" fill="#555">Overlay rule: colour nodes by path prefix: RED=services/calculators, v2/Orchestrator, reducers; AMBER=utils, hooks; GREEN=components.</text>
+
+  <!-- Legend -->
+  <rect x="20" y="130" width="12" height="12" fill="#e74c3c"/><text x="40" y="141" font-family="monospace" font-size="12">RED High blast radius</text>
+  <rect x="20" y="150" width="12" height="12" fill="#f39c12"/><text x="40" y="161" font-family="monospace" font-size="12">AMBER Shared utilities/hooks</text>
+  <rect x="20" y="170" width="12" height="12" fill="#2ecc71"/><text x="40" y="181" font-family="monospace" font-size="12">GREEN Presentational components</text>
+
+  <!-- Boxes (indicative grouping) -->
+  <rect x="20" y="200" width="280" height="60" fill="#e74c3c" opacity="0.15" stroke="#e74c3c"/>
+  <text x="30" y="220" font-family="monospace" font-size="12" fill="#c0392b">src/services/TimelineCalculator*.ts</text>
+  <text x="30" y="238" font-family="monospace" font-size="12" fill="#c0392b">src/services/dag/*.ts</text>
+
+  <rect x="320" y="200" width="260" height="60" fill="#e74c3c" opacity="0.15" stroke="#e74c3c"/>
+  <text x="330" y="220" font-family="monospace" font-size="12" fill="#c0392b">src/v2/Orchestrator.tsx</text>
+  <text x="330" y="238" font-family="monospace" font-size="12" fill="#c0392b">src/reducers/*.ts</text>
+
+  <rect x="600" y="200" width="180" height="60" fill="#f39c12" opacity="0.2" stroke="#f39c12"/>
+  <text x="610" y="220" font-family="monospace" font-size="12" fill="#d35400">src/utils/dateHelpers.ts</text>
+  <text x="610" y="238" font-family="monospace" font-size="12" fill="#d35400">src/hooks/*</text>
+
+  <rect x="800" y="200" width="160" height="60" fill="#2ecc71" opacity="0.2" stroke="#2ecc71"/>
+  <text x="810" y="220" font-family="monospace" font-size="12" fill="#27ae60">src/components/*</text>
+
+  <!-- Footer commands -->
+  <text x="20" y="300" font-family="monospace" font-size="12" fill="#555">Optional: post-process SVG to colour nodes programmatically using a script that maps fill by path regex.</text>
+</svg>
+

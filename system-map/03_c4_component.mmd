@@ -1,0 +1,34 @@
+%% Date: 2025-09-20 | Legend: Boxes show repo paths; arrows label protocols/events.
+
+%% Component diagram for the main web app
+C4Component
+title Main App Components (src/)
+
+Container_Boundary(web, "Web app: src/index.js → src/v2/TimelineBuilderV2.tsx"){
+  Component(app, "TimelineBuilderV2 [Stateful]", "src/v2/TimelineBuilderV2.tsx", "Composes provider + v2 UI")
+  Component(ctx, "Timeline Context/Provider [State]", "src/hooks/useTimeline.tsx", "State + dispatch")
+  Component(sel, "Selector Hooks [State]", "src/hooks/useTimelineSelectors.tsx", "Derived state for UI")
+  Component(orc, "Orchestrator [Stateful]", "src/v2/Orchestrator.tsx", "Rebuilds timelines; warnings")
+  Component(red, "Reducers [State]", "src/reducers/*.ts", "State transitions")
+  Component(act, "Actions [State]", "src/actions/timelineActions.ts", "Action creators")
+  Component(calc, "TimelineCalculator (factory) [Algorithm]", "src/services/TimelineCalculator.ts", "Selects DAG vs Sequential")
+  Component(dag, "DAG/CPM [Algorithm]", "src/services/TimelineCalculatorDAG.ts + src/services/dag/*.ts", "Graph build, dates, critical path")
+  Component(util, "Date utils [Algorithm]", "src/utils/dateHelpers.ts", "Working days, holidays")
+  Component(val, "Validation [Algorithm]", "src/services/ValidationService.ts, DependencyValidationEnhanced.ts", "Rules & consistency checks")
+  Component(flags, "Feature flags [State]", "src/config/features.ts", "Enable/disable features; dev debug API")
+  Component(gantt, "Gantt UI [Presentational]", "src/components/Gantt*.js|.tsx", "Render and interact")
+  Component(xls, "Excel I/O [IO]", "src/services/Excel(Importer|Exporter).js", "Import/export plan data")
+}
+
+Rel(app, ctx, "React props/context")
+Rel(app, sel, "use* selectors")
+Rel(orc, calc, "Function calls")
+Rel(calc, dag, "Function calls")
+Rel(calc, util, "Working day math")
+Rel(orc, act, "Dispatch actions")
+Rel(act, red, "Action objects")
+Rel(sel, red, "Read state via context")
+Rel(gantt, act, "UI events → dispatch")
+Rel(gantt, sel, "use* selectors")
+Rel(flags, calc, "Feature checks")
+Rel(xls, act, "Import/export triggers → dispatch/update")

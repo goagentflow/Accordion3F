@@ -17,6 +17,7 @@ export interface FeatureFlags {
   ENABLE_DEPENDENCY_UI: boolean;
   DEBUG_TIMELINE_CALCULATIONS: boolean;
   ALLOW_WEEKEND_LIVE_DATE: boolean;
+  STRICT_OVERLAP_CALC?: boolean; // If true, compute overlaps without +1 inclusion
 }
 
 // ============================================
@@ -45,6 +46,9 @@ const DEFAULT_FLAGS: FeatureFlags = {
 
   // Allow the final live task to land on weekend/holiday (anchor to chosen live date)
   ALLOW_WEEKEND_LIVE_DATE: true,
+
+  // Overlap calculation mode (off by default for backwards compatibility)
+  STRICT_OVERLAP_CALC: false,
 };
 
 // ============================================
@@ -226,6 +230,14 @@ export const isDebugMode = (): boolean => {
  */
 export const allowWeekendLiveDate = (): boolean => {
   return featureFlags.isEnabled('ALLOW_WEEKEND_LIVE_DATE');
+};
+
+/**
+ * Strict overlap calculation (no inclusive +1 day on drag-created overlaps)
+ */
+export const useStrictOverlapCalc = (): boolean => {
+  // Optional chaining for legacy persisted flags
+  return (featureFlags as any).isEnabled('STRICT_OVERLAP_CALC');
 };
 
 // ============================================

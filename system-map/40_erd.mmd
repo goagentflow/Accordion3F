@@ -1,0 +1,40 @@
+%% Date: 2025-09-20 | Legend: Boxes show repo paths; arrows label protocols/events.
+
+%% Logical ERD for in-memory/browser model (no DB)
+erDiagram
+  ASSET ||--o{ TASK : has
+  TASK ||--o{ DEPENDENCY : "successor has predecessor (FS, lag)"
+  TASK ||--o{ TIMELINE_TASK : "computed (adds start/end/progress)"
+
+  ASSET {
+    string id
+    string type
+    string name
+    date   startDate
+  }
+  TASK {
+    string id
+    string name
+    int    duration
+    enum   owner  "'c'|'m'|'a'|'l'"
+    string assetId
+    string assetType
+    bool   isCustom
+  }
+  DEPENDENCY {
+    string successorId
+    string predecessorId
+    enum   type  "FS"
+    int    lag   "negative => overlap"
+  }
+  TIMELINE_TASK {
+    string id
+    date   start
+    date   end
+    int    progress
+    bool   isCritical
+    int    totalFloat
+  }
+
+%% Sources: src/types/timeline.types.ts, src/services/TimelineCalculator(DAG).ts
+

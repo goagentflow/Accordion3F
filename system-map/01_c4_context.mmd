@@ -1,0 +1,15 @@
+%% Date: 2025-09-20 | Legend: Boxes show repo paths; arrows label protocols/events.
+
+C4Context
+title System context
+Person(user, "End user", "Interacts via browser")
+System_Boundary(app, "Accordion 3F (src/)"){
+  System(web, "Web app", "React (CRA) — src/index.js → src/v2/TimelineBuilderV2.tsx")
+}
+System(storage, "Browser storage", "localStorage")
+System(files, "Excel files", "Download/Upload .xlsx via ExcelJS")
+
+Rel(user, web, "Browser UI events (click/drag/keys)")
+Rel(web, storage, "Web Storage API (localStorage)")
+Rel(web, files, "File upload/download (Excel)")
+

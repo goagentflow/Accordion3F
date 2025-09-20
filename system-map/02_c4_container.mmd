@@ -1,0 +1,15 @@
+%% Date: 2025-09-20 | Legend: Boxes show repo paths; arrows label protocols/events.
+
+C4Container
+title Containers
+Person(user, "End user")
+System_Boundary(sys, "Accordion 3F"){
+  Container(web, "Web app", "React 18 / CRA", "Renders UI and computes schedules\nEntry: src/index.js; App: src/v2/TimelineBuilderV2.tsx")
+  ContainerDb(ls, "Browser localStorage", "Web Storage", "Persists feature flags and autosave")
+}
+System(files, "Excel files", ".xlsx via ExcelJS — src/services/Excel(Importer|Exporter).js")
+
+Rel(user, web, "Browser")
+Rel(web, ls, "localStorage read/write")
+Rel(web, files, "Upload/Download .xlsx")
+

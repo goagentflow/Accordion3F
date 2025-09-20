@@ -22,6 +22,8 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "npm run test:unit && npm run test:e2e",
+    "map:deps": "node scripts/gen-dep-graph.mjs",
+    "map:heatmap": "node scripts/gen-heatmap.mjs",
     "eject": "react-scripts eject"
   },
   "browserslist": {
@@ -37,6 +39,7 @@
     ]
   },
   "devDependencies": {
+    "@aduh95/viz.js": "^3.7.0",
     "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
@@ -45,6 +48,8 @@
     "@types/papaparse": "^5.3.16",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
+    "dependency-cruiser": "^17.0.1",
+    "graphviz-cli": "^2.0.0",
     "typescript": "^5.9.2"
   },
   "jest": {

@@ -209,8 +209,13 @@ const RightColumn: React.FC = () => {
       const predecessor = overlappedTask;
       const predecessorEnd = new Date(predecessor.end);
 
-      // Correctly calculate overlap days, making it inclusive
-      const overlapDays = calculateWorkingDaysBetween(newStart, predecessorEnd, dates.bankHolidays) + 1;
+      // Calculate overlap days using feature-flagged policy
+      const { computeOverlapDays } = require('../utils/overlap');
+      const overlapDays = computeOverlapDays(newStart, predecessorEnd, dates.bankHolidays);
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('[TimelineBuilderV2] onTaskMove overlapDays', { taskId, predecessorId: predecessor.id, overlapDays });
+      }
 
       // If other dependencies exist, remove them. A task can only follow one predecessor via drag-drop.
       existingDeps.forEach((dep: any) => {
