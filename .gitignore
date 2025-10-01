@@ -70,4 +70,7 @@ jspm_packages/
 # dotenv environment variables file
 .env
 
+# Playwright test reports
+playwright-report/
+
 
