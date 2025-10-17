@@ -13,7 +13,7 @@ import CatalogInitializer from './CatalogInitializer';
 import BankHolidays from './BankHolidays';
 import Orchestrator from './Orchestrator';
 import { CatalogProvider, useCatalog } from './CatalogContext';
-import { calculateWorkingDaysBetween, safeToISOString } from '../utils/dateHelpers';
+import { safeToISOString } from '../utils/dateHelpers';
 import GettingStarted from './GettingStarted';
 import useExcelExport from '../hooks/useExcelExport';
 import { useBeforeUnload } from '../hooks/useBeforeUnload';
