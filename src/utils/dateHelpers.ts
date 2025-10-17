@@ -16,9 +16,12 @@ export const isNonWorkingDay = (
   if (!date || isNaN(date.getTime())) {
     return true; // Treat invalid dates as non-working days
   }
-  
+
   const day = date.getDay();
-  const yyyy_mm_dd = date.toISOString().split('T')[0];
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy_mm_dd = `${yyyy}-${mm}-${dd}`;
   return day === 0 || day === 6 || bankHolidays.includes(yyyy_mm_dd);
 };
 
@@ -261,8 +264,11 @@ export const calculateWorkingDaysBetween = (
   
   while (currentDate < end) {
     const dayOfWeek = currentDate.getDay();
-    const dateStr = currentDate.toISOString().split('T')[0];
-    
+    const yyyy = currentDate.getFullYear();
+    const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(currentDate.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+
     // Count if not weekend (0 = Sunday, 6 = Saturday) and not bank holiday
     if (dayOfWeek !== 0 && dayOfWeek !== 6 && !bankHolidays.includes(dateStr)) {
       workingDays++;
@@ -281,9 +287,16 @@ export const calculateWorkingDaysBetween = (
 export const safeToISOString = (date: Date | null | undefined): string => {
   if (!date || isNaN(date.getTime())) {
     console.warn('Invalid date detected, using today\'s date as fallback');
-    return new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   }
-  return date.toISOString().split('T')[0];
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 /**

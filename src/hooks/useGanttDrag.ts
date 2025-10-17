@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GANTT_CONFIG } from '../components/ganttUtils';
 import { countWorkingDays } from '../components/ganttUtils';
-import { getNextWorkingDay as getNextWorkingDayStrict, isNonWorkingDay, getPreviousWorkingDay } from '../utils/dateHelpers';
+import { getNextWorkingDay as getNextWorkingDayStrict, isNonWorkingDay, getPreviousWorkingDay, safeToISOString } from '../utils/dateHelpers';
 
 type DragMode = 'resize-left' | 'resize-right' | 'move' | null;
 
@@ -126,7 +126,7 @@ export const useGanttDrag = ({
         const baseStart = originalStartDate ? originalStartDate : new Date(task.start);
         const proposedStart = new Date(baseStart.getTime() + (moveDaysDelta * 24 * 60 * 60 * 1000));
         const snappedStart = _getNextWorkingDay(proposedStart);
-        onTaskMove(draggedTaskId, snappedStart.toISOString().split('T')[0], task.assetType, task.name);
+        onTaskMove(draggedTaskId, safeToISOString(snappedStart), task.assetType, task.name);
       }
     }
     setIsDragging(false);

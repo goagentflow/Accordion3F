@@ -106,7 +106,16 @@ const AssetInstanceEditor = ({
           <label className="text-xs text-gray-600 mb-1">Go-Live Date</label>
           <DatePicker
             selected={asset.startDate ? new Date(asset.startDate) : null}
-            onChange={date => onAssetStartDateChange(asset.id, date ? date.toISOString().split('T')[0] : '')}
+            onChange={date => {
+              if (!date) {
+                onAssetStartDateChange(asset.id, '');
+              } else {
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                onAssetStartDateChange(asset.id, `${yyyy}-${mm}-${dd}`);
+              }
+            }}
             dateFormat="yyyy-MM-dd"
             className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
             disabled={useGlobalDate}

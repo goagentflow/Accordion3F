@@ -43,7 +43,10 @@ const CampaignSetup = React.memo(({
         const d = new Date(dateString);
         if (isNaN(d.getTime())) return false;
         const day = d.getDay();
-        const iso = d.toISOString().split('T')[0];
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const iso = `${yyyy}-${mm}-${dd}`;
         return day === 0 || day === 6 || (Array.isArray(bankHolidays) && bankHolidays.includes(iso));
     };
 

@@ -6,13 +6,15 @@
  * identified in the UAT testing: progressive degradation, correction failures
  */
 
-import { 
-  TimelineState, 
-  DragTaskAction, 
+import {
+  TimelineState,
+  DragTaskAction,
   HydrateFromStorageAction,
   UndoAction,
   RedoAction
 } from '../types/timeline.types';
+
+import { safeToISOString } from '../utils/dateHelpers';
 
 /**
  * Handle DRAG_TASK action - Fixes the manipulation degradation bug
@@ -56,12 +58,12 @@ export function handleDragTask(state: TimelineState, action: DragTaskAction): Ti
             return task; // Return unchanged if dates would be invalid
           }
           
-          console.log(`[ManipulationReducer] Task ${taskId} moved ${daysToMove} days: ${task.start} → ${newStart.toISOString().split('T')[0]}`);
-          
+          console.log(`[ManipulationReducer] Task ${taskId} moved ${daysToMove} days: ${task.start} → ${safeToISOString(newStart)}`);
+
           return {
             ...task,
-            start: newStart.toISOString().split('T')[0],
-            end: newEnd.toISOString().split('T')[0]
+            start: safeToISOString(newStart),
+            end: safeToISOString(newEnd)
           };
         }
         return task;
@@ -156,8 +158,8 @@ export function handleMoveTask(state: TimelineState, action: any): TimelineState
 
           return {
             ...task,
-            start: newStart.toISOString().split('T')[0],
-            end: newEnd.toISOString().split('T')[0],
+            start: safeToISOString(newStart),
+            end: safeToISOString(newEnd),
           };
         }
         return task;

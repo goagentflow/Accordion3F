@@ -1,4 +1,4 @@
-import { calculateWorkingDaysBetween } from './dateHelpers';
+import { calculateWorkingDaysBetween, safeToISOString } from './dateHelpers';
 import { isDebugMode, useStrictOverlapCalc } from '../config/features';
 
 /**
@@ -14,7 +14,7 @@ export function computeOverlapDays(newStartISO: string | Date, predecessorEndISO
   const overlap = strict ? base : base + 1;
   if (isDebugMode()) {
     // eslint-disable-next-line no-console
-    console.log('[overlap] calc', { strict, base, overlap, newStart: newStart.toISOString().split('T')[0], predEnd: predEnd.toISOString().split('T')[0] });
+    console.log('[overlap] calc', { strict, base, overlap, newStart: safeToISOString(newStart), predEnd: safeToISOString(predEnd) });
   }
   return Math.max(0, overlap);
 }

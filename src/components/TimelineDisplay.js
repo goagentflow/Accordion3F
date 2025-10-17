@@ -47,7 +47,12 @@ const TimelineDisplay = ({ timeline, selectedAssets, formatDate }) => {
     XLSX.utils.book_append_sheet(workbook, timelineWorksheet, "Detailed Timeline");
 
     // 4. Trigger the download
-    XLSX.writeFile(workbook, `campaign_timeline_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    XLSX.writeFile(workbook, `campaign_timeline_${dateStr}.xlsx`);
   };
 
   if (!timeline) {

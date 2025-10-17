@@ -13,7 +13,7 @@ import CatalogInitializer from './CatalogInitializer';
 import BankHolidays from './BankHolidays';
 import Orchestrator from './Orchestrator';
 import { CatalogProvider, useCatalog } from './CatalogContext';
-import { calculateWorkingDaysBetween } from '../utils/dateHelpers';
+import { calculateWorkingDaysBetween, safeToISOString } from '../utils/dateHelpers';
 import GettingStarted from './GettingStarted';
 import useExcelExport from '../hooks/useExcelExport';
 import { useBeforeUnload } from '../hooks/useBeforeUnload';
@@ -88,7 +88,7 @@ const LeftColumn: React.FC = () => {
           },
           isNonWorkingDay: (date: Date) => {
             const day = date.getDay();
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = safeToISOString(date);
             const isWeekend = day === 0 || day === 6;
             const isHoliday = dates.bankHolidays.includes(dateStr);
             return isWeekend || isHoliday;
@@ -104,7 +104,7 @@ const LeftColumn: React.FC = () => {
             const cur = new Date(s);
             while (cur < e) {
               const dow = cur.getDay();
-              const iso = cur.toISOString().split('T')[0];
+              const iso = safeToISOString(cur);
               if (dow !== 0 && dow !== 6 && !(dates.bankHolidays || []).includes(iso)) wd++;
               cur.setDate(cur.getDate() + 1);
             }
@@ -186,7 +186,7 @@ const RightColumn: React.FC = () => {
 
     // Prevent dragging to a non-working day
     const dayOfWeek = newStart.getDay();
-    const isHoliday = (dates.bankHolidays || []).includes(newStart.toISOString().split('T')[0]);
+    const isHoliday = (dates.bankHolidays || []).includes(safeToISOString(newStart));
     if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) {
       // This is a simplification; a real implementation should snap to the next working day.
       // For now, we prevent the move to avoid invalid states.

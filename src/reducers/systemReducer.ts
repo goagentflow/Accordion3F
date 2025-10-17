@@ -14,6 +14,7 @@ import {
 } from '../types/timeline.types';
 
 import { ValidationService } from '../services/ValidationService';
+import { safeToISOString } from '../utils/dateHelpers';
 
 // ============================================
 // Initial State
@@ -72,7 +73,7 @@ export function handleSetGlobalLiveDate(
     return state;
   }
 
-  const validatedDate = dateValidation.value?.toISOString().split('T')[0] || '';
+  const validatedDate = dateValidation.value ? safeToISOString(dateValidation.value) : '';
   
   // If using global date, update all asset start dates
   let updatedAssets = state.assets.selected;
@@ -149,7 +150,7 @@ export function handleSetAssetLiveDate(
     return state;
   }
 
-  const validatedDate = dateValidation.value?.toISOString().split('T')[0] || '';
+  const validatedDate = dateValidation.value ? safeToISOString(dateValidation.value) : '';
   
   return {
     ...state,
@@ -180,7 +181,7 @@ export function handleSetAssetStartDate(
     return state;
   }
 
-  const validatedDate = dateValidation.value?.toISOString().split('T')[0] || '';
+  const validatedDate = dateValidation.value ? safeToISOString(dateValidation.value) : '';
   
   const updatedAssets = state.assets.selected.map(asset =>
     asset.id === assetId ? { ...asset, startDate: validatedDate } : asset

@@ -362,7 +362,7 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     })),
     // Application state for full restoration
     selectedAssets: applicationState.selectedAssets || [],
-    globalLiveDate: applicationState.globalLiveDate || trueEndDate.toISOString().split('T')[0],
+    globalLiveDate: applicationState.globalLiveDate || safeToISOString(trueEndDate),
     assetLiveDates: applicationState.assetLiveDates || {},
     useGlobalDate: applicationState.useGlobalDate !== undefined ? applicationState.useGlobalDate : true,
     customTasks: applicationState.customTasks || [],
