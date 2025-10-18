@@ -185,7 +185,9 @@ export const calculateTaskPosition = (task, minDate) => {
 // Check if asset type requires Sunday-only go-live dates
 export const isSundayOnlyAsset = (assetType) => {
   const sundayOnlyAssets = [
-    'Print - Supplements Full Page'
+    'Print - Supplements Full Page',
+    'Weekend Sunday Supplement Full Page',
+    'You Sunday Supplement Full Page'
   ];
   return sundayOnlyAssets.includes(assetType);
 };

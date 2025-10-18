@@ -506,24 +506,39 @@ const TimelineBuilder = () => {
         return buildAssetTimelineCalculator(tasksWithDependencies, liveDateStr, customDurations, bankHolidays);
     };
 
-    // Load CSV data
+    // Load CSV data (try new You/Weekend CSV first, then fallback)
     useEffect(() => {
-        Papa.parse(`${window.location.origin}/Group_Asset_Task_Time.csv`, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                const parsedData = results.data;
-                setCsvData(parsedData);
-                
-                // Extract unique asset types from CSV
-                const assetTypes = [...new Set(parsedData.map(row => row['Asset Type']))].filter(type => type);
-                setUniqueAssets(assetTypes);
-            },
-            error: (error) => {
-                console.error("Error parsing CSV file:", error);
-            }
+        const parseCSV = (url) => new Promise((resolve, reject) => {
+            Papa.parse(url, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => resolve(results.data),
+                error: reject
+            });
         });
+
+        const loadCSV = async () => {
+            const candidates = [
+                `${window.location.origin}/Group_Asset_Task_Timev.2 Inc You_Weekend.csv`
+            ];
+            for (const url of candidates) {
+                try {
+                    const parsedData = await parseCSV(url);
+                    setCsvData(parsedData);
+                    const assetTypes = [...new Set(parsedData.map(row => row['Asset Type']))].filter(type => type);
+                    setUniqueAssets(assetTypes);
+                    return;
+                } catch (err) {
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log(`[TimelineBuilder] CSV load failed for ${url}, trying next...`);
+                    }
+                }
+            }
+            console.error('All CSV load attempts failed');
+        };
+
+        loadCSV();
     }, []);
 
     // Helper function to safely convert date to ISO string
@@ -2183,7 +2198,7 @@ useEffect(() => {
                                     <div className="flex-1">
                                         <h3 className="text-lg font-semibold text-red-800 mb-2">Date Conflict</h3>
                                         <p className="text-red-700 text-sm mb-3">
-                                            Print Supplements require a Sunday Go-Live date, but your global date is set to {' '}
+                                            Weekend/You Sunday Supplements require a Sunday go-live date, but your global date is set to {' '}
                                             <span className="font-medium">
                                                 {globalLiveDate && new Date(globalLiveDate).toLocaleDateString('en-GB', { 
                                                     weekday: 'long', 
@@ -2195,7 +2210,7 @@ useEffect(() => {
                                         </p>
                                         <div className="bg-red-100 border border-red-300 rounded p-3 text-sm text-red-800">
                                             <p className="font-medium mb-1">To fix this:</p>
-                                            <p>Uncheck "Use same live date for all assets" and set individual Sunday dates for your Print Supplement assets below.</p>
+                                            <p>Uncheck "Use same live date for all assets" and set individual Sunday dates for your Weekend/You Sunday Supplement assets below.</p>
                                         </div>
                                     </div>
                                 </div>

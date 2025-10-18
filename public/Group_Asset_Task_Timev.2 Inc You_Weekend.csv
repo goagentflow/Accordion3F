@@ -122,19 +122,32 @@ PRINT ADVERTORIALS,Print - DM Check-in Advertorial,Final artwork supplied to cli
 PRINT ADVERTORIALS,Print - DM Check-in Advertorial,Final approval from client by 4pm,2,c
 PRINT ADVERTORIALS,Print - DM Check-in Advertorial,Repro,2,m
 PRINT ADVERTORIALS,Print - DM Check-in Advertorial,Check-in - Issue Date,1,l
-PRINT ADVERTORIALS,Print - Supplements Full Page,Brief and assets sent to MMM,1,c
-PRINT ADVERTORIALS,Print - Supplements Full Page,Visual to client,2,m
-PRINT ADVERTORIALS,Print - Supplements Full Page,Client approval on layout,2,c
-PRINT ADVERTORIALS,Print - Supplements Full Page,Amendment Approval Phase - Layout with copy & images to Client,4,m
-PRINT ADVERTORIALS,Print - Supplements Full Page,Amendment Approval Phase - Client Feedback,2,c
-PRINT ADVERTORIALS,Print - Supplements Full Page,Amendment Approval Phase - 2nd layout to Client,2,m
-PRINT ADVERTORIALS,Print - Supplements Full Page,Amendment Approval Phase - Client Feedback,2,c
-PRINT ADVERTORIALS,Print - Supplements Full Page,Amendment Approval Phase - 3rd layout to Client,2,m
-PRINT ADVERTORIALS,Print - Supplements Full Page,Amendment Approval Phase - Client Feedback,2,c
-PRINT ADVERTORIALS,Print - Supplements Full Page,Final Amended and Subbed layout sent for approval,2,m
-PRINT ADVERTORIALS,Print - Supplements Full Page,Client Confirms Sign off,2,c
-PRINT ADVERTORIALS,Print - Supplements Full Page,Repro,1,m
-PRINT ADVERTORIALS,Print - Supplements Full Page,You/Weekend - Issue Date,9,l
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Brief and assets sent to MMM,1,c
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Visual to client,2,m
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Client approval on layout,2,c
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Amendment Approval Phase - Layout with copy & images to Client,4,m
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Amendment Approval Phase - Client Feedback,2,c
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Amendment Approval Phase - 2nd layout to Client,2,m
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Amendment Approval Phase - Client Feedback,2,c
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Amendment Approval Phase - 3rd layout to Client,2,m
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Amendment Approval Phase - Client Feedback,2,c
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Final Amended and Subbed layout sent for approval,2,m
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Client Confirms Sign off,2,c
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Repro,1,m
+PRINT ADVERTORIALS,Weekend Sunday Supplement Full Page,Weekend - Issue Date,9,l
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Brief and assets sent to MMM,1,c
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Visual to client,2,m
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Client approval on layout,2,c
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Amendment Approval Phase - Layout with copy & images to Client,4,m
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Amendment Approval Phase - Client Feedback,2,c
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Amendment Approval Phase - 2nd layout to Client,2,m
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Amendment Approval Phase - Client Feedback,2,c
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Amendment Approval Phase - 3rd layout to Client,2,m
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Amendment Approval Phase - Client Feedback,2,c
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Final Amended and Subbed layout sent for approval,2,m
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Client Confirms Sign off,2,c
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,Repro,1,m
+PRINT ADVERTORIALS,You Sunday Supplement Full Page,You - Issue Date,9,l
 PRINT ADVERTORIALS,Print - Metro Cover Wrap,Rough Copy sent to Metro,1,c
 PRINT ADVERTORIALS,Print - Metro Cover Wrap,Metro editorial approval,6,m
 PRINT ADVERTORIALS,Print - Metro Cover Wrap,Final Copy uploaded to Specle,2,c

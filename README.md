@@ -10,12 +10,8 @@
 - Export the updated plan to Excel. Re‑import later to continue. Do not edit the “DO_NOT_EDIT_DATA” sheet in Excel; changing it will prevent regeneration.
 
 ## CSV Path (Public Asset) and Sub‑Path Deployments
-- The app loads `public/Group_Asset_Task_Time.csv` at start to seed the catalog.
-- A robust fallback chain is used:
-  1. `${PUBLIC_URL}/Group_Asset_Task_Time.csv` (for sub‑path deployments)
-  2. `/Group_Asset_Task_Time.csv` (root path)
-  3. `${window.location.origin}/Group_Asset_Task_Time.csv` (legacy fallback)
-- For sub‑path deployments (e.g., `/app/`), set `PUBLIC_URL=/app` at build time:
+- The app loads `public/Group_Asset_Task_Timev.2 Inc You_Weekend.csv` at start to seed the catalog.
+- For sub‑path deployments (e.g., `/app/`), set `PUBLIC_URL=/app` at build time so the CSV is served from the correct base:
   - `PUBLIC_URL=/app npm run build`
 
 ## Saving
@@ -25,4 +21,3 @@
 ## Production Safety
 - Debug logging is disabled in production builds; no localStorage clearing.
 - Deploy the built `build/` folder behind an SPA‑friendly server (fallback to `/index.html`).
-

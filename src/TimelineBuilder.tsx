@@ -69,35 +69,46 @@ const TimelineBuilder: React.FC = () => {
   // ============================================
   
   useEffect(() => {
-    Papa.parse(`${window.location.origin}/Group_Asset_Task_Time.csv`, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const parsedData = results.data as CsvRow[];
-        setCsvData(parsedData);
-        
-        // Extract unique asset types from CSV
-        const assetTypes = [...new Set(parsedData.map(row => row['Asset Type']))].filter(type => type);
-        
-        // Load CSV data into state
-        dispatch(TimelineActions.loadCsvData(parsedData, assetTypes));
-        
-        // Process CSV into task bank for each selected asset
-        assets.selected.forEach(asset => {
-          const assetTasks = createTasksFromCsv(parsedData, asset);
-          dispatch(TimelineActions.updateTaskBank(assetTasks));
-        });
-
-        // CSV parsed and initial bank seeded
-        setCatalogReady(true);
-      },
-      error: (error) => {
-        console.error("Error parsing CSV file:", error);
-        // Avoid blocking UI; downstream handles empty bank safely
-        setCatalogReady(true);
-      }
+    const parseCSV = (url: string) => new Promise<CsvRow[]>((resolve, reject) => {
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => resolve(results.data as CsvRow[]),
+        error: reject
+      });
     });
+
+    const loadCSV = async () => {
+      const candidates = [
+        `${window.location.origin}/Group_Asset_Task_Timev.2 Inc You_Weekend.csv`
+      ];
+      for (const url of candidates) {
+        try {
+          const parsedData = await parseCSV(url);
+          setCsvData(parsedData);
+
+          const assetTypes = [...new Set(parsedData.map(row => row['Asset Type']))].filter(type => type);
+          dispatch(TimelineActions.loadCsvData(parsedData, assetTypes));
+
+          assets.selected.forEach(asset => {
+            const assetTasks = createTasksFromCsv(parsedData, asset);
+            dispatch(TimelineActions.updateTaskBank(assetTasks));
+          });
+
+          setCatalogReady(true);
+          return;
+        } catch (err) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[TimelineBuilder] CSV load failed for ${url}, trying next...`);
+          }
+        }
+      }
+      // All attempts failed
+      setCatalogReady(true);
+    };
+
+    loadCSV();
   }, [dispatch, assets.selected]);
 
   // ============================================

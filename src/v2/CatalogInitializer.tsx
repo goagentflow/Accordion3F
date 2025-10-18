@@ -26,10 +26,11 @@ export const CatalogInitializer: React.FC = () => {
       });
 
     const loadCSV = async () => {
+      // Single-source of truth: only load the new CSV asset
       const candidates = [
-        process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/Group_Asset_Task_Time.csv` : null,
-        '/Group_Asset_Task_Time.csv',
-        `${window.location.origin}/Group_Asset_Task_Time.csv`
+        process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/Group_Asset_Task_Timev.2 Inc You_Weekend.csv` : null,
+        '/Group_Asset_Task_Timev.2 Inc You_Weekend.csv',
+        `${window.location.origin}/Group_Asset_Task_Timev.2 Inc You_Weekend.csv`
       ].filter(Boolean) as string[];
 
       for (const url of candidates) {

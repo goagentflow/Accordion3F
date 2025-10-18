@@ -141,7 +141,7 @@ const AssetInstanceEditor = ({
             <div className="flex-1">
               <p className="font-semibold mb-1">Sunday Go-Live Required</p>
               <p className="mb-2">
-                Print Supplements must go live on a Sunday, but you're using a global date that falls on a {' '}
+                Sunday Supplement assets must go live on a Sunday, but you're using a global date that falls on a {' '}
                 {new Date(asset.startDate || '').toLocaleDateString('en-GB', { weekday: 'long' })}.
               </p>
               <p className="text-xs font-medium">

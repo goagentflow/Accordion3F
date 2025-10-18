@@ -2,7 +2,7 @@
 
 This project is a web-based timeline builder application. It allows users to create and visualize project timelines, particularly for marketing campaigns. The application is built using React and utilizes Tailwind CSS for styling.
 
-The core functionality of the application revolves around parsing a CSV file (`Group_Asset_Task_Time.csv`) that contains information about different assets and their associated tasks and durations. Users can select assets, specify "go-live" dates, and the application will automatically generate a timeline, calculating the start and end dates for each task based on its duration and dependencies.
+The core functionality of the application revolves around parsing a CSV file (`Group_Asset_Task_Timev.2 Inc You_Weekend.csv`) that contains information about different assets and their associated tasks and durations. Users can select assets, specify "go-live" dates, and the application will automatically generate a timeline, calculating the start and end dates for each task based on its duration and dependencies.
 
 The timeline is displayed as a Gantt chart, providing a clear visual representation of the project schedule. The application also includes features for:
 
