@@ -11,7 +11,7 @@ import { importFromExcel, validateExcelFile, getImportPreview } from './services
 import { useAutoSave } from './hooks/useAutoSave';
 import { useBeforeUnload } from './hooks/useBeforeUnload';
 import { flatToNested, nestedToFlat, createStateSnapshot, hasStateChanged } from './utils/stateAdapters';
-import { isSundayOnlyAsset } from './components/ganttUtils';
+import { isSundayOnlyAsset, isSaturdayOnlyAsset } from './components/ganttUtils';
 import { buildAssetTimeline as buildAssetTimelineCalculator } from './services/TimelineCalculator';
 import { TimelineActions } from './actions/timelineActions';
 // import DependencyManagementButton from './components/DependencyManagementButton';
@@ -1106,7 +1106,7 @@ useEffect(() => {
 
     // REMOVED: Custom task merging useEffect that was causing timeline disruption
     // Custom tasks are now handled properly in the main timeline calculation
-    // Sunday-only validation for supplement assets
+    // Sunday-only and Saturday-only validation for supplement assets
     useEffect(() => {
         if (!useGlobalDate || !globalLiveDate) {
             setSundayDateErrors([]);
@@ -1114,18 +1114,21 @@ useEffect(() => {
         }
 
         const globalDate = new Date(globalLiveDate);
-        const isSunday = globalDate.getDay() === 0;
-        
-        if (isSunday) {
-            setSundayDateErrors([]);
-            return;
-        }
+        const dayOfWeek = globalDate.getDay();
+        const isSunday = dayOfWeek === 0;
+        const isSaturday = dayOfWeek === 6;
 
-        // Find all selected assets that require Sunday-only dates
-        const violatingAssets = selectedAssets.filter(asset => 
-            isSundayOnlyAsset(asset.type)
-        );
-        
+        // Find all selected assets that violate their day-of-week requirement
+        const violatingAssets = selectedAssets.filter(asset => {
+            if (isSundayOnlyAsset(asset.type) && !isSunday) {
+                return true; // Sunday-only asset on non-Sunday
+            }
+            if (isSaturdayOnlyAsset(asset.type) && !isSaturday) {
+                return true; // Saturday-only asset on non-Saturday
+            }
+            return false;
+        });
+
         setSundayDateErrors(violatingAssets.map(asset => asset.id));
     }, [globalLiveDate, selectedAssets, useGlobalDate]);
 
@@ -2186,7 +2189,7 @@ useEffect(() => {
                             </div>
                         )}
 
-                        {/* Sunday Date Validation Error Banner */}
+                        {/* Sunday/Saturday Date Validation Error Banner */}
                         {sundayDateErrors.length > 0 && (
                             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
                                 <div className="flex items-start">
@@ -2198,19 +2201,29 @@ useEffect(() => {
                                     <div className="flex-1">
                                         <h3 className="text-lg font-semibold text-red-800 mb-2">Date Conflict</h3>
                                         <p className="text-red-700 text-sm mb-3">
-                                            Weekend/You Sunday Supplements require a Sunday go-live date, but your global date is set to {' '}
+                                            {(() => {
+                                                const violatingAsset = selectedAssets.find(asset => sundayDateErrors.includes(asset.id));
+                                                if (!violatingAsset) return 'Supplement assets have day-of-week requirements.';
+
+                                                if (isSaturdayOnlyAsset(violatingAsset.type)) {
+                                                    return `Weekend Saturday Supplement requires a Saturday go-live date, but your global date is set to `;
+                                                } else if (isSundayOnlyAsset(violatingAsset.type)) {
+                                                    return `Sunday Supplements require a Sunday go-live date, but your global date is set to `;
+                                                }
+                                                return 'Supplement assets have day-of-week requirements, but your global date is set to ';
+                                            })()}
                                             <span className="font-medium">
-                                                {globalLiveDate && new Date(globalLiveDate).toLocaleDateString('en-GB', { 
-                                                    weekday: 'long', 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric' 
+                                                {globalLiveDate && new Date(globalLiveDate).toLocaleDateString('en-GB', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
                                                 })}
                                             </span>.
                                         </p>
                                         <div className="bg-red-100 border border-red-300 rounded p-3 text-sm text-red-800">
                                             <p className="font-medium mb-1">To fix this:</p>
-                                            <p>Uncheck "Use same live date for all assets" and set individual Sunday dates for your Weekend/You Sunday Supplement assets below.</p>
+                                            <p>Uncheck "Use same live date for all assets" and set individual dates matching the required day of the week for your supplement assets below.</p>
                                         </div>
                                     </div>
                                 </div>

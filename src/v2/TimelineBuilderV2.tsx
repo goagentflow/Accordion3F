@@ -7,7 +7,7 @@ import { TimelineActions } from '../actions/timelineActions';
 import AssetSelector from '../components/AssetSelector';
 import CampaignSetup from '../components/CampaignSetup';
 import GanttChart from '../components/GanttChart';
-import { isSundayOnlyAsset } from '../components/ganttUtils';
+import { isSundayOnlyAsset, isSaturdayOnlyAsset } from '../components/ganttUtils';
 import { calculateWorkingDaysNeeded } from '../services/TimelineCalculator';
 import CatalogInitializer from './CatalogInitializer';
 import BankHolidays from './BankHolidays';
@@ -74,7 +74,9 @@ const LeftColumn: React.FC = () => {
           sundayDateErrors: (assets.selected || []).filter(a => {
             const live = dates.useGlobalDate ? dates.globalLiveDate : a.startDate;
             if (!live) return false;
-            return isSundayOnlyAsset(a.type) && new Date(live).getDay() !== 0;
+            const dayOfWeek = new Date(live).getDay();
+            return (isSundayOnlyAsset(a.type) && dayOfWeek !== 0) ||
+                   (isSaturdayOnlyAsset(a.type) && dayOfWeek !== 6);
           }).map(a => a.id),
           onRenameAsset: renameAsset,
           onAssetStartDateChange: setAssetStartDate,
@@ -152,11 +154,13 @@ const RightColumn: React.FC = () => {
     'If you close the browser or if you refresh the browser, you will lose your work.'
   );
 
-  // Sunday-only violations for right-panel conflicts
+  // Day-of-week violations for right-panel conflicts (Sunday-only and Saturday-only)
   const sundayViolations = (assets.selected || []).filter((a: any) => {
     const live = dates.useGlobalDate ? dates.globalLiveDate : a.startDate;
     if (!live) return false;
-    return isSundayOnlyAsset(a.type) && new Date(live).getDay() !== 0;
+    const dayOfWeek = new Date(live).getDay();
+    return (isSundayOnlyAsset(a.type) && dayOfWeek !== 0) ||
+           (isSaturdayOnlyAsset(a.type) && dayOfWeek !== 6);
   });
 
   const onTaskDurationChange = (taskId: string, duration: number, a?: any, b?: any) => {

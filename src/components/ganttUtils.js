@@ -186,10 +186,17 @@ export const calculateTaskPosition = (task, minDate) => {
 export const isSundayOnlyAsset = (assetType) => {
   const sundayOnlyAssets = [
     'Print - Supplements Full Page',
-    'Weekend Sunday Supplement Full Page',
     'You Sunday Supplement Full Page'
   ];
   return sundayOnlyAssets.includes(assetType);
+};
+
+// Check if asset type requires Saturday-only go-live dates
+export const isSaturdayOnlyAsset = (assetType) => {
+  const saturdayOnlyAssets = [
+    'Weekend Saturday Supplement Full Page'
+  ];
+  return saturdayOnlyAssets.includes(assetType);
 };
 
 // Detect if a task should be treated as the final live task

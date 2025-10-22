@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DatePicker from 'react-datepicker';
 
 const CampaignSetup = React.memo(({ 
     clientCampaignName,
@@ -15,9 +16,15 @@ const CampaignSetup = React.memo(({
     // Remove the clientDeadline state and handleDeadlineChange
 
     // Handle global live date change
-    const handleLiveDateChange = (e) => {
-        const newDate = e.target.value;
-        onGlobalLiveDateChange(newDate);
+    const handleLiveDateChange = (date) => {
+        if (!date) {
+            onGlobalLiveDateChange('');
+        } else {
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            onGlobalLiveDateChange(`${yyyy}-${mm}-${dd}`);
+        }
     };
 
     // Handle use global date toggle
@@ -85,12 +92,12 @@ const CampaignSetup = React.memo(({
                 <p className="text-xs text-gray-500 mb-2">
                     If campaign elements start on different days, uncheck the box and set each asset's start date when selected.
                 </p>
-                <input
-                    type="date"
-                    value={globalLiveDate}
+                <DatePicker
+                    selected={globalLiveDate ? new Date(globalLiveDate) : null}
                     onChange={handleLiveDateChange}
+                    dateFormat="dd/MM/yyyy"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    placeholderText="Select date"
                     data-testid="global-live-date"
                 />
                 {globalLiveDate && (

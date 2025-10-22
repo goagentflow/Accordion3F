@@ -52,7 +52,7 @@ const GettingStarted: React.FC = () => {
                       <div className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
                       <div>
                         <h3 className="font-semibold text-gray-800">Set your go live dates (Required)</h3>
-                        <p className="text-gray-600 text-sm">Use one global date for everything, or set individual dates per asset. Go live dates can fall on weekends or bank holidays (the “Live” task anchors there), while all other tasks use working days only. One requirement: Weekend Sunday Supplement Full Page and You Sunday Supplement Full Page must have a Sunday go-live date.</p>
+                        <p className="text-gray-600 text-sm">Use one global date for everything, or set individual dates per asset. Go live dates can fall on weekends or bank holidays (the "Live" task anchors there), while all other tasks use working days only. Special requirements: Weekend Saturday Supplement Full Page must have a Saturday go-live date, and You Sunday Supplement Full Page must have a Sunday go-live date.</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
@@ -87,7 +87,7 @@ const GettingStarted: React.FC = () => {
                     <h4 className="font-semibold text-gray-800 mb-1">Warnings & Conflicts</h4>
                     <ul className="list-disc pl-5 text-gray-600 text-sm space-y-1">
                       <li>Left panel “Timeline Status” shows how many working days you need to save across how many assets.</li>
-                      <li>Right panel “Timeline Conflicts” lists assets that can't meet their current go live dates. Weekend Sunday Supplement Full Page and You Sunday Supplement Full Page require Sunday go-live dates. You'll need to manually select a Sunday and uncheck the “Use same live date for all assets” box.</li>
+                      <li>Right panel "Timeline Conflicts" lists assets that can't meet their current go live dates. Weekend Saturday Supplement Full Page requires a Saturday go-live date, and You Sunday Supplement Full Page requires a Sunday go-live date. You'll need to manually select the appropriate day and uncheck the "Use same live date for all assets" box.</li>
                       <li>Fix conflicts by reducing duration, adjusting go live dates or making tasks run concurrently.</li>
                     </ul>
                   </section>

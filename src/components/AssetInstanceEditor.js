@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import { isSundayOnlyAsset } from './ganttUtils';
+import { isSundayOnlyAsset, isSaturdayOnlyAsset } from './ganttUtils';
 
 const AssetInstanceEditor = ({
   asset,
@@ -22,8 +22,10 @@ const AssetInstanceEditor = ({
 
   // Add a warning if go-live date is a non-working day
   // BUT don't warn about Sundays for Sunday-only assets (they SHOULD be on Sunday)
+  // or Saturdays for Saturday-only assets (they SHOULD be on Saturday)
   const goLiveDateIsNonWorking = asset.startDate && isNonWorkingDay && isNonWorkingDay(new Date(asset.startDate)) &&
-    !(isSundayOnlyAsset(asset.type) && new Date(asset.startDate).getDay() === 0);
+    !(isSundayOnlyAsset(asset.type) && new Date(asset.startDate).getDay() === 0) &&
+    !(isSaturdayOnlyAsset(asset.type) && new Date(asset.startDate).getDay() === 6);
 
   // Get the list of tasks for this asset type from csvData (no duration editing here)
   const assetTasks = csvData.filter(row => row['Asset Type'] === asset.type);
@@ -116,36 +118,49 @@ const AssetInstanceEditor = ({
                 onAssetStartDateChange(asset.id, `${yyyy}-${mm}-${dd}`);
               }
             }}
-            dateFormat="yyyy-MM-dd"
+            dateFormat="dd/MM/yyyy"
             className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
             disabled={useGlobalDate}
             data-testid={`asset-live-date-${asset.id}`}
             placeholderText="Select date"
-            filterDate={isSundayOnlyAsset(asset.type) ? date => date.getDay() === 0 : undefined}
+            filterDate={
+              isSundayOnlyAsset(asset.type) ? date => date.getDay() === 0 :
+              isSaturdayOnlyAsset(asset.type) ? date => date.getDay() === 6 :
+              undefined
+            }
           />
         </div>
       </div>
       {goLiveDateIsNonWorking && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-2 mb-2 text-xs">
-          ⚠️ {isSundayOnlyAsset(asset.type) && asset.startDate && new Date(asset.startDate).getDay() === 6 
-            ? 'This asset requires Sunday, not Saturday.' 
-            : 'The selected go-live date is a weekend or bank holiday. Consider choosing a working day.'
-          }
+          ⚠️ {(() => {
+            if (isSundayOnlyAsset(asset.type) && asset.startDate && new Date(asset.startDate).getDay() === 6) {
+              return 'This asset requires Sunday, not Saturday.';
+            }
+            if (isSaturdayOnlyAsset(asset.type) && asset.startDate && new Date(asset.startDate).getDay() === 0) {
+              return 'This asset requires Saturday, not Sunday.';
+            }
+            return 'The selected go-live date is a weekend or bank holiday. Consider choosing a working day.';
+          })()}
         </div>
       )}
-      {/* Sunday validation error for supplement assets */}
+      {/* Day-of-week validation error for supplement assets */}
       {hasSundayError && (
         <div className="bg-red-50 border border-red-300 text-red-800 rounded p-3 mb-2 text-xs">
           <div className="flex items-start">
             <span className="text-red-500 mr-2 text-lg">⚠️</span>
             <div className="flex-1">
-              <p className="font-semibold mb-1">Sunday Go-Live Required</p>
+              <p className="font-semibold mb-1">
+                {isSaturdayOnlyAsset(asset.type) ? 'Saturday Go-Live Required' : 'Sunday Go-Live Required'}
+              </p>
               <p className="mb-2">
-                Sunday Supplement assets must go live on a Sunday, but you're using a global date that falls on a {' '}
-                {new Date(asset.startDate || '').toLocaleDateString('en-GB', { weekday: 'long' })}.
+                {isSaturdayOnlyAsset(asset.type)
+                  ? `This asset must go live on a Saturday, but you're using a global date that falls on a ${new Date(asset.startDate || '').toLocaleDateString('en-GB', { weekday: 'long' })}.`
+                  : `Sunday Supplement assets must go live on a Sunday, but you're using a global date that falls on a ${new Date(asset.startDate || '').toLocaleDateString('en-GB', { weekday: 'long' })}.`
+                }
               </p>
               <p className="text-xs font-medium">
-                Switch to individual dates and select a Sunday for this asset.
+                Switch to individual dates and select a {isSaturdayOnlyAsset(asset.type) ? 'Saturday' : 'Sunday'} for this asset.
               </p>
             </div>
           </div>

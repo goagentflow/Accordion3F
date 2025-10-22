@@ -2,7 +2,7 @@
 
 ## Context and Challenge
 
-- Client requirement: For Sunday supplements (Weekend and You), ensure two business‑critical anchors relative to the Sunday issue date:
+- Client requirement: For Sunday supplements (Weekend and You), ensure two business‑critical anchors relative to the issue date (Saturday for Weekend, Sunday for You):
   - Client Sign‑off on the Tuesday two weeks before issue.
   - Repro (Send to Press) on the Wednesday in the week before issue.
 - Current data model: CSV encodes generic durations/owners with a Sunday go‑live, but does not encode weekday anchors. As a result, Sign‑off and Repro float based on durations and working‑day math, and will not reliably land on Tuesday/Wednesday, nor guarantee the intended lead‑time.
@@ -20,8 +20,8 @@
 
 ## Scope
 
-- Assets: “Weekend Sunday Supplement Full Page” and “You Sunday Supplement Full Page”.
-- Target tasks: “Client Confirms Sign off” (Sign‑off) and “Repro” (Send to Press). Keep the task name as “Repro” in data/UI; use “Repro (Send to Press)” in explanatory copy if needed.
+- Assets: "Weekend Saturday Supplement Full Page" (Saturday go-live) and "You Sunday Supplement Full Page" (Sunday go-live).
+- Target tasks: "Client Confirms Sign off" (Sign‑off) and "Repro and Printing" (Send to Press). The task is named "Repro and Printing" in data/UI to represent the full printing process; use "Repro and Printing (Send to Press)" in explanatory copy if needed.
 - Feature flag: `ENABLE_SUPPLEMENT_ANCHORS` (default: false), enabling safe rollout and rollback.
 
 ## Technical Approach (High‑Level)
@@ -42,8 +42,8 @@
 
 ### Asset Scope & Task Identification
 
-- Apply only when asset type ∈ {Weekend Sunday Supplement Full Page, You Sunday Supplement Full Page}.
-- Required task names in the timeline: “Client Confirms Sign off” and “Repro”. If either is missing, skip anchoring.
+- Apply only when asset type ∈ {Weekend Saturday Supplement Full Page (Saturday), You Sunday Supplement Full Page (Sunday)}.
+- Required task names in the timeline: "Client Confirms Sign off" and "Repro and Printing". If either is missing, skip anchoring.
 
 ### Anchor Target Calculation
 
@@ -99,7 +99,7 @@
 
 - Double holiday cascade (e.g., Tuesday + Monday): Snap left to the previous working day (often Friday). Accept the drift and raise NOTICE while preserving a valid order.
 - Missing tasks: If either Sign‑off or Repro is missing for the asset, skip anchoring; dev‑only console note; no user banner.
-- Live date not Sunday: Existing Sunday‑only validation handles this; anchoring is only designed for Sunday live.
+- Live date not on required day: Existing day-of-week validation handles this; anchoring is only designed for the correct day (Saturday for Weekend, Sunday for You).
 - Month/year boundaries and DST week: Covered by date utilities and tests; include boundary scenarios in unit tests.
 
 ## Testing Plan
@@ -122,7 +122,7 @@
 ## Risks and Mitigations
 
 - Ambiguity on “10 days” minimum: Treat as calendar days (PM‑friendly); include working‑day counts in messages; confirm with stakeholders.
-- User confusion around “Repro” vs “Press”: Keep task name “Repro”; use “Repro (Send to Press)” phrasing in help/warnings only.
+- User confusion around printing duration: Task renamed to "Repro and Printing" (9 days) to clearly represent the full printing process; Issue Date reduced to 1 day to represent the actual publication date.
 - Over‑constraint/CPM conflicts: Feasibility‑first with no forced moves prevents invalid timelines.
 - Regression risk: Isolated, flagged, asset‑scoped; covered by targeted unit and E2E tests.
 
@@ -130,7 +130,7 @@
 
 1) Numeric “10‑day before” rule for Repro: Enforce as calendar‑day minimum in addition to the Wednesday anchor? Severity when violated (WARNING vs ERROR)?
 2) Double‑holiday drift acceptance: Confirm NOTICE policy for snapping beyond the exact weekday anchor.
-3) Banner wording: Confirm inclusion of both calendar and working‑day counts in messages; confirm use of “Repro (Send to Press)” in explanatory copy.
+3) Banner wording: Confirm inclusion of both calendar and working‑day counts in messages; confirm use of "Repro and Printing (Send to Press)" in explanatory copy.
 
 ## Golden Rules Compliance (Internal)
 
@@ -143,7 +143,7 @@
 
 ## Appendix: Example Banner Copy
 
-- INFO: “Sunday Supplement anchors applied: Sign‑off on Tuesday two weeks before issue; Repro on Wednesday the week before.”
+- INFO: "Sunday Supplement anchors applied: Sign‑off on Tuesday two weeks before issue; Repro and Printing on Wednesday the week before."
 - NOTICE: “Anchors adjusted due to holidays: Sign‑off moved to Friday (16 calendar days before issue).”
 - WARNING: “Repro anchor set, but gap is 9 calendar days (6 working days); recommended minimum is 10 calendar days.”
 - ERROR: “Cannot apply weekday anchors: would require ‘Final Amended and Subbed layout…’ to complete in 0 days (short by 3 working days). Baseline timeline preserved.”

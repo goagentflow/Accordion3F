@@ -46,12 +46,12 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     : 'Timeline';
   const worksheet = workbook.addWorksheet(safeSheetName);
 
-  // Define colors for different owners (matching pre-refactored colors)
+  // Define colors for different owners
   const colorMap = {
-    'm': { fill: '4F81BD', border: '2E5984' }, // MMM Action - Dark blue
-    'c': { fill: 'F79646', border: 'E67E22' }, // Client Action - Dark orange
-    'a': { fill: '9B59B6', border: '8E44AD' }, // Agency Action - Dark purple
-    'l': { fill: '82B366', border: '27AE60' }  // Live Date - Dark green
+    'm': { fill: '92ccdc', border: '5AAEC9' }, // MMM Action - Light blue
+    'c': { fill: 'fabf8f', border: 'F39C5E' }, // Client Action - Light peach/orange
+    'a': { fill: 'ccc0d9', border: 'A99BC2' }, // Agency Action - Light purple
+    'l': { fill: 'c2d69b', border: '9FBA6D' }  // Live Date - Light green
   };
 
   const getOwnerColor = (owner) => {
@@ -86,6 +86,14 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
     const headerRow2 = worksheet.addRow(['']);
     currentRow++;
   }
+
+  // Add disclaimer in E3 (regardless of logo placement)
+  const disclaimerCell = worksheet.getCell('E3');
+  disclaimerCell.value = 'THIS TIMELINE IS PROVISIONAL AND SUBJECT TO CHANGE';
+  disclaimerCell.font = { bold: true, size: 12 };
+  disclaimerCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+  // Merge E3 across multiple columns to allow text to expand
+  worksheet.mergeCells('E3:M3');
 
   // Compute true, unpadded range and working-day duration from tasks
   const starts = [];
@@ -123,15 +131,11 @@ export const exportToExcel = async (tasks, dateColumns, bankHolidays, minDate, m
   headerRow7.getCell(1).font = { bold: true, size: 12 };
   currentRow++;
 
-  const headerRow8 = worksheet.addRow(safeRow(['Project Duration:', `${totalWorkingDays} working days`]));
-  headerRow8.getCell(1).font = { bold: true, size: 12 };
-  currentRow++;
-
-  const headerRow9 = worksheet.addRow(['']); // Empty row for spacing
+  const headerRow8 = worksheet.addRow(['']); // Empty row for spacing
   currentRow++;
 
   // 2. Add dynamic legend based on actual tasks
-  const legendRow1 = worksheet.addRow(safeRow(['Legend:']));
+  const legendRow1 = worksheet.addRow(safeRow(['Owner:']));
   legendRow1.getCell(1).font = { bold: true, size: 14 };
   currentRow++;
 
