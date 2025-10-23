@@ -179,17 +179,17 @@ const GanttTaskRow = memo(({
                 resolveTaskLabel={resolveTaskLabel || undefined}
                 onViewTask={onViewTask || undefined}
               />
-              {/* Unlink for same-day SS/FF(0) */}
-              {Array.isArray(task.dependencies) && task.dependencies.some(d => (d.type === 'SS' || d.type === 'FF') && Number(d.lag) === 0) && typeof onRemoveSameDayLink === 'function' && (
+              {/* Unlink for any overlap (SS/FF any lag, FS with negative lag) */}
+              {Array.isArray(task.dependencies) && task.dependencies.some(d => (d && ((d.type === 'SS' || d.type === 'FF') || (d.type === 'FS' && Number(d.lag) < 0)))) && typeof onRemoveSameDayLink === 'function' && (
                 <span className="relative inline-flex items-center">
                   <button
                     className="text-gray-400 hover:text-red-600 p-1 transition-colors transition-transform duration-150 motion-reduce:transform-none hover:scale-110"
-                    aria-label="Remove same‑day link"
+                    aria-label="Remove link"
                     onMouseEnter={() => setShowUnlinkTip(true)}
                     onMouseLeave={() => setShowUnlinkTip(false)}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const dep = task.dependencies.find(d => (d.type === 'SS' || d.type === 'FF') && Number(d.lag) === 0);
+                      const dep = task.dependencies.find(d => d && ((d.type === 'SS' || d.type === 'FF') || (d.type === 'FS' && Number(d.lag) < 0)));
                       if (dep) onRemoveSameDayLink(task.id, dep.predecessorId, dep.type);
                     }}
                   >
@@ -200,7 +200,7 @@ const GanttTaskRow = memo(({
                       role="tooltip"
                       className="absolute z-30 -top-8 left-0 whitespace-nowrap bg-red-600 text-white text-xs px-2 py-1 rounded shadow"
                     >
-                      Remove same‑day link (unlink) — return to sequential order
+                      Remove link (unlink) — return to template order
                     </div>
                   )}
                 </span>

@@ -9,8 +9,8 @@ import { isSundayOnlyAsset, isSaturdayOnlyAsset } from '../components/ganttUtils
 import GanttChart from '../components/GanttChart';
 import SameDayChooser from '../components/SameDayChooser';
 import WeekendSnapModal from '../components/WeekendSnapModal';
-import { safeToISOString, getPreviousWorkingDay } from '../utils/dateHelpers';
-import { enableDependencyUI, autoApplySameDay } from '../config/features';
+import { safeToISOString, calculateWorkingDaysBetween, subtractWorkingDays, addWorkingDays } from '../utils/dateHelpers';
+import { compressUpstreamEnabled } from '../config/features';
 
 const RightColumn: React.FC = () => {
   const { tasks } = useTasks();
@@ -69,46 +69,91 @@ const RightColumn: React.FC = () => {
     const task = (tasks.timeline || []).find((t: any) => t.id === taskId);
     if (!task) return;
     const newStart = new Date(startDate);
-    const overlappedTask = (tasks.timeline || []).find((t: any) => {
+    let overlappedTask = (tasks.timeline || []).find((t: any) => {
       if (t.id === taskId || t.assetId !== task.assetId) return false;
       const tStart = new Date(t.start);
       const tEnd = new Date(t.end);
       return newStart >= tStart && newStart <= tEnd;
     });
+    // If newStart falls before target but end aligns with a later task's start (handoff), treat as overlap too
+    if (!overlappedTask) {
+      const newEnd = addWorkingDays(newStart, Number(task.duration) || 1, dates.bankHolidays || []);
+      const newEndISO = safeToISOString(newEnd);
+      overlappedTask = (tasks.timeline || []).find((t: any) => t.id !== taskId && t.assetId === task.assetId && t.start === newEndISO);
+    }
     const existingDeps = ((tasks.deps as any) || {})[taskId] || [];
-    if (overlappedTask && enableDependencyUI()) {
+    if (overlappedTask) {
+      const dragged = task;
       const target = overlappedTask;
-      const targetStart = new Date(target.start);
-      const isTargetLater = targetStart >= newStart; // dropping onto later bar → FF, earlier → SS
-      const suggested: 'SS' | 'FF' = isTargetLater ? 'FF' : 'SS';
-      const predecessorId = isTargetLater ? taskId : target.id;
-      const successorId = isTargetLater ? target.id : taskId;
 
-      // Auto-apply path (no chooser) to avoid bounce
-      if (autoApplySameDay()) {
-        // Remove conflicting inbound deps to successor
-        const inboundSucc = ((tasks.deps as any) || {})[successorId] || [];
-        inboundSucc.forEach((d: any) => { if (d.predecessorId !== predecessorId) dispatch(TimelineActions.removeDependency(successorId, d.predecessorId)); });
-        // Remove reverse edge if present
-        const inboundPred = ((tasks.deps as any) || {})[predecessorId] || [];
-        inboundPred.forEach((d: any) => { if (d.predecessorId === successorId) dispatch(TimelineActions.removeDependency(predecessorId, successorId)); });
-        // Add typed dependency with zero lag
-        dispatch(TimelineActions.addTypedDependency(predecessorId, successorId, suggested, 0));
-        return;
+      // Determine predecessor/successor by sequence index (template id), fallback to timeline order
+      const parseIdx = (id: string): number => {
+        const m = id && id.match(/template-(\d+)/);
+        return m ? parseInt(m[1], 10) : Number.NaN;
+      };
+      const di = parseIdx(dragged.id);
+      const ti = parseIdx(target.id);
+      const sameAsset = dragged.assetId === target.assetId;
+      let predecessor: any = dragged;
+      let successor: any = target;
+      if (sameAsset && !Number.isNaN(di) && !Number.isNaN(ti)) {
+        if (di > ti) {
+          predecessor = target;
+          successor = dragged;
+        }
+      } else {
+        // Fallback: by original start date
+        if (new Date(dragged.start).getTime() > new Date(target.start).getTime()) {
+          predecessor = target;
+          successor = dragged;
+        }
       }
 
-      // Chooser path
-      setChooser({ open: true, predecessorId, successorId, suggested });
-      return;
-    } else if (overlappedTask) {
-      const predecessor = overlappedTask;
-      const predecessorEnd = new Date(predecessor.end);
-      const { computeOverlapDays } = require('../utils/overlap');
-      const overlapDays = computeOverlapDays(newStart, predecessorEnd, dates.bankHolidays);
-      existingDeps.forEach((dep: any) => { if (dep.predecessorId !== predecessor.id) dispatch(TimelineActions.removeDependency(taskId, dep.predecessorId)); });
-      const hasDep = existingDeps.some((d: any) => d.predecessorId === predecessor.id);
-      if (hasDep) dispatch(TimelineActions.updateDependency(predecessor.id, taskId, overlapDays));
-      else dispatch(TimelineActions.addDependency(predecessor.id, taskId, overlapDays));
+      // Move the dragged task to the chosen date (sticky)
+      const oldDraggedStart = new Date(dragged.start);
+      const draggedNewStartISO = safeToISOString(newStart);
+      const draggedNewStart = new Date(draggedNewStartISO);
+      dispatch(TimelineActions.moveTask(dragged.id, draggedNewStartISO));
+
+      // Compute SS lag from predecessor.start (after potential move) to successor.start (after potential move)
+      const predStart = predecessor.id === dragged.id ? draggedNewStart : new Date(predecessor.start);
+      const succStart = successor.id === dragged.id ? draggedNewStart : new Date(successor.start);
+      let ssLag = calculateWorkingDaysBetween(predStart, succStart, dates.bankHolidays || []);
+      if (ssLag < 0) ssLag = 0; // keep successor starting no earlier than predecessor (simple model)
+
+      // Clean inbound deps to successor and remove reverse edge successor->predecessor
+      const inboundSucc = ((tasks.deps as any) || {})[successor.id] || [];
+      inboundSucc.forEach((d: any) => { if (d.predecessorId !== predecessor.id) dispatch(TimelineActions.removeDependency(successor.id, d.predecessorId)); });
+      const inboundPred = ((tasks.deps as any) || {})[predecessor.id] || [];
+      inboundPred.forEach((d: any) => { if (d.predecessorId === successor.id) dispatch(TimelineActions.removeDependency(predecessor.id, successor.id)); });
+
+      // Apply typed SS (predecessor -> successor)
+      dispatch(TimelineActions.addTypedDependency(predecessor.id, successor.id, 'SS', ssLag));
+
+      // Compress upstream by saved days (tasks before the predecessor in sequence)
+      // If we pulled the dragged task earlier, saved = working days from new -> old; otherwise 0
+      const movedEarlier = draggedNewStart.getTime() < oldDraggedStart.getTime();
+      const saved = movedEarlier
+        ? Math.max(0, calculateWorkingDaysBetween(draggedNewStart, oldDraggedStart, dates.bankHolidays || []))
+        : 0;
+      if (saved > 0 && compressUpstreamEnabled()) {
+        const assetTasks = (tasks.timeline || []).filter((t: any) => t.assetId === predecessor.assetId);
+        // Prefer template index ordering
+        const predIdx = assetTasks.findIndex((t: any) => t.id === predecessor.id);
+        const toShift = assetTasks.slice(0, Math.max(0, predIdx));
+        toShift.forEach((t: any) => {
+          const shiftedStart = subtractWorkingDays(new Date(t.start), saved, dates.bankHolidays || []);
+          dispatch(TimelineActions.moveTask(t.id, safeToISOString(shiftedStart)));
+        });
+      }
+
+      // Toast
+      const dayIndex = Math.max(1, ssLag + 1);
+      const sameDay = dayIndex === 1;
+      const msg = sameDay
+        ? `Moved '${dragged.name}' to the same day as '${target.name}'. Saved ${saved}d.`
+        : `Moved '${dragged.name}' to start on day ${dayIndex} of '${target.name}'. Saved ${saved}d.`;
+      showToast('success', msg);
     } else {
       if (existingDeps.length > 0) existingDeps.forEach((dep: any) => dispatch(TimelineActions.removeDependency(taskId, dep.predecessorId)));
       dispatch(TimelineActions.moveTask(taskId, safeToISOString(newStart)));
@@ -119,14 +164,7 @@ const RightColumn: React.FC = () => {
     const task = (tasks.timeline || []).find((t: any) => t.id === taskId);
     if (!task) return;
     const newStart = new Date(newStartISO);
-    const dayOfWeek = newStart.getDay();
-    const isHoliday = (dates.bankHolidays || []).includes(safeToISOString(newStart));
-    const isLive = task.owner === 'l';
-    if ((dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) && !isLive) {
-      const prev = getPreviousWorkingDay(newStart, dates.bankHolidays || []);
-      setSnap({ open: true, taskId, proposed: newStart, snapped: prev });
-      return;
-    }
+    // Do not snap away from non-working days; allow spans to cross weekends visually
     commitMoveOrLink(taskId, newStart);
   };
 
@@ -308,8 +346,12 @@ const RightColumn: React.FC = () => {
               showToast('success', 'Task deleted.');
             },
             onRemoveSameDayLink: (successorId: string, predecessorId: string) => {
+              // Remove the typed link and reassert template order FS(0)
               dispatch(TimelineActions.removeDependency(successorId, predecessorId));
-              showToast('success', 'Removed same‑day link.');
+              dispatch(TimelineActions.addTypedDependency(predecessorId, successorId, 'FS', 0));
+              const predName = (tasks.timeline || []).find((t: any) => t.id === predecessorId)?.name || 'previous task';
+              const succName = (tasks.timeline || []).find((t: any) => t.id === successorId)?.name || 'task';
+              showToast('success', `Removed link between '${predName}' and '${succName}'. Returned to template order.`);
             },
             resolveTaskLabel: (id: string) => {
               const t = (tasks.timeline || []).find((x: any) => x.id === id);

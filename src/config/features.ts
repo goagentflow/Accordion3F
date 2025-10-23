@@ -20,6 +20,7 @@ export interface FeatureFlags {
   STRICT_OVERLAP_CALC?: boolean; // If true, compute overlaps without +1 inclusion
   AUTO_APPLY_SAME_DAY?: boolean; // Auto-apply SS/FF on drop (no chooser)
   SIMPLE_MODE?: boolean; // Hide links/lines by default; info on hover only
+  COMPRESS_UPSTREAM_ON_OVERLAP?: boolean; // Pull predecessors forward by saved days
 }
 
 // ============================================
@@ -57,6 +58,9 @@ const DEFAULT_FLAGS: FeatureFlags = {
 
   // Simple mode hides dependency badges/lines by default; keeps info-on-hover
   SIMPLE_MODE: true,
+
+  // Upstream compression kill switch (ON by default)
+  COMPRESS_UPSTREAM_ON_OVERLAP: true,
 };
 
 // ============================================
@@ -242,6 +246,15 @@ export const simpleModeEnabled = (): boolean => {
     return (featureFlags as any).isEnabled('SIMPLE_MODE');
   } catch {
     return true;
+  }
+};
+
+/** Upstream compression on overlap */
+export const compressUpstreamEnabled = (): boolean => {
+  try {
+    return (featureFlags as any).isEnabled('COMPRESS_UPSTREAM_ON_OVERLAP');
+  } catch {
+    return false;
   }
 };
 
