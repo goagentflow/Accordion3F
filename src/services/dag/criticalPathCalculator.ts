@@ -35,6 +35,8 @@ export interface TaskTimingInfo {
 // ============================================
 
 export class CriticalPathCalculator {
+  private static readonly MAX_ITERATIONS = 1000;
+  private static readonly TIME_BUDGET_MS = 5000;
   /**
    * Perform complete CPM calculation on a task graph
    * 
@@ -52,14 +54,16 @@ export class CriticalPathCalculator {
         };
       }
       
+      const start = Date.now();
+      const deadline = start + CriticalPathCalculator.TIME_BUDGET_MS;
       // Step 1: Forward Pass - Calculate earliest times
-      this.performForwardPass(graph);
+      this.performForwardPass(graph, deadline);
       
       // Step 2: Determine project duration
       const projectDuration = this.calculateProjectDuration(graph);
       
       // Step 3: Backward Pass - Calculate latest times
-      this.performBackwardPass(graph, projectDuration);
+      this.performBackwardPass(graph, projectDuration, deadline);
       
       // Step 4: Calculate float and identify critical path
       const criticalPath = this.identifyCriticalPath(graph);
@@ -85,7 +89,7 @@ export class CriticalPathCalculator {
    * Step 1: CPM Forward Pass - Calculate earliest start and finish times
    * Works in topological order from tasks with no predecessors
    */
-  private performForwardPass(graph: TaskGraph): void {
+  private performForwardPass(graph: TaskGraph, deadlineMs: number): void {
     // Initialize start nodes
     graph.startNodes.forEach(nodeId => {
       const node = graph.nodes.get(nodeId)!;
@@ -96,10 +100,19 @@ export class CriticalPathCalculator {
     // Process nodes in topological order
     const processed = new Set<string>();
     const queue = [...graph.startNodes];
+    let iterations = 0;
     
     while (queue.length > 0) {
       const nodeId = queue.shift()!;
       if (processed.has(nodeId)) continue;
+      
+      iterations++;
+      if (iterations > CriticalPathCalculator.MAX_ITERATIONS) {
+        throw new Error('CPM forward pass iteration limit exceeded');
+      }
+      if (Date.now() > deadlineMs) {
+        throw new Error('CPM forward pass timed out');
+      }
       
       const node = graph.nodes.get(nodeId)!;
       
@@ -114,22 +127,36 @@ export class CriticalPathCalculator {
         continue;
       }
       
-      // Calculate earliest start based on all predecessors
+      // Calculate earliest start based on all predecessors and dependency types
       if (node.dependencies.length > 0) {
-        let maxEarliestStart = 0;
-        
+        let requiredES = 0; // minimum ES constraint
+        let requiredEF = -Infinity; // for FF constraints
+
         node.dependencies.forEach(dep => {
           const predecessor = graph.nodes.get(dep.predecessorId)!;
-          
+          if (!predecessor) return;
+
           if (dep.type === 'FS') {
-            // Finish-to-Start relationship
-            const predecessorFinish = predecessor.earliestFinish;
-            const earliestStart = predecessorFinish + 1 + dep.lag;
-            maxEarliestStart = Math.max(maxEarliestStart, earliestStart);
+            // ES >= pred.EF + 1 + lag
+            const cand = predecessor.earliestFinish + 1 + dep.lag;
+            requiredES = Math.max(requiredES, cand);
+          } else if (dep.type === 'SS') {
+            // ES >= pred.ES + lag
+            const cand = predecessor.earliestStart + dep.lag;
+            requiredES = Math.max(requiredES, cand);
+          } else if (dep.type === 'FF') {
+            // EF >= pred.EF + lag
+            const candEF = predecessor.earliestFinish + dep.lag;
+            requiredEF = Math.max(requiredEF, candEF);
           }
         });
-        
-        node.earliestStart = maxEarliestStart;
+
+        if (requiredEF !== -Infinity) {
+          const candFromFF = requiredEF - (node.duration - 1);
+          requiredES = Math.max(requiredES, candFromFF);
+        }
+
+        node.earliestStart = requiredES;
         node.earliestFinish = node.earliestStart + node.duration - 1;
       }
       
@@ -162,7 +189,7 @@ export class CriticalPathCalculator {
    * Step 2: CPM Backward Pass - Calculate latest start and finish times
    * Works backwards from the project end
    */
-  private performBackwardPass(graph: TaskGraph, projectDuration: number): void {
+  private performBackwardPass(graph: TaskGraph, projectDuration: number, deadlineMs: number): void {
     // Initialize end nodes with latest = earliest (they're on critical path)
     graph.endNodes.forEach(nodeId => {
       const node = graph.nodes.get(nodeId)!;
@@ -173,10 +200,19 @@ export class CriticalPathCalculator {
     // Process nodes in reverse topological order
     const processed = new Set<string>();
     const queue = [...graph.endNodes];
+    let iterations = 0;
     
     while (queue.length > 0) {
       const nodeId = queue.shift()!;
       if (processed.has(nodeId)) continue;
+      
+      iterations++;
+      if (iterations > CriticalPathCalculator.MAX_ITERATIONS) {
+        throw new Error('CPM backward pass iteration limit exceeded');
+      }
+      if (Date.now() > deadlineMs) {
+        throw new Error('CPM backward pass timed out');
+      }
       
       const node = graph.nodes.get(nodeId)!;
       
@@ -190,26 +226,35 @@ export class CriticalPathCalculator {
         continue;
       }
       
-      // Calculate latest finish based on all successors
+      // Calculate latest finish/start based on all successors and dependency types
       if (node.successors.length > 0) {
-        let minLatestFinish = Infinity;
-        
+        let minLF = Infinity;
+
         node.successors.forEach(successorId => {
           const successor = graph.nodes.get(successorId)!;
-          
-          // Find the dependency from successor back to this node
-          const dependency = successor.dependencies.find(dep => 
-            dep.predecessorId === nodeId
-          );
-          
-          if (dependency && dependency.type === 'FS') {
-            const latestFinish = successor.latestStart - 1 - dependency.lag;
-            minLatestFinish = Math.min(minLatestFinish, latestFinish);
+          if (!successor) return;
+
+          const dependency = successor.dependencies.find(dep => dep.predecessorId === nodeId);
+          if (!dependency) return;
+
+          if (dependency.type === 'FS') {
+            // LF <= succ.LS - 1 - lag
+            const candLF = successor.latestStart - 1 - dependency.lag;
+            minLF = Math.min(minLF, candLF);
+          } else if (dependency.type === 'SS') {
+            // LS <= succ.LS - lag → LF = LS + dur - 1
+            const candLS = successor.latestStart - dependency.lag;
+            const candLF = candLS + node.duration - 1;
+            minLF = Math.min(minLF, candLF);
+          } else if (dependency.type === 'FF') {
+            // LF <= succ.LF - lag
+            const candLF = successor.latestFinish - dependency.lag;
+            minLF = Math.min(minLF, candLF);
           }
         });
-        
-        if (minLatestFinish !== Infinity) {
-          node.latestFinish = minLatestFinish;
+
+        if (minLF !== Infinity) {
+          node.latestFinish = minLF;
           node.latestStart = node.latestFinish - node.duration + 1;
         }
       }

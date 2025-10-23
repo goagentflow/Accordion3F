@@ -18,6 +18,8 @@ export interface FeatureFlags {
   DEBUG_TIMELINE_CALCULATIONS: boolean;
   ALLOW_WEEKEND_LIVE_DATE: boolean;
   STRICT_OVERLAP_CALC?: boolean; // If true, compute overlaps without +1 inclusion
+  AUTO_APPLY_SAME_DAY?: boolean; // Auto-apply SS/FF on drop (no chooser)
+  SIMPLE_MODE?: boolean; // Hide links/lines by default; info on hover only
 }
 
 // ============================================
@@ -49,6 +51,12 @@ const DEFAULT_FLAGS: FeatureFlags = {
 
   // Overlap calculation mode (off by default for backwards compatibility)
   STRICT_OVERLAP_CALC: false,
+
+  // Auto-apply SS/FF on overlap drop in development to reduce bounce
+  AUTO_APPLY_SAME_DAY: process.env.NODE_ENV === 'development',
+
+  // Simple mode hides dependency badges/lines by default; keeps info-on-hover
+  SIMPLE_MODE: true,
 };
 
 // ============================================
@@ -198,16 +206,17 @@ export const useDAGCalculator = (): boolean => {
  * Quick check if task overlapping UI should be shown
  */
 export const showTaskOverlaps = (): boolean => {
-  return featureFlags.isEnabled('ENABLE_TASK_OVERLAPS') && 
-         featureFlags.isEnabled('USE_DAG_CALCULATOR');
+  // In simple mode, suppress overlap badges/lines by default
+  if ((featureFlags as any).isEnabled('SIMPLE_MODE')) return false;
+  return featureFlags.isEnabled('ENABLE_TASK_OVERLAPS') && featureFlags.isEnabled('USE_DAG_CALCULATOR');
 };
 
 /**
  * Quick check if critical path should be highlighted
  */
 export const showCriticalPath = (): boolean => {
-  return featureFlags.isEnabled('SHOW_CRITICAL_PATH') && 
-         featureFlags.isEnabled('USE_DAG_CALCULATOR');
+  if ((featureFlags as any).isEnabled('SIMPLE_MODE')) return false;
+  return featureFlags.isEnabled('SHOW_CRITICAL_PATH') && featureFlags.isEnabled('USE_DAG_CALCULATOR');
 };
 
 /**
@@ -216,6 +225,24 @@ export const showCriticalPath = (): boolean => {
 export const enableDependencyUI = (): boolean => {
   return featureFlags.isEnabled('ENABLE_DEPENDENCY_UI') && 
          featureFlags.isEnabled('USE_DAG_CALCULATOR');
+};
+
+/** Auto-apply same-day typed dependency on drop (no chooser) */
+export const autoApplySameDay = (): boolean => {
+  try {
+    return (featureFlags as any).isEnabled('AUTO_APPLY_SAME_DAY');
+  } catch {
+    return false;
+  }
+};
+
+/** Simple mode (minimal UI) */
+export const simpleModeEnabled = (): boolean => {
+  try {
+    return (featureFlags as any).isEnabled('SIMPLE_MODE');
+  } catch {
+    return true;
+  }
 };
 
 /**

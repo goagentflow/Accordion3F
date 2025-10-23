@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useAssets, useDates, useTasks, useUI } from '../hooks/useTimelineSelectors';
 import { useTimeline } from '../hooks/useTimeline';
 import { TimelineActions } from '../actions/timelineActions';
-import { buildAssetTimeline, getEarliestStartDate, findDateConflicts } from '../services/TimelineCalculator';
+import { buildAssetTimeline, buildAssetTimelineSequential, getEarliestStartDate, findDateConflicts } from '../services/TimelineCalculator';
 
 // Orchestrates timeline build + warnings based on selected assets and dates
 export const Orchestrator: React.FC = () => {
@@ -66,6 +66,7 @@ export const Orchestrator: React.FC = () => {
     }
 
     const allTimeline: any[] = [];
+    const warnings: string[] = [];
     orderedSelected.forEach((asset: any) => {
       const instanceBase = (tasks as any).instanceBase && (tasks as any).instanceBase[asset.id];
       const base = (instanceBase && instanceBase.length > 0)
@@ -90,15 +91,15 @@ export const Orchestrator: React.FC = () => {
 
       // Build allowed id set and sanitize dependencies
       const allowedIds = new Set(raw.map((r: any) => r.id));
-      const depsMap: Record<string, Array<{ predecessorId: string; type: 'FS'; lag: number }>> = (tasks.deps as any) || {};
+      const depsMap: Record<string, Array<{ predecessorId: string; type: 'FS'|'SS'|'FF'; lag: number }>> = (tasks.deps as any) || {};
       let dropped = 0;
       const sanitizeFromGlobal = (succId: string) => {
         const list = depsMap[succId] || [];
         if (!list || list.length === 0) return [] as any[];
         const filtered = list.filter(d => allowedIds.has(d.predecessorId) && d.predecessorId !== succId);
         dropped += (list.length - filtered.length);
-        // Ensure FS type and negative lag for overlaps
-        return filtered.map(d => ({ predecessorId: d.predecessorId, type: 'FS' as const, lag: d.lag }));
+        // Preserve dependency type and lag (default FS)
+        return filtered.map(d => ({ predecessorId: d.predecessorId, type: (d as any).type || 'FS', lag: d.lag }));
       };
 
       raw.forEach((r: any, idx: number) => {
@@ -106,7 +107,7 @@ export const Orchestrator: React.FC = () => {
         const baseDeps = Array.isArray(base[idx]?.dependencies) ? base[idx].dependencies : [];
         const remappedBaseDeps = baseDeps.map((d: any) => ({
           predecessorId: idMap.get(d.predecessorId) || d.predecessorId,
-          type: 'FS' as const,
+          type: (d && (d.type === 'SS' || d.type === 'FF')) ? d.type : 'FS',
           lag: Number(d.lag) || 0
         }));
         const fromGlobal = sanitizeFromGlobal(r.id);
@@ -115,16 +116,17 @@ export const Orchestrator: React.FC = () => {
       });
 
       // Enforce within-asset sequential guard when using instanceBase
+      // Do NOT add an FS(0) edge if there is already ANY dependency from prev to curr (SS/FF/FS)
       if (instanceBase && instanceBase.length > 0) {
         for (let i = 1; i < raw.length; i++) {
           const prev = raw[i - 1];
           const curr = raw[i];
-          const deps: Array<{ predecessorId: string; type: 'FS'; lag: number }> = Array.isArray(curr.dependencies)
-            ? (curr.dependencies as Array<{ predecessorId: string; type: 'FS'; lag: number }>)
+          const depsAny: Array<{ predecessorId: string; type: 'FS' | 'SS' | 'FF'; lag: number }> = Array.isArray(curr.dependencies)
+            ? (curr.dependencies as Array<{ predecessorId: string; type: 'FS' | 'SS' | 'FF'; lag: number }>)
             : [];
-          const hasPrev = deps.some((d: { predecessorId: string; type: 'FS'; lag: number }) => d && d.type === 'FS' && d.predecessorId === prev.id);
-          if (!hasPrev) deps.push({ predecessorId: prev.id, type: 'FS' as const, lag: 0 });
-          curr.dependencies = deps;
+          const alreadyLinked = depsAny.some(d => d && d.predecessorId === prev.id);
+          if (!alreadyLinked) depsAny.push({ predecessorId: prev.id, type: 'FS', lag: 0 });
+          curr.dependencies = depsAny as any;
         }
       }
 
@@ -170,7 +172,48 @@ export const Orchestrator: React.FC = () => {
         });
       }
 
-      let timeline = buildAssetTimeline(raw as any, live, assets.taskDurations[asset.type] || {}, dates.bankHolidays || []);
+      let timeline: any[] = [];
+      try {
+        timeline = buildAssetTimeline(raw as any, live, assets.taskDurations[asset.type] || {}, dates.bankHolidays || []);
+        const hadDagFailure = (!timeline || timeline.length === 0) && raw.length > 0;
+        if (hadDagFailure) {
+          // Graceful fallback to sequential calculator
+          const seq = buildAssetTimelineSequential(raw as any, live, assets.taskDurations[asset.type] || {}, dates.bankHolidays || []);
+          if (seq && seq.length > 0) {
+            timeline = seq as any;
+            warnings.push(`Advanced scheduling failed for "${asset.name || asset.type}". Showing safe timeline.`);
+          } else {
+            // Last resort: show last good timeline if available
+            const lastGood = (tasks as any).lastGoodByAsset && (tasks as any).lastGoodByAsset[asset.id];
+            if (Array.isArray(lastGood) && lastGood.length > 0) {
+              timeline = lastGood as any;
+              warnings.push(`Showing last known good timeline for "${asset.name || asset.type}".`);
+            } else {
+              // Nothing to show for this asset; log in dev
+              if (process.env.NODE_ENV !== 'production') {
+                // eslint-disable-next-line no-console
+                console.warn('[Orchestrator] No timeline available after fallback for asset', asset);
+              }
+              timeline = [] as any;
+            }
+          }
+        }
+      } catch (error) {
+        // Calculator threw; attempt last-good, then empty with warning
+        const lastGood = (tasks as any).lastGoodByAsset && (tasks as any).lastGoodByAsset[asset.id];
+        if (Array.isArray(lastGood) && lastGood.length > 0) {
+          timeline = lastGood as any;
+          warnings.push(`Calculation error for "${asset.name || asset.type}". Showing last known good timeline.`);
+        } else {
+          timeline = [] as any;
+          warnings.push(`Calculation error for "${asset.name || asset.type}". Timeline unavailable for this asset.`);
+        }
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.error('[Orchestrator] Calculator error', error);
+        }
+      }
+
       // Apply task name overrides (renameTask) if present
       if (tasks.names) {
         timeline = timeline.map((t: any) => ({
@@ -178,10 +221,25 @@ export const Orchestrator: React.FC = () => {
           name: tasks.names[t.id] ? tasks.names[t.id] : t.name
         }));
       }
+
+      // Update last good cache when we have a non-empty computed timeline for this asset
+      if (Array.isArray(timeline) && timeline.length > 0) {
+        const perAsset = (timeline as any[]).filter(t => t.assetId === asset.id);
+        if (perAsset.length > 0) {
+          dispatch(TimelineActions.setLastGoodByAsset(asset.id, perAsset as any));
+        }
+      }
       allTimeline.push(...timeline);
     });
 
     dispatch(TimelineActions.updateTimeline(allTimeline as any));
+
+    // Set/clear calculation warning banner
+    if (warnings.length > 0) {
+      dispatch(TimelineActions.setCalcWarning(warnings.join(' ')));
+    } else if (ui && (ui as any).calcWarning) {
+      dispatch(TimelineActions.setCalcWarning(null));
+    }
   }, [
     assets.selected,
     assets.taskDurations,

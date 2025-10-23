@@ -216,5 +216,40 @@ export const TimelineActions = {
 
   recalculateWithDependencies: (): TimelineAction => ({
     type: ActionType.RECALCULATE_WITH_DEPENDENCIES
+  }),
+
+  // Typed dependency actions (SS/FF support)
+  addTypedDependency: (
+    predecessorId: string,
+    successorId: string,
+    depType: 'FS' | 'SS' | 'FF',
+    lag: number = 0
+  ): TimelineAction => ({
+    type: ActionType.ADD_TYPED_DEPENDENCY,
+    payload: { predecessorId, successorId, depType, lag }
+  }),
+
+  updateTypedDependency: (
+    predecessorId: string,
+    successorId: string,
+    depType: 'FS' | 'SS' | 'FF',
+    lag: number = 0
+  ): TimelineAction => ({
+    type: ActionType.UPDATE_TYPED_DEPENDENCY,
+    payload: { predecessorId, successorId, depType, lag }
+  }),
+
+  // ============================================
+  // Safety & Fallback UI/system actions
+  // ============================================
+
+  setCalcWarning: (message: string | null): TimelineAction => ({
+    type: ActionType.SET_CALC_WARNING,
+    payload: { message }
+  }),
+
+  setLastGoodByAsset: (assetId: string, tasks: TimelineTask[]): TimelineAction => ({
+    type: ActionType.SET_LAST_GOOD_BY_ASSET,
+    payload: { assetId, tasks }
   })
 };

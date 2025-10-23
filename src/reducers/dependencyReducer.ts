@@ -144,6 +144,57 @@ export function handleUpdateDependency(
 }
 
 /**
+ * Handle ADD_TYPED_DEPENDENCY action (SS/FF/FS with explicit lag)
+ */
+export function handleAddTypedDependency(
+  state: TimelineState,
+  action: Extract<TimelineAction, { type: ActionType.ADD_TYPED_DEPENDENCY }>
+): TimelineState {
+  const { predecessorId, successorId, depType, lag } = (action as any).payload || {};
+  if (!predecessorId || !successorId || !depType) return state;
+  const existing = state.tasks.deps?.[successorId] || [];
+  if (existing.some(dep => dep.predecessorId === predecessorId && dep.type === depType)) {
+    return state;
+  }
+  const dep = { predecessorId, type: depType as 'FS'|'SS'|'FF', lag: Number(lag) || 0 };
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      deps: {
+        ...(state.tasks.deps || {}),
+        [successorId]: [...existing, dep]
+      }
+    },
+    ui: { ...state.ui, freezeImportedTimeline: false }
+  };
+}
+
+/**
+ * Handle UPDATE_TYPED_DEPENDENCY action
+ */
+export function handleUpdateTypedDependency(
+  state: TimelineState,
+  action: Extract<TimelineAction, { type: ActionType.UPDATE_TYPED_DEPENDENCY }>
+): TimelineState {
+  const { predecessorId, successorId, depType, lag } = (action as any).payload || {};
+  if (!predecessorId || !successorId || !depType) return state;
+  const existing = state.tasks.deps?.[successorId] || [];
+  const updated = existing.map(d => (d.predecessorId === predecessorId ? { ...d, type: depType as any, lag: Number(lag) || 0 } : d));
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      deps: {
+        ...(state.tasks.deps || {}),
+        [successorId]: updated
+      }
+    },
+    ui: { ...state.ui, freezeImportedTimeline: false }
+  };
+}
+
+/**
  * Handle CLEAR_ALL_DEPENDENCIES action
  */
 export function handleClearAllDependencies(state: TimelineState): TimelineState {

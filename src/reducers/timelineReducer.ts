@@ -17,6 +17,8 @@ import {
   handleAddDependency,
   handleRemoveDependency,
   handleUpdateDependency,
+  handleAddTypedDependency,
+  handleUpdateTypedDependency,
   handleClearAllDependencies,
   handleRecalculateWithDependencies,
   handleBulkAddDependencies,
@@ -54,12 +56,14 @@ import {
   handleUpdateTaskBank,
   handleSetClientCampaignName
 } from './systemReducer';
+import { handleSetCalcWarning, handleSetLastGoodByAsset } from './systemReducer';
 
 import {
   handleDragTask,
   handleHydrateFromStorage,
   handleUndo,
   handleRedo,
+  handleMoveTask,
   recordStateForUndo
 } from './manipulationReducer';
 
@@ -137,6 +141,10 @@ export function timelineReducer(
       return handleSetAllInstructions(state, action);
     case ActionType.SET_CLIENT_CAMPAIGN_NAME:
       return handleSetClientCampaignName(state, action);
+    case ActionType.SET_CALC_WARNING:
+      return handleSetCalcWarning(state, action);
+    case ActionType.SET_LAST_GOOD_BY_ASSET:
+      return handleSetLastGoodByAsset(state, action);
 
     // ============================================
     // System Actions
@@ -161,6 +169,10 @@ export function timelineReducer(
       return handleRemoveDependency(state, action);
     case ActionType.UPDATE_DEPENDENCY:
       return handleUpdateDependency(state, action);
+    case ActionType.ADD_TYPED_DEPENDENCY:
+      return handleAddTypedDependency(state, action);
+    case ActionType.UPDATE_TYPED_DEPENDENCY:
+      return handleUpdateTypedDependency(state, action);
     case ActionType.CLEAR_ALL_DEPENDENCIES:
       return handleClearAllDependencies(state);
     case ActionType.BULK_ADD_DEPENDENCIES:
@@ -184,6 +196,9 @@ export function timelineReducer(
       return handleUndo(state, action);
     case ActionType.REDO:
       return handleRedo(state, action);
+    case ActionType.MOVE_TASK:
+      // Direct task repositioning (commits a new start date)
+      return handleMoveTask(state, action as any);
 
     default: {
       // TypeScript exhaustiveness check - this should never be reached

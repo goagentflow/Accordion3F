@@ -11,7 +11,8 @@ import {
   DragTaskAction,
   HydrateFromStorageAction,
   UndoAction,
-  RedoAction
+  RedoAction,
+  MoveTaskAction
 } from '../types/timeline.types';
 
 import { safeToISOString } from '../utils/dateHelpers';
@@ -143,8 +144,18 @@ export function handleHydrateFromStorage(state: TimelineState, action: HydrateFr
 /**
  * Handle MOVE_TASK action - Handles direct task repositioning from drag-and-drop
  */
-export function handleMoveTask(state: TimelineState, action: any): TimelineState {
+export function handleMoveTask(state: TimelineState, action: MoveTaskAction): TimelineState {
   const { taskId, newStartDate } = action.payload;
+
+  // Defensive guard: validate date
+  const parsed = new Date(newStartDate);
+  if (isNaN(parsed.getTime())) {
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.warn('[ManipulationReducer] Ignoring MOVE_TASK with invalid date', newStartDate);
+    }
+    return state;
+  }
 
   return {
     ...state,
@@ -152,7 +163,7 @@ export function handleMoveTask(state: TimelineState, action: any): TimelineState
       ...state.tasks,
       timeline: state.tasks.timeline.map(task => {
         if (task.id === taskId) {
-          const newStart = new Date(newStartDate);
+          const newStart = new Date(parsed);
           const newEnd = new Date(newStart);
           newEnd.setDate(newEnd.getDate() + task.duration - 1);
 

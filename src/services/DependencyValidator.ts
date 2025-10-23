@@ -15,7 +15,7 @@ import type { DependencyValidationResult, DependencyValidationError } from '../t
 
 interface TaskDependency {
   predecessorId: string;
-  type: 'FS';
+  type: 'FS' | 'SS' | 'FF';
   lag: number;
 }
 
@@ -100,18 +100,13 @@ export class DependencyValidator {
       return { valid: false, error: `Successor task ${successorId} not found` };
     }
     
-    // Check overlap amount
+    // FS-only overlap validation remains for legacy addDependency API
     const predecessorDuration = customDurations[predecessor.name] ?? predecessor.duration ?? 1;
-    
     if (overlapDays < 0) {
       return { valid: false, error: 'Overlap days cannot be negative' };
     }
-    
     if (overlapDays > predecessorDuration) {
-      return { 
-        valid: false, 
-        error: `Overlap (${overlapDays} days) cannot exceed predecessor duration (${predecessorDuration} days)` 
-      };
+      return { valid: false, error: `Overlap (${overlapDays} days) cannot exceed predecessor duration (${predecessorDuration} days)` };
     }
     
     // Check asset boundary (business rule)
@@ -277,7 +272,7 @@ export class DependencyValidator {
           const predecessor = this.nodes.get(dep.predecessorId);
           if (predecessor) {
             const overlapDays = Math.abs(dep.lag);
-            if (overlapDays > predecessor.duration) {
+            if (dep.type === 'FS' && overlapDays > predecessor.duration) {
               const predecessorTask = predecessor.task;
               const successorTask = node.task;
               errors.push(

@@ -26,7 +26,7 @@ export function sanitizeDependencies(
     .filter(dep => idSet.has(dep.predecessorId))
     .map(dep => ({
       predecessorId: dep.predecessorId,
-      type: 'FS' as const,
+      type: (dep.type as any) === 'SS' || (dep.type as any) === 'FF' ? (dep.type as any) : 'FS',
       lag: dep.lag ?? 0
     }));
 }

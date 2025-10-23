@@ -36,7 +36,8 @@ export const initialTimelineState: TimelineState = {
     timeline: [],
     custom: [],
     names: {},
-    deps: {}
+    deps: {},
+    lastGoodByAsset: {}
   },
   dates: {
     globalLiveDate: '',
@@ -51,7 +52,8 @@ export const initialTimelineState: TimelineState = {
     showAllInstructions: false,
     dateErrors: [],
     freezeImportedTimeline: false,
-    clientCampaignName: ''
+    clientCampaignName: '',
+    calcWarning: null
   },
   status: 'ready'
 };
@@ -367,6 +369,8 @@ export function handleImportState(
       showAllInstructions: false,
       // Respect caller's intent: if import path sets freezeImportedTimeline, keep it
       freezeImportedTimeline: (importedState.ui as any)?.freezeImportedTimeline ?? state.ui.freezeImportedTimeline,
+      // Clear calc warnings on import
+      calcWarning: null
     }
   };
 }
@@ -462,6 +466,41 @@ export function handleUpdateTaskBank(
         acc[assetType].push(task);
         return acc;
       }, {} as Record<string, Task[]>)
+    }
+  };
+}
+
+// ============================================
+// Safety & Fallback UI/system handlers
+// ============================================
+
+export function handleSetCalcWarning(
+  state: TimelineState,
+  action: Extract<TimelineAction, { type: ActionType.SET_CALC_WARNING }>
+): TimelineState {
+  const { message } = action.payload;
+  return {
+    ...state,
+    ui: {
+      ...state.ui,
+      calcWarning: message || null
+    }
+  };
+}
+
+export function handleSetLastGoodByAsset(
+  state: TimelineState,
+  action: Extract<TimelineAction, { type: ActionType.SET_LAST_GOOD_BY_ASSET }>
+): TimelineState {
+  const { assetId, tasks } = action.payload;
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      lastGoodByAsset: {
+        ...(state.tasks.lastGoodByAsset || {}),
+        [assetId]: tasks
+      }
     }
   };
 }

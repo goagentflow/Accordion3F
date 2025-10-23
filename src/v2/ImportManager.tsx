@@ -51,8 +51,8 @@ const ImportManager: React.FC = () => {
           isCustom: !!t.isCustom,
           dependencies: Array.isArray(t.dependencies) ? t.dependencies.map((d: any) => ({
             predecessorId: d.predecessorId,
-            type: 'FS' as const,
-            lag: d.lag
+            type: (d && (d.type === 'SS' || d.type === 'FF')) ? d.type : 'FS',
+            lag: Number(d.lag) || 0
           })) : []
         });
       });
@@ -70,7 +70,8 @@ const ImportManager: React.FC = () => {
           byAsset: {},
           instanceBase: baseByInstance,
           instanceDurations: {},
-          timeline: [],
+          // Preserve the dated timeline exactly as imported (freeze avoids rebuild)
+          timeline: (data.tasks as any[]) || [],
           custom: [],
           names: {},
           deps: {}
@@ -82,7 +83,7 @@ const ImportManager: React.FC = () => {
           bankHolidays: [],
           calculatedStartDates: {}
         },
-        ui: { freezeImportedTimeline: false, clientCampaignName: (data as any).clientCampaignName || '' } as any
+        ui: { freezeImportedTimeline: true, clientCampaignName: (data as any).clientCampaignName || '' } as any
       }));
 
       // Re-seed catalog after import so AssetSelector lists all assets

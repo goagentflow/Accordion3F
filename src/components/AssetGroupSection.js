@@ -20,7 +20,10 @@ const AssetGroupSection = ({
   getDropValidation,
   // Visual drag props
   dragMode,
-  moveDaysDelta
+  moveDaysDelta,
+  resolveTaskLabel,
+  onViewTask,
+  onRemoveSameDayLink
 }) => {
   return (
     <div className="relative" id={`asset-${group.key}`} data-asset-id={group.key}>
@@ -71,6 +74,9 @@ const AssetGroupSection = ({
           getDropValidation={getDropValidation}
           dragMode={dragMode}
           moveDaysDelta={moveDaysDelta}
+          resolveTaskLabel={resolveTaskLabel}
+          onViewTask={onViewTask}
+          onRemoveSameDayLink={onRemoveSameDayLink}
         />
       ))}
 

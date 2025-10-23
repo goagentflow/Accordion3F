@@ -7,11 +7,11 @@
  */
 
 import React, { useMemo } from 'react';
-import { showTaskOverlaps, showCriticalPath } from '../config/features';
+import { showTaskOverlaps, showCriticalPath, simpleModeEnabled } from '../config/features';
 
 interface TaskDependency {
   predecessorId: string;
-  type: 'FS';
+  type: 'FS' | 'SS' | 'FF';
   lag: number;
 }
 
@@ -25,6 +25,8 @@ interface TaskDependencyIndicatorProps {
   size?: 'small' | 'medium';
   showLabels?: boolean;
   predecessorNames?: Record<string, string>; // Map of predecessor IDs to names
+  resolveTaskLabel?: (id: string) => string; // Preferred label resolver
+  onViewTask?: (id: string) => void; // Jump/highlight predecessor
 }
 
 const TaskDependencyIndicator = React.memo<TaskDependencyIndicatorProps>(({
@@ -35,10 +37,13 @@ const TaskDependencyIndicator = React.memo<TaskDependencyIndicatorProps>(({
   className = '',
   size = 'medium',
   showLabels = true,
-  predecessorNames = {}
+  predecessorNames = {},
+  resolveTaskLabel,
+  onViewTask
 }) => {
   const canShowOverlaps = showTaskOverlaps();
   const canShowCriticalPath = showCriticalPath();
+  const isSimple = simpleModeEnabled();
 
   // Calculate indicator data
   const indicatorData = useMemo(() => {
@@ -56,10 +61,8 @@ const TaskDependencyIndicator = React.memo<TaskDependencyIndicatorProps>(({
     };
   }, [dependencies]);
 
-  // Don't render if features are disabled
-  if (!canShowOverlaps && !canShowCriticalPath) {
-    return null;
-  }
+  // In simple mode, we still show info-only card when dependencies exist
+  if (!canShowOverlaps && !canShowCriticalPath && !(isSimple && dependencies.length > 0)) return null;
 
   // Don't render if no indicators to show
   if (!indicatorData.hasDependencies && !isCritical && !canShowCriticalPath) {
@@ -99,8 +102,8 @@ const TaskDependencyIndicator = React.memo<TaskDependencyIndicatorProps>(({
         </div>
       )}
 
-      {/* Dependency Indicators */}
-      {canShowOverlaps && indicatorData.hasDependencies && (
+      {/* Dependency Indicators (hidden in simple mode) */}
+      {canShowOverlaps && indicatorData.hasDependencies && !isSimple && (
         <>
           {/* Overlap Indicator */}
           {indicatorData.hasOverlaps && (
@@ -134,12 +137,12 @@ const TaskDependencyIndicator = React.memo<TaskDependencyIndicatorProps>(({
         </>
       )}
 
-      {/* Detailed dependency tooltip on hover */}
-      {canShowOverlaps && indicatorData.hasDependencies && dependencies.length > 0 && (
+      {/* Detailed dependency tooltip on hover (always available in simple mode when deps exist) */}
+      {(isSimple || canShowOverlaps) && indicatorData.hasDependencies && dependencies.length > 0 && (
         <div className="group relative">
           <button
             type="button"
-            className="text-gray-400 hover:text-gray-600 p-1"
+            className="text-gray-400 hover:text-gray-600 p-1 transition-transform duration-150 motion-reduce:transform-none hover:scale-110"
             title="Show dependency details"
           >
             ℹ️
@@ -149,20 +152,91 @@ const TaskDependencyIndicator = React.memo<TaskDependencyIndicatorProps>(({
           <div className="absolute bottom-full left-0 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20">
             <div className="font-medium mb-2">{taskName} Dependencies:</div>
             {dependencies.map((dep, index) => {
-              const predecessorName = predecessorNames[dep.predecessorId] || `Task ${dep.predecessorId}`;
-              const overlapDays = Math.abs(dep.lag);
-              const isOverlap = dep.lag < 0;
-              
-              return (
-                <div key={index} className="text-xs mb-1 last:mb-0">
-                  {isOverlap ? (
-                    <span className="text-orange-300">
-                      ⚡ Starts {overlapDays}d before <strong>{predecessorName}</strong> finishes
-                    </span>
-                  ) : (
+              const label = resolveTaskLabel ? resolveTaskLabel(dep.predecessorId) : (predecessorNames[dep.predecessorId] || `Task ${dep.predecessorId}`);
+              const lag = Number(dep.lag) || 0;
+              let line: React.ReactNode = null;
+
+              if (simpleModeEnabled()) {
+                // Simple, user‑friendly semantics: this task follows the previous one
+                if ((dep.type === 'SS' || dep.type === 'FF') && lag === 0) {
+                  line = (
                     <span className="text-blue-300">
-                      🔗 Starts when <strong>{predecessorName}</strong> finishes
+                      ➜ Follows <strong>{label}</strong> on the same day
                     </span>
+                  );
+                } else if (lag > 0) {
+                  line = (
+                    <span className="text-blue-300">
+                      ➜ Follows <strong>{label}</strong> {lag === 1 ? 'the next working day' : `after ${lag} working days`}
+                    </span>
+                  );
+                } else if (lag < 0) {
+                  // Overlap case (uncommon in Simple Mode): still convey relation without jargon
+                  line = (
+                    <span className="text-orange-300">
+                      ➜ Overlaps <strong>{label}</strong> by {Math.abs(lag)} working day{Math.abs(lag) !== 1 ? 's' : ''}
+                    </span>
+                  );
+                } else {
+                  line = (
+                    <span className="text-blue-300">
+                      ➜ Follows <strong>{label}</strong>
+                    </span>
+                  );
+                }
+              } else {
+                // Full detail mode retains typed terminology
+                if (dep.type === 'FF') {
+                  line = (
+                    <span className="text-blue-300">
+                      🔗 Finishes {lag === 0 ? 'together with' : `${Math.abs(lag)}d ${lag > 0 ? 'after' : 'before'}`} <strong>{label}</strong>
+                    </span>
+                  );
+                } else if (dep.type === 'SS') {
+                  line = (
+                    <span className="text-blue-300">
+                      🔗 Starts {lag === 0 ? 'together with' : `${Math.abs(lag)}d ${lag > 0 ? 'after' : 'before'}`} <strong>{label}</strong>
+                    </span>
+                  );
+                } else {
+                  // FS
+                  if (lag < 0) {
+                    line = (
+                      <span className="text-orange-300">
+                        ⚡ Starts {Math.abs(lag)}d before <strong>{label}</strong> finishes
+                      </span>
+                    );
+                  } else if (lag === 0) {
+                    line = (
+                      <span className="text-blue-300">
+                        🔗 Starts when <strong>{label}</strong> finishes
+                      </span>
+                    );
+                  } else {
+                    line = (
+                      <span className="text-blue-300">
+                        🔗 Starts {lag}d after <strong>{label}</strong> finishes
+                      </span>
+                    );
+                  }
+                }
+              }
+
+              return (
+                <div key={index} className="text-xs mb-1 last:mb-0 flex items-center justify-between gap-2">
+                  {line}
+                  {onViewTask && (
+                    <button
+                      type="button"
+                      className="ml-2 text-blue-300 hover:text-white underline"
+                      onClick={(e) => { e.stopPropagation(); onViewTask(dep.predecessorId); }}
+                    >
+                      View
+                    </button>
+                  )}
+                  {/* Remove same-day link (SS/FF lag 0) inside tooltip for simple mode */}
+                  {isSimple && (dep.type === 'SS' || dep.type === 'FF') && lag === 0 && typeof (onViewTask as any) === 'function' && (
+                    <></>
                   )}
                 </div>
               );

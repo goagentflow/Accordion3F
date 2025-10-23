@@ -27,8 +27,8 @@ export interface Task {
   // NEW: Optional dependency tracking for DAG calculator (null/undefined for sequential tasks)
   dependencies?: Array<{
     predecessorId: string;    // Which task this depends on
-    type: 'FS';              // Start with Finish-Start only
-    lag: number;             // Negative = overlap days (e.g. -2 = overlap by 2 days)
+    type: 'FS' | 'SS' | 'FF'; // Dependency type: Finish-Start, Start-Start, Finish-Finish
+    lag: number;              // Working-day lag (negative = overlap)
   }>;
 }
 
@@ -64,7 +64,9 @@ export interface TasksState {
   custom: Task[];                // User-added custom tasks
   names: Record<string, string>; // taskId -> custom name
   // NEW: Explicit dependencies keyed by successor task ID
-  deps?: Record<string, Array<{ predecessorId: string; type: 'FS'; lag: number }>>;
+  deps?: Record<string, Array<{ predecessorId: string; type: 'FS' | 'SS' | 'FF'; lag: number }>>;
+  // NEW: Last known good timelines per asset (for graceful fallback)
+  lastGoodByAsset?: Record<string, TimelineTask[]>;
 }
 
 export interface DatesState {
@@ -85,6 +87,8 @@ export interface UIState {
   freezeImportedTimeline?: boolean;
   // Project identity field shown in UI and exported to Excel
   clientCampaignName?: string;
+  // CALC warning banner for graceful fallback (non-blocking)
+  calcWarning?: string | null;
 }
 
 export interface TimelineState {
@@ -120,6 +124,8 @@ export enum ActionType {
   ADD_DEPENDENCY = 'ADD_DEPENDENCY',
   REMOVE_DEPENDENCY = 'REMOVE_DEPENDENCY',
   UPDATE_DEPENDENCY = 'UPDATE_DEPENDENCY',
+  ADD_TYPED_DEPENDENCY = 'ADD_TYPED_DEPENDENCY',
+  UPDATE_TYPED_DEPENDENCY = 'UPDATE_TYPED_DEPENDENCY',
   CLEAR_ALL_DEPENDENCIES = 'CLEAR_ALL_DEPENDENCIES',
   RECALCULATE_WITH_DEPENDENCIES = 'RECALCULATE_WITH_DEPENDENCIES',
   
@@ -158,7 +164,11 @@ export enum ActionType {
   
   // NEW: Undo/redo actions  
   UNDO = 'UNDO',
-  REDO = 'REDO'
+  REDO = 'REDO',
+  
+  // NEW: Safety & Fallback UI/system actions
+  SET_CALC_WARNING = 'SET_CALC_WARNING',
+  SET_LAST_GOOD_BY_ASSET = 'SET_LAST_GOOD_BY_ASSET'
 }
 
 // ============================================
@@ -276,6 +286,16 @@ export interface RenameTaskAction {
     taskId: string;
     newName: string;
   };
+}
+
+export interface SetCalcWarningAction {
+  type: ActionType.SET_CALC_WARNING;
+  payload: { message: string | null };
+}
+
+export interface SetLastGoodByAssetAction {
+  type: ActionType.SET_LAST_GOOD_BY_ASSET;
+  payload: { assetId: string; tasks: TimelineTask[] };
 }
 
 export interface SetGlobalLiveDateAction {
@@ -419,6 +439,26 @@ export interface RecalculateWithDependenciesAction {
   payload?: never;
 }
 
+export interface AddTypedDependencyAction {
+  type: ActionType.ADD_TYPED_DEPENDENCY;
+  payload: {
+    predecessorId: string;
+    successorId: string;
+    depType: 'FS' | 'SS' | 'FF';
+    lag: number;
+  };
+}
+
+export interface UpdateTypedDependencyAction {
+  type: ActionType.UPDATE_TYPED_DEPENDENCY;
+  payload: {
+    predecessorId: string;
+    successorId: string;
+    depType: 'FS' | 'SS' | 'FF';
+    lag: number;
+  };
+}
+
 // NEW: Manipulation bug fix action payloads
 export interface DragTaskAction {
   type: ActionType.DRAG_TASK;
@@ -485,6 +525,10 @@ export type TimelineAction =
   | BulkAddDependenciesAction
   | BulkRemoveDependenciesAction
   | RecalculateWithDependenciesAction
+  | SetCalcWarningAction
+  | SetLastGoodByAssetAction
+  | AddTypedDependencyAction
+  | UpdateTypedDependencyAction
   | DragTaskAction
   | HydrateFromStorageAction
   | UndoAction

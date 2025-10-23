@@ -28,11 +28,15 @@ const GanttTaskRow = memo(({
   getDropValidation = () => ({ isValid: false }),
   // Visual drag props
   dragMode = null,
-  moveDaysDelta = 0
+  moveDaysDelta = 0,
+  resolveTaskLabel = null,
+  onViewTask = null,
+  onRemoveSameDayLink = null
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(task.name);
   const [showDeleteTip, setShowDeleteTip] = useState(false);
+  const [showUnlinkTip, setShowUnlinkTip] = useState(false);
 
   const handleNameClick = () => {
     setIsEditing(true);
@@ -120,7 +124,7 @@ const GanttTaskRow = memo(({
     !dropValidation.isValid;
 
   return (
-    <div className="flex" style={{ height: `${GANTT_CONFIG.ROW_HEIGHT}px` }}>
+    <div className="flex" style={{ height: `${GANTT_CONFIG.ROW_HEIGHT}px` }} data-task-id={task.id}>
       {/* Task name cell */}
       <div
         className={`border-b border-r border-gray-200 flex flex-col justify-center px-3 bg-white ${
@@ -172,7 +176,35 @@ const GanttTaskRow = memo(({
                 totalFloat={task.totalFloat}
                 size="small"
                 showLabels={false}
+                resolveTaskLabel={resolveTaskLabel || undefined}
+                onViewTask={onViewTask || undefined}
               />
+              {/* Unlink for same-day SS/FF(0) */}
+              {Array.isArray(task.dependencies) && task.dependencies.some(d => (d.type === 'SS' || d.type === 'FF') && Number(d.lag) === 0) && typeof onRemoveSameDayLink === 'function' && (
+                <span className="relative inline-flex items-center">
+                  <button
+                    className="text-gray-400 hover:text-red-600 p-1 transition-colors transition-transform duration-150 motion-reduce:transform-none hover:scale-110"
+                    aria-label="Remove same‑day link"
+                    onMouseEnter={() => setShowUnlinkTip(true)}
+                    onMouseLeave={() => setShowUnlinkTip(false)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const dep = task.dependencies.find(d => (d.type === 'SS' || d.type === 'FF') && Number(d.lag) === 0);
+                      if (dep) onRemoveSameDayLink(task.id, dep.predecessorId, dep.type);
+                    }}
+                  >
+                    ❌
+                  </button>
+                  {showUnlinkTip && (
+                    <div
+                      role="tooltip"
+                      className="absolute z-30 -top-8 left-0 whitespace-nowrap bg-red-600 text-white text-xs px-2 py-1 rounded shadow"
+                    >
+                      Remove same‑day link (unlink) — return to sequential order
+                    </div>
+                  )}
+                </span>
+              )}
               
               {/* Dependency drag handle */}
               {isDependencyDragEnabled && (
@@ -209,7 +241,7 @@ const GanttTaskRow = memo(({
                   onClick={handleDeleteClick}
                   onMouseEnter={() => setShowDeleteTip(true)}
                   onMouseLeave={() => setShowDeleteTip(false)}
-                  className="inline-flex items-center p-2 -m-1 text-gray-400 hover:text-red-600 focus:outline-none rounded"
+                  className="inline-flex items-center p-2 -m-1 text-gray-400 hover:text-red-600 focus:outline-none rounded transition-transform duration-150 motion-reduce:transform-none hover:scale-110"
                   aria-label="Delete task"
                 >
                   {/* Dustbin icon */}

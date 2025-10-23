@@ -18,8 +18,8 @@ import { sanitizeDependencies } from './dependencySanitizer';
 
 export interface TaskDependency {
   predecessorId: string;
-  type: 'FS';  // Start with Finish-Start only
-  lag: number; // Negative = overlap days (e.g., -2 = overlap by 2 days)
+  type: 'FS' | 'SS' | 'FF';  // Dependency type
+  lag: number; // Working-day lag (negative = overlap)
 }
 
 export interface TaskNode {

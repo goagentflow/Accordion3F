@@ -32,7 +32,10 @@ const GanttChart = ({
   // Optional dependency function for move mode (only available with new context system)
   addDependency = null,
   onExportExcel = null,
-  onDeleteTask = () => {}
+  onDeleteTask = () => {},
+  resolveTaskLabel = null,
+  onViewTask = null,
+  onRemoveSameDayLink = null
 }) => {
   // Drag state moved into hook (Golden Rule #2)
   const { isDragging, draggedTaskId, dragMode, moveDaysDelta, handleMouseDown } = useGanttDrag({
@@ -165,14 +168,26 @@ const GanttChart = ({
   );
 
   // Fallback values for drag-drop dependency functionality without context
-  const dragState = { isDragging: false, sourceTaskId: null, sourceTaskName: '' };
+  const dragState = {
+    isDragging: !!isDragging && dragMode === 'move',
+    sourceTaskId: draggedTaskId || null,
+    sourceTaskName: (tasks.find(t => t.id === draggedTaskId) || {}).name || ''
+  };
   const isDragDropEnabled = false;
   const handleTaskDragStart = useCallback(() => {}, []);
   const handleTaskDragEnd = useCallback(() => {}, []);
   const handleDependencyMouseMove = useCallback(() => {}, []);
   const handleDependencyMouseUp = useCallback(() => {}, []);
   const getDragLineCoordinates = useCallback(() => ({ x1: 0, y1: 0, x2: 0, y2: 0 }), []);
-  const getDropValidation = useCallback(() => ({ isValid: false, reason: '' }), []);
+  const getDropValidation = useCallback((targetTaskId) => {
+    if (!dragState.isDragging || !dragState.sourceTaskId) return { isValid: false, reason: '' };
+    if (targetTaskId === dragState.sourceTaskId) return { isValid: false, reason: 'Same task' };
+    const src = tasks.find(t => t.id === dragState.sourceTaskId);
+    const tgt = tasks.find(t => t.id === targetTaskId);
+    if (!src || !tgt) return { isValid: false, reason: '' };
+    if ((src.assetId || src.assetType) !== (tgt.assetId || tgt.assetType)) return { isValid: false, reason: 'Cross-asset' };
+    return { isValid: true, reason: '' };
+  }, [dragState.isDragging, dragState.sourceTaskId, tasks]);
 
   // Calculate task positions for dependency visuals
   const taskPositions = useMemo(() => {
@@ -351,6 +366,9 @@ const GanttChart = ({
                 getDropValidation={getDropValidation}
                 dragMode={dragMode}
                 moveDaysDelta={moveDaysDelta}
+                resolveTaskLabel={resolveTaskLabel}
+                onViewTask={onViewTask}
+                onRemoveSameDayLink={onRemoveSameDayLink}
               />
             ))}
           </div>
