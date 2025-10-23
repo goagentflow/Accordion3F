@@ -48,13 +48,21 @@ const ImportManager: React.FC = () => {
           owner: t.owner || 'm',
           assetId: t.assetId,
           assetType: t.assetType,
-          isCustom: !!t.isCustom,
-          dependencies: Array.isArray(t.dependencies) ? t.dependencies.map((d: any) => ({
-            predecessorId: d.predecessorId,
-            type: (d && (d.type === 'SS' || d.type === 'FF')) ? d.type : 'FS',
-            lag: Number(d.lag) || 0
-          })) : []
+          isCustom: !!t.isCustom
         });
+      });
+
+      // Build live deps map from imported per-task dependencies so the chart
+      // can rebuild from CSV + deps (editable import)
+      const depsMap: Record<string, Array<{ predecessorId: string; type: 'FS'|'SS'|'FF'; lag: number }>> = {};
+      ((data.tasks as any[]) || []).forEach((t: any) => {
+        if (!t || !Array.isArray(t.dependencies)) return;
+        const arr = t.dependencies.map((d: any) => ({
+          predecessorId: d.predecessorId,
+          type: (d && (d.type === 'SS' || d.type === 'FF')) ? d.type : 'FS',
+          lag: Number(d.lag) || 0
+        }));
+        if (arr.length > 0) depsMap[t.id] = arr as any;
       });
 
       dispatch(TimelineActions.importState({
@@ -70,11 +78,11 @@ const ImportManager: React.FC = () => {
           byAsset: {},
           instanceBase: baseByInstance,
           instanceDurations: {},
-          // Preserve the dated timeline exactly as imported (freeze avoids rebuild)
-          timeline: (data.tasks as any[]) || [],
+          // Editable import: allow Orchestrator to rebuild from CSV + deps
+          timeline: [],
           custom: [],
           names: {},
-          deps: {}
+          deps: depsMap
         },
         dates: {
           globalLiveDate: (data.globalLiveDate as string) || '',
@@ -83,7 +91,7 @@ const ImportManager: React.FC = () => {
           bankHolidays: [],
           calculatedStartDates: {}
         },
-        ui: { freezeImportedTimeline: true, clientCampaignName: (data as any).clientCampaignName || '' } as any
+        ui: { freezeImportedTimeline: false, clientCampaignName: (data as any).clientCampaignName || '' } as any
       }));
 
       // Re-seed catalog after import so AssetSelector lists all assets
