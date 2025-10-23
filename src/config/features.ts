@@ -40,8 +40,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
   // Critical Path Visualization - OFF by default
   SHOW_CRITICAL_PATH: false,
   
-  // Dependency Management UI - OFF by default (drag-to-move provides UI)
-  ENABLE_DEPENDENCY_UI: false,
+  // Dependency Management UI - ON by default (SS/FF same-day chooser for timeline compression)
+  ENABLE_DEPENDENCY_UI: true,
   
   // Debug Mode - ON in development only
   DEBUG_TIMELINE_CALCULATIONS: process.env.NODE_ENV === 'development',
